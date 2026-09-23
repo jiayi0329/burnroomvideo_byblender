@@ -1,0 +1,25 @@
+services:
+  app-server:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - minio-oss
+    volumes:
+      # 挂载本地代码目录，方便你改代码时热更新
+      - .:/app
+      
+  minio-oss:
+    image: quay.io/minio/minio:latest
+    ports:
+      - "9000:9000"   # API 接口端口 (代码调用)
+      - "9001:9001"   # Web 管理后台端口 (你用浏览器看)
+    environment:
+      MINIO_ROOT_USER: admin_blender
+      MINIO_ROOT_PASSWORD: Password123!
+    command: server /data --console-address ":9001"
+    volumes:
+      # 将云端数据映射到本机的 minio_data 文件夹，保证重启不丢
+      - ./minio_data:/data

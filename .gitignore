@@ -1,0 +1,13 @@
+# 敏感环境配置
+.env
+minio_data/
+
+# 缓存与编译文件
+__pycache__/
+*.pyc
+
+# 巨大的模型与缓存数据
+*.obj
+*.jpg
+*.mtl
+/data/
