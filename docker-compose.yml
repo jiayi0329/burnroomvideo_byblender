@@ -5,6 +5,9 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      # Windows 挂载目录下强制轮询文件变化，保证热更新生效
+      - WATCHFILES_FORCE_POLLING=true
     depends_on:
       - minio-oss
     volumes:

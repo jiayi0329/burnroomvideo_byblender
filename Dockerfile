@@ -26,10 +26,10 @@ ENV PATH="/usr/local/blender:${PATH}"
 # 3. 配置 Python 环境与应用代码
 WORKDIR /app
 COPY requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/ --default-timeout=100
 
 # 拷贝项目所有文件到容器内
 COPY . .
 
 # 启动 FastAPI 后端
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "/app/app"]
