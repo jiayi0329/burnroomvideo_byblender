@@ -3,11 +3,17 @@ import os
 import requests
 import urllib.request
 import json  # 新增了 json 库用来保存文件
+from pathlib import Path
+
+from app.F6_detect import find_ignition_point
+from app.F7_spread import SpreadTimeline, bfs_spread, load_adjacency
 
 app = FastAPI(title="火灾蔓延视频生成系统 API")
 
 BASE_URL = "https://api.4dkankan.com"
 APP_KEY = os.getenv("DK_APPKEY")
+
+DATA_ROOT = Path("/app/data")  # 场景资产根目录 (与下载接口保存路径一致)
 
 HEADERS = {
     "Content-Type": "application/json",
@@ -77,3 +83,42 @@ def download_scene_files(scene_code: str):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"下载过程中发生错误: {str(e)}")
+
+
+@app.post("/api/generate_timeline/{scene_code}")
+def generate_timeline(scene_code: str) -> SpreadTimeline:
+    """串联 F6 + F7：识别全局起火点，生成蔓延时序并落盘 timeline.json。"""
+
+    # 1. 校验场景目录与 points.json 是否存在
+    scene_dir = DATA_ROOT / scene_code
+    if not scene_dir.is_dir():
+        raise HTTPException(status_code=404, detail=f"场景目录不存在: {scene_code}")
+    points_path = scene_dir / "points.json"
+    if not points_path.is_file():
+        raise HTTPException(status_code=404, detail=f"points.json 不存在: {scene_code}")
+
+    # 2. 解析拓扑，筛选有对应全景图 (device.jpg) 的合法点位
+    adjacency = load_adjacency(points_path)
+    valid_points = sorted(
+        point_id
+        for point_id in adjacency
+        if (scene_dir / f"{point_id}.jpg").is_file()
+    )
+    if not valid_points:
+        raise HTTPException(
+            status_code=404, detail=f"场景 {scene_code} 内没有可用的点位图片"
+        )
+
+    # 3. F6: 全局起火点识别
+    f6_result = find_ignition_point(scene_dir, valid_points)
+
+    # 4. F7: 以起火点为根生成蔓延时序
+    timeline = bfs_spread(adjacency, f6_result.ignition_point)
+
+    # 5. 落盘 timeline.json
+    (scene_dir / "timeline.json").write_text(
+        timeline.model_dump_json(indent=2), encoding="utf-8"
+    )
+
+    # 6. 返回完整时序数据模型
+    return timeline
