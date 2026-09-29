@@ -1,63 +1,62 @@
-"""F6 本地验证脚本：对侧室 A/B 的测试全景图跑起火点识别。
+"""F6 单元测试：纯函数逻辑 + 真实场景回归 + 边界用例。
 
-用法:
-    本机 (需已安装 opencv-python-headless):
-        python test/test_f6.py
-    容器 (推荐, 与生产环境一致):
-        docker compose exec app-server python3 test/test_f6.py
+运行 (容器内):
+    docker exec burnroomvideo_byblender-app-server-1 python3 -m unittest test.test_f6 -v
 """
-import argparse
 import sys
+import unittest
 from pathlib import Path
 
+import numpy as np
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-# 将项目根目录加入 sys.path，保证 `python test/test_f6.py` 直接运行时能 import app
 sys.path.insert(0, str(PROJECT_ROOT))
 
-try:
-    from app.F6_detect import find_ignition_point
-except ModuleNotFoundError as exc:
-    # 仅当缺失的是 cv2 本身时才提示；其他导入错误原样抛出
-    if exc.name == "cv2":
-        raise SystemExit(
-            "缺少依赖 (cv2)。请先安装 opencv-python-headless，"
-            "或直接在容器内运行:\n"
-            "    docker compose exec app-server python3 test/test_f6.py"
-        ) from exc
-    raise
+from app.F6_detect import calc_burn_ratio, find_ignition_point, load_pano
 
-DEFAULT_DATA_DIR = PROJECT_ROOT / "data" / "KK-EEz16cmU14"
-
-# 最小 Scope: 侧室 A 与 侧室 B 的点位 (全景图文件名即点位 ID)
-SIDE_ROOMS: dict[str, list[int]] = {
-    "侧室A": [32, 34, 36, 38],
-    "侧室B": [40, 42],
-}
+DATA_DIR = PROJECT_ROOT / "data" / "KK-EEz16cmU14"
 
 
-def run_room(data_dir: Path, room_name: str, point_ids: list[int]) -> None:
-    """对单个房间跑 F6，打印每个点位占比与最终起火点。"""
-    result = find_ignition_point(data_dir, point_ids)
-    print(f"\n=== {room_name} ===")
-    for stat in result.stats:
-        bar = "#" * round(stat.burn_ratio * 100)
-        print(f"  点位 {stat.point_id}: 烧痕占比 {stat.burn_ratio * 100:.2f}%  {bar}")
-    print(f"  🔥 起火点: {result.ignition_point} (占比 {result.max_ratio * 100:.2f}%)")
+class TestBurnRatio(unittest.TestCase):
+    """合成图像：固定输入 → 固定期望输出。"""
+
+    def test_all_black_is_burn(self) -> None:
+        image = np.zeros((16, 16, 3), dtype=np.uint8)  # 纯黑 → 全部炭化
+        self.assertEqual(calc_burn_ratio(image), 1.0)
+
+    def test_all_white_is_clean(self) -> None:
+        image = np.full((16, 16, 3), 255, dtype=np.uint8)  # 纯白 → 无烧痕
+        self.assertEqual(calc_burn_ratio(image), 0.0)
+
+    def test_mid_gray_is_clean(self) -> None:
+        image = np.full((16, 16, 3), 128, dtype=np.uint8)  # 中性灰: 亮度与饱和度均不达标
+        self.assertEqual(calc_burn_ratio(image), 0.0)
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="F6 起火点识别本地验证")
-    parser.add_argument(
-        "--data-dir", type=Path, default=DEFAULT_DATA_DIR, help="场景数据目录"
-    )
-    args = parser.parse_args()
+@unittest.skipUnless(DATA_DIR.is_dir(), "缺少场景数据 data/KK-EEz16cmU14")
+class TestFindIgnition(unittest.TestCase):
+    """真实场景回归：侧室 A/B 的固定预期起火点。"""
 
-    if not args.data_dir.is_dir():
-        raise SystemExit(f"数据目录不存在: {args.data_dir}")
+    def test_side_a_ignition_is_38(self) -> None:
+        result = find_ignition_point(DATA_DIR, [32, 34, 36, 38])
+        self.assertEqual(result.ignition_point, 38)
 
-    for room_name, point_ids in SIDE_ROOMS.items():
-        run_room(args.data_dir, room_name, point_ids)
+    def test_side_b_ignition_is_40(self) -> None:
+        result = find_ignition_point(DATA_DIR, [40, 42])
+        self.assertEqual(result.ignition_point, 40)
+
+
+class TestEdgeCases(unittest.TestCase):
+    """边界用例。"""
+
+    def test_empty_point_list_raises(self) -> None:
+        with self.assertRaises(ValueError):
+            find_ignition_point(DATA_DIR, [])
+
+    def test_missing_image_raises(self) -> None:
+        with self.assertRaises(FileNotFoundError):
+            load_pano(DATA_DIR, 99999)
 
 
 if __name__ == "__main__":
-    main()
+    unittest.main()
