@@ -1,13 +1,23 @@
 # 敏感环境配置
 .env
+.env.*
 minio_data/
 
 # 缓存与编译文件
 __pycache__/
 *.pyc
+.DS_Store
 
-# 巨大的模型与缓存数据
+# 巨大的模型、缓存数据与产物
 *.obj
 *.jpg
 *.mtl
+*.mp4
 /data/
+
+# 部署打包产物目录 (为自动构建脚本准备)
+release/out/
+*.tar
+*.tar.gz
+*.tgz
+*.zip
