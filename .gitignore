@@ -21,3 +21,5 @@ release/out/
 *.tar.gz
 *.tgz
 *.zip
+
+release/prod.env
