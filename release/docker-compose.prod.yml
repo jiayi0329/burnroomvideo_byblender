@@ -20,4 +20,4 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     command: server /data --console-address ":9001"
     volumes:
-      - /data/minio_data:/data  # 生产环境建议挂载到服务器的绝对路径下
+      - /data/zhaojy/burnroom-data/minio:/data  # 生产环境建议挂载到服务器的绝对路径下
