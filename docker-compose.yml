@@ -17,7 +17,7 @@ services:
       
   minio-oss:
     # 替换为国内代理镜像源，解决服务器拉取失败问题
-    image: docker.m.daocloud.io/minio/minio:latest
+    image: docker.1panel.live/minio/minio:latest
     restart: unless-stopped
     ports:
       - "9000:9000"   # API 接口端口 (代码调用)

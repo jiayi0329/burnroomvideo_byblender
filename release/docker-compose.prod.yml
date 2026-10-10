@@ -10,7 +10,7 @@ services:
       - minio-oss
       
   minio-oss:
-    image: docker.m.daocloud.io/minio/minio:latest
+    image: docker.1panel.live/minio/minio:latest
     restart: always
     ports:
       - "9000:9000"
