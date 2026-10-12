@@ -5,6 +5,9 @@ import urllib.request
 import json  # 新增了 json 库用来保存文件
 from pathlib import Path
 
+import subprocess
+from datetime import datetime, timezone
+
 from app.F6_detect import find_ignition_point
 from app.F7_spread import SpreadTimeline, bfs_spread, load_adjacency
 
@@ -14,6 +17,10 @@ BASE_URL = "https://api.4dkankan.com"
 APP_KEY = os.getenv("DK_APPKEY")
 
 DATA_ROOT = Path("/app/data")  # 场景资产根目录 (与下载接口保存路径一致)
+
+RENDER_STATUS_FILENAME = "render_status.json"
+RENDER_SCRIPT_PATH = Path(__file__).resolve().parent / "F8_blender_render.py"
+BLENDER_BIN = "blender"
 
 HEADERS = {
     "Content-Type": "application/json",
@@ -122,3 +129,96 @@ def generate_timeline(scene_code: str) -> SpreadTimeline:
 
     # 6. 返回完整时序数据模型
     return timeline
+
+
+def _now_iso() -> str:
+    """当前 UTC 时间 ISO 字符串 (任务状态时间戳)。"""
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _write_render_status(scene_dir: Path, **fields: object) -> None:
+    """把渲染任务状态写入 data/{scene}/render_status.json (无状态设计: JSON 文件维系)。"""
+    (scene_dir / RENDER_STATUS_FILENAME).write_text(
+        json.dumps(fields, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
+def _read_render_status(scene_dir: Path) -> dict | None:
+    """读取渲染任务状态, 无记录时返回 None。"""
+    status_path = scene_dir / RENDER_STATUS_FILENAME
+    if not status_path.is_file():
+        return None
+    return json.loads(status_path.read_text(encoding="utf-8"))
+
+
+@app.post("/api/render/{scene_code}")
+def start_render(scene_code: str) -> dict:
+    """F8 渲染接口: 以独立子进程启动 Blender, 立即返回, 状态写入 render_status.json。
+
+    铁律: 绝不 import bpy, Blender 通过 subprocess 完全独立运行。
+    """
+    scene_dir = DATA_ROOT / scene_code
+    if not scene_dir.is_dir():
+        raise HTTPException(status_code=404, detail=f"场景目录不存在: {scene_code}")
+    if not (scene_dir / "timeline.json").is_file():
+        raise HTTPException(
+            status_code=404,
+            detail=f"timeline.json 不存在，请先调用 POST /api/generate_timeline/{scene_code}",
+        )
+
+    # 幂等保护: 已有渲染在进行时直接返回当前状态
+    existing = _read_render_status(scene_dir)
+    if existing and existing.get("status") == "running":
+        return {"scene_code": scene_code, **existing}
+
+    # 启动 Blender 子进程 (不等待), 输出重定向到 render.log
+    cmd = [
+        BLENDER_BIN, "--background",
+        "--python", str(RENDER_SCRIPT_PATH),
+        "--", "--scene", scene_code,
+    ]
+    log_file = (scene_dir / "render.log").open("w", encoding="utf-8")
+    proc = subprocess.Popen(
+        cmd,
+        cwd=str(RENDER_SCRIPT_PATH.parent.parent),
+        stdout=log_file,
+        stderr=subprocess.STDOUT,
+        env={**os.environ, "LIBGL_ALWAYS_SOFTWARE": "1"},  # 无 GPU 环境下强制软件渲染
+    )
+    log_file.close()  # 子进程持有 fd 副本, 关闭本进程引用不影响写日志
+
+    _write_render_status(
+        scene_dir,
+        scene_code=scene_code,
+        status="running",
+        pid=proc.pid,
+        output="output.mp4",
+        started_at=_now_iso(),
+    )
+    return {
+        "scene_code": scene_code,
+        "status": "running",
+        "pid": proc.pid,
+        "status_endpoint": f"/api/render/{scene_code}/status",
+    }
+
+
+@app.get("/api/render/{scene_code}/status")
+def get_render_status(scene_code: str) -> dict:
+    """查询渲染进度: 依据子进程存活与 output.mp4 是否存在自动收敛终态。"""
+    scene_dir = DATA_ROOT / scene_code
+    status = _read_render_status(scene_dir)
+    if status is None:
+        raise HTTPException(status_code=404, detail=f"场景 {scene_code} 尚未发起渲染")
+    if status.get("status") == "running":
+        pid = status.get("pid")
+        if pid is None or not Path(f"/proc/{pid}").is_dir():
+            output_path = scene_dir / status.get("output", "output.mp4")
+            final_status = "done" if output_path.is_file() else "failed"
+            status = {
+                **status,
+                "status": final_status,
+                "finished_at": _now_iso(),
+            }
+            _write_render_status(scene_dir, **status)
+    return status
