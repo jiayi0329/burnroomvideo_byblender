@@ -9,6 +9,10 @@ services:
     environment:
       # Windows 挂载目录下强制轮询文件变化，保证热更新生效
       - WATCHFILES_FORCE_POLLING=true
+      # MinIO 数据流转连接配置 (凭证与 minio-oss 服务共用项目 .env)
+      - MINIO_ENDPOINT=minio-oss:9000
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-admin_blender}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
     depends_on:
       - minio-oss
     volumes:

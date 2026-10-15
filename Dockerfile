@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
     python3.11 python3-pip python3.11-venv \
     ffmpeg wget xz-utils \
     libgl1 libxi6 libxxf86vm1 libxfixes3 libxrender1 \
+    libsm6 libice6 libegl1 nvidia-utils-535 \
     && rm -rf /var/lib/apt/lists/*
 
 # 2. 下载并安装 Blender 4.2 LTS

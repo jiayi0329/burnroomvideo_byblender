@@ -42,10 +42,10 @@ def clear_scene() -> None:
 def import_mesh(mesh_path: Path) -> None:
     """导入 mesh.obj (保持原始 Z-up 坐标系, 与 points.json 一致)。"""
     if not mesh_path.is_file():
-        print(f"[警告] 未找到网格: {mesh_path}, 跳过 (仅渲染红球)")
+        print(f"[警告] 未找到网格: {mesh_path}, 跳过 (仅渲染红球)", flush=True)
         return
     bpy.ops.wm.obj_import(filepath=str(mesh_path), up_axis="Z", forward_axis="Y")
-    print(f"[F8] 网格已导入: {mesh_path}")
+    print(f"[F8] 网格已导入: {mesh_path}", flush=True)
 
 
 def build_point_map(points_path: Path) -> dict[int, tuple[float, float, float]]:
@@ -95,7 +95,7 @@ def spawn_fire_balls(
     for event in events:
         point_id = int(event["point"])
         if point_id not in point_map:
-            print(f"[警告] 点位 {point_id} 在 points.json 中无坐标, 跳过")
+            print(f"[警告] 点位 {point_id} 在 points.json 中无坐标, 跳过", flush=True)
             continue
         x, y, z = point_map[point_id]
         bpy.ops.mesh.primitive_uv_sphere_add(
@@ -179,6 +179,18 @@ def setup_render(output_path: Path, frame_end: int) -> None:
     scene.render.filepath = str(output_path)
 
 
+def _register_frame_progress(total_frames: int) -> None:
+    """注册逐帧渲染进度回调: 每帧渲染完成打印进度到 stdout (被外部日志系统捕获)。"""
+    def _on_frame_done(*args: object) -> None:
+        frame = bpy.context.scene.frame_current
+        print(
+            f"[F8] 帧 {frame}/{total_frames} ({frame / total_frames * 100:.1f}%)",
+            flush=True,
+        )
+
+    bpy.app.handlers.render_post.append(_on_frame_done)
+
+
 def main() -> None:
     args = parse_args()
     scene_dir = PROJECT_ROOT / "data" / args.scene
@@ -201,10 +213,17 @@ def main() -> None:
     # 最后一个事件后多渲染 1 秒, 便于观察最终蔓延状态
     frame_end = max(int(e["time"]) for e in events) * FPS + FPS
     setup_render(output_path, frame_end)
+    _register_frame_progress(frame_end)
 
-    print(f"[F8] 开始渲染: {len(events)} 个事件, 共 {frame_end} 帧 → {output_path}")
+    scene = bpy.context.scene
+    print(
+        f"[F8] 渲染配置: engine=Eevee(EEVEE_NEXT) 分辨率={scene.render.resolution_x}x{scene.render.resolution_y} "
+        f"fps={FPS} 帧范围=1-{frame_end} 事件数={len(events)} 输出={output_path}",
+        flush=True,
+    )
     bpy.ops.render.render(animation=True)
-    print(f"[F8] 渲染完成: {output_path}")
+    output_size = output_path.stat().st_size / (1024 * 1024)
+    print(f"[F8] 渲染完成: {output_path} ({output_size:.2f} MB)", flush=True)
 
 
 if __name__ == "__main__":

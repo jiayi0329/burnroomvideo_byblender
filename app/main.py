@@ -3,10 +3,24 @@ import os
 import requests
 import urllib.request
 import json  # 新增了 json 库用来保存文件
+import subprocess
+import threading
+import traceback
 from pathlib import Path
 
 from app.F6_detect import find_ignition_point
 from app.F7_spread import SpreadTimeline, bfs_spread, load_adjacency
+from app.observability import (
+    append_log,
+    now_iso,
+    read_render_status,
+    start_gpu_sampler,
+    verify_output,
+    write_event,
+    write_failure,
+    write_render_status,
+)
+from app.s3_io import download_scene_assets, upload_output
 
 app = FastAPI(title="火灾蔓延视频生成系统 API")
 
@@ -14,6 +28,9 @@ BASE_URL = "https://api.4dkankan.com"
 APP_KEY = os.getenv("DK_APPKEY")
 
 DATA_ROOT = Path("/app/data")  # 场景资产根目录 (与下载接口保存路径一致)
+
+RENDER_SCRIPT_PATH = Path(__file__).resolve().parent / "F8_blender_render.py"
+BLENDER_BIN = "blender"
 
 HEADERS = {
     "Content-Type": "application/json",
@@ -122,3 +139,142 @@ def generate_timeline(scene_code: str) -> SpreadTimeline:
 
     # 6. 返回完整时序数据模型
     return timeline
+
+
+@app.post("/api/render/{scene_code}")
+def start_render(scene_code: str) -> dict:
+    """F8 渲染接口: 拉取资产 -> 启动 Blender 子进程 -> 后台守护线程完成验证与上传。
+
+    铁律: 绝不 import bpy, Blender 通过 subprocess 完全独立运行。
+    """
+    scene_dir = DATA_ROOT / scene_code
+    if not scene_dir.is_dir():
+        raise HTTPException(status_code=404, detail=f"场景目录不存在: {scene_code}")
+
+    # 幂等保护: 已有渲染在进行时直接返回当前状态
+    existing = read_render_status(scene_dir)
+    if existing and existing.get("status") == "running":
+        return {"scene_code": scene_code, **existing}
+
+    # ---- 前期准备: 从 MinIO 补齐依赖资产 (timeline.json 等) ----
+    write_event(scene_dir, "prepare", "asset_download_start")
+    try:
+        summary = download_scene_assets(scene_code, scene_dir)
+        write_event(
+            scene_dir, "prepare", "asset_download_done",
+            detail=f"拉取 {summary['pulled']} 个, 跳过 {summary['skipped']} 个, 失败 {summary['failed']} 个",
+        )
+    except Exception as exc:  # MinIO 不可用时仅警告, 本地资产齐全仍可渲染
+        append_log(scene_dir, f"[prepare/警告] MinIO 资产下载失败: {exc}")
+    if not (scene_dir / "timeline.json").is_file():
+        raise HTTPException(
+            status_code=404,
+            detail=f"timeline.json 不存在，请先调用 POST /api/generate_timeline/{scene_code}",
+        )
+
+    # ---- 实时进程: 启动 Blender 子进程 (不等待) ----
+    cmd = [
+        BLENDER_BIN, "--background",
+        "--python", str(RENDER_SCRIPT_PATH),
+        "--", "--scene", scene_code,
+    ]
+    log_file = (scene_dir / "render.log").open("w", encoding="utf-8")
+    proc = subprocess.Popen(
+        cmd,
+        cwd=str(RENDER_SCRIPT_PATH.parent.parent),
+        stdout=log_file,
+        stderr=subprocess.STDOUT,
+        env={**os.environ, "LIBGL_ALWAYS_SOFTWARE": "1"},  # 无 GPU 环境下强制软件渲染
+    )
+    log_file.close()  # 子进程持有 fd 副本, 关闭本进程引用不影响写日志
+    write_event(scene_dir, "process", "blender_started", detail=f"pid={proc.pid}")
+
+    write_render_status(
+        scene_dir,
+        scene_code=scene_code,
+        status="running",
+        pid=proc.pid,
+        output="output.mp4",
+        started_at=now_iso(),
+    )
+
+    # ---- 后台守护: GPU 指标采样线程 + 结果验证与上传线程 ----
+    start_gpu_sampler(scene_dir, is_running=lambda: proc.poll() is None)
+    threading.Thread(
+        target=_watch_render,
+        args=(proc, scene_dir, scene_code),
+        name=f"render-watcher-{scene_code}",
+        daemon=True,
+    ).start()
+
+    return {
+        "scene_code": scene_code,
+        "status": "running",
+        "pid": proc.pid,
+        "status_endpoint": f"/api/render/{scene_code}/status",
+    }
+
+
+def _watch_render(proc: subprocess.Popen[bytes], scene_dir: Path, scene_code: str) -> None:
+    """守护线程: 等待 Blender 退出 -> 验证产物 -> 上传 MinIO -> 收敛任务状态。"""
+    try:
+        return_code = proc.wait()
+        output_path = verify_output(scene_dir)
+        if return_code == 0 and output_path is not None:
+            size_mb = output_path.stat().st_size / (1024 * 1024)
+            write_event(
+                scene_dir, "verify", "output_ok",
+                detail=f"output.mp4 大小 {size_mb:.2f} MB",
+            )
+            output_object: str | None = None
+            try:
+                output_object = upload_output(scene_code, output_path)
+                write_event(
+                    scene_dir, "upload", "output_uploaded",
+                    detail=f"MinIO 对象: {output_object}",
+                )
+            except Exception as exc:
+                append_log(scene_dir, f"[upload/警告] 产物上传 MinIO 失败: {exc}")
+            write_render_status(
+                scene_dir,
+                scene_code=scene_code,
+                status="done",
+                pid=proc.pid,
+                output="output.mp4",
+                output_size_bytes=output_path.stat().st_size,
+                output_object=output_object,
+                finished_at=now_iso(),
+            )
+        else:
+            summary = f"Blender 退出码 {return_code}, output.mp4 {'存在' if output_path else '不存在'}"
+            write_failure(scene_dir, summary)
+            write_render_status(
+                scene_dir,
+                scene_code=scene_code,
+                status="failed",
+                pid=proc.pid,
+                failure=summary,
+                finished_at=now_iso(),
+            )
+    except Exception:
+        write_failure(scene_dir, f"守护线程异常: {traceback.format_exc()}")
+        write_render_status(
+            scene_dir, scene_code=scene_code, status="failed", finished_at=now_iso()
+        )
+
+
+@app.get("/api/render/{scene_code}/status")
+def get_render_status(scene_code: str) -> dict:
+    """查询渲染进度快照 (守护线程自动收敛终态, 此处兜底进程意外消失的情况)。"""
+    scene_dir = DATA_ROOT / scene_code
+    status = read_render_status(scene_dir)
+    if status is None:
+        raise HTTPException(status_code=404, detail=f"场景 {scene_code} 尚未发起渲染")
+    if status.get("status") == "running":
+        pid = status.get("pid")
+        if pid is None or not Path(f"/proc/{pid}").is_dir():
+            output_path = verify_output(scene_dir)
+            final_status = "done" if output_path is not None else "failed"
+            status = {**status, "status": final_status, "finished_at": now_iso()}
+            write_render_status(scene_dir, **status)
+    return status
