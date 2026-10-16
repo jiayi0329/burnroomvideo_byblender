@@ -2,12 +2,19 @@ services:
   app-server:
     image: burnroom-app:latest  # 直接使用打包好的镜像，不再现场 build
     restart: always
+    gpus: all                   # 使用宿主机 NVIDIA GPU (需已装 nvidia-container-toolkit)
     ports:
       - "8000:8000"
     env_file:
-      - prod.env                # 引用生产环境的专属密码文件
+      - prod.env                # 引用生产环境的专属密码文件 (含 MINIO_ROOT_USER/PASSWORD)
+    environment:
+      # MinIO 数据流转连接配置 (凭证由 prod.env 注入容器)
+      - MINIO_ENDPOINT=minio-oss:9000
     depends_on:
       - minio-oss
+    volumes:
+      # 场景资产与渲染产物落服务器独立数据盘, 容器重建不丢
+      - /data/zhaojy/burnroom-data/app-data:/app/data
       
   minio-oss:
     image: docker.1panel.live/minio/minio:latest
