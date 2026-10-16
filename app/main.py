@@ -184,7 +184,6 @@ def start_render(scene_code: str) -> dict:
         cwd=str(RENDER_SCRIPT_PATH.parent.parent),
         stdout=log_file,
         stderr=subprocess.STDOUT,
-        env={**os.environ, "LIBGL_ALWAYS_SOFTWARE": "1"},  # 无 GPU 环境下强制软件渲染
     )
     log_file.close()  # 子进程持有 fd 副本, 关闭本进程引用不影响写日志
     write_event(scene_dir, "process", "blender_started", detail=f"pid={proc.pid}")
