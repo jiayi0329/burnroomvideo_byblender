@@ -172,6 +172,12 @@ def start_render(scene_code: str) -> dict:
             detail=f"timeline.json 不存在，请先调用 POST /api/generate_timeline/{scene_code}",
         )
 
+    # 覆盖机制: 启动渲染前清除旧产物, 防止新渲染失败时误判为旧视频成功
+    old_output = scene_dir / "output.mp4"
+    if old_output.exists():
+        old_output.unlink()
+        write_event(scene_dir, "prepare", "old_output_removed", detail="已清除上一轮的 output.mp4")
+
     # ---- 实时进程: 启动 Blender 子进程 (不等待) ----
     cmd = [
         BLENDER_BIN, "--background",

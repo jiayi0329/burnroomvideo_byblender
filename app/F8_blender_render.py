@@ -261,6 +261,11 @@ def main() -> None:
     timeline = load_timeline(timeline_path)
     events: list[dict] = timeline["spread_events"]
 
+    # 覆盖机制: 强制清除旧产物, 保证每次生成的都是最新渲染的视频
+    if output_path.exists():
+        output_path.unlink()
+        print(f"[F8] 已删除旧产物: {output_path}", flush=True)
+
     clear_scene()
     import_mesh(scene_dir / "mesh.obj")
     bounds_min, bounds_max = compute_scene_bounds(point_map)
