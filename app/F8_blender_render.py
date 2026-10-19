@@ -1,22 +1,23 @@
-"""F8 渲染层阶段二：真实场景渲染框架 (GPU 服务器版)。
+"""F8 渲染层阶段三：鲁棒场景渲染 (防瞎版)。
 
 ⚠️ 仅供 Blender 内部 Python 以独立子进程方式执行，绝对禁止在常规后端代码中 import bpy。
 
 运行方式 (容器内):
     blender --background --python app/F8_blender_render.py -- --scene KK-EEz16cmU14
 
-本阶段实现:
-  1. 明亮光照: 太阳光 (开阴影) + 亮色世界环境, 确保模型清晰可见
-  2. 智能机位: 依据网格包围盒自动计算 45° 俯角透视机位并 LookAt 场景中心
-  3. 蔓延动画: 每个火焰事件独立材质 + 点光源, Emission/能量/缩放三路关键帧 1 秒渐入,
-     火焰燃起的同时照亮房间, 实现基于 timeline.json 的真实动态蔓延
+防瞎策略 (本阶段核心):
+  1. 模型归一化: 导入后整体平移, 几何中心强制对齐世界原点, 打印实际尺寸
+  2. 安全机位: 相机置于斜上方 3 倍最大尺寸处, 用 TRACK_TO 约束死盯原点 (零手算角度)
+  3. 暴力提亮: 世界背景纯白 + 太阳光 (开阴影), 模型绝不可能一片黑/灰
+  4. 强制激活: 显式设置 scene.camera 并打印确认
 
-坐标系说明: points.json 与 mesh.obj 均为 Z-up (z 为高度方向),
-因此 OBJ 导入不做轴转换, 球体直接使用点位 translation 坐标。
+蔓延动画: 按 timeline.json 事件生成火焰球体 + 点光源,
+Emission/能量/缩放三路关键帧 1 秒渐入, 火光燃起同时照亮房间。
+
+坐标系: points.json 与 mesh.obj 均为 Z-up; 模型居中偏移会同步应用到火点坐标。
 """
 import argparse
 import json
-import math
 import sys
 from pathlib import Path
 
@@ -24,9 +25,10 @@ import bpy
 from mathutils import Vector
 
 FPS = 24
-FIRE_RADIUS = 0.45          # 火焰球体半径 (米)
-FIRE_EMISSION_STRENGTH = 12.0   # 火焰材质发光强度
-FIRE_GLOW_ENERGY = 400.0    # 火焰点光源能量 (瓦)
+FIRE_RADIUS = 0.45            # 火焰球体半径 (米)
+FIRE_EMISSION_STRENGTH = 12.0  # 火焰材质发光强度
+FIRE_GLOW_ENERGY = 400.0      # 火焰点光源能量 (瓦)
+CAMERA_DISTANCE_FACTOR = 3.0  # 相机距离 = 模型最大尺寸 * 该系数 (安全远点)
 DEFAULT_SCENE = "KK-EEz16cmU14"
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -76,14 +78,52 @@ def load_timeline(timeline_path: Path) -> dict:
     return json.loads(timeline_path.read_text(encoding="utf-8"))
 
 
+def normalize_model(point_map: dict[int, tuple[float, float, float]]) -> tuple[Vector, float]:
+    """模型归一化: 重置缩放并把几何中心平移到世界原点 (0,0,0)。
+
+    返回 (offset, max_dim):
+      offset  —— 供火点坐标同步平移, 保证球体与模型仍对齐
+      max_dim —— 模型最大维度 (米), 供相机定距
+    无网格时以点位坐标兜底。
+    """
+    corners: list[Vector] = []
+    mesh_objs = [obj for obj in bpy.data.objects if obj.type == "MESH"]
+    for obj in mesh_objs:
+        corners.extend(obj.matrix_world @ Vector(c) for c in obj.bound_box)
+    if not corners:
+        print("[警告] 无网格对象, 以点位坐标兜底", flush=True)
+        corners = [Vector(pos) for pos in point_map.values()]
+
+    mins = Vector(
+        (min(v.x for v in corners), min(v.y for v in corners), min(v.z for v in corners))
+    )
+    maxs = Vector(
+        (max(v.x for v in corners), max(v.y for v in corners), max(v.z for v in corners))
+    )
+    center = (mins + maxs) / 2
+    dims = maxs - mins
+    offset = -center
+
+    for obj in mesh_objs:
+        obj.scale = (1.0, 1.0, 1.0)          # 重置缩放
+        obj.matrix_world.translation += offset  # 整体平移居中
+
+    print(
+        f"[F8] 模型尺寸: X={dims.x:.2f} Y={dims.y:.2f} Z={dims.z:.2f} (米) "
+        f"| 中心已对齐世界原点 (偏移 {offset.x:.2f}, {offset.y:.2f}, {offset.z:.2f})",
+        flush=True,
+    )
+    return offset, max(dims.x, dims.y, dims.z)
+
+
 def setup_world() -> None:
-    """设置亮色世界背景, 提供环境补光, 避免场景死黑。"""
+    """暴力提亮: 世界背景纯白 + 强度 1.0, 确保模型绝不可能一片黑/灰。"""
     world = bpy.context.scene.world
     world.use_nodes = True
     background = world.node_tree.nodes.get("Background")
     if background is None:
         background = world.node_tree.nodes.new("ShaderNodeBackground")
-    background.inputs["Color"].default_value = (0.55, 0.6, 0.65, 1.0)
+    background.inputs["Color"].default_value = (1.0, 1.0, 1.0, 1.0)  # 纯白环境光
     background.inputs["Strength"].default_value = 1.0
 
 
@@ -97,10 +137,15 @@ def setup_lighting() -> None:
     sun.data.use_shadow = True
 
 
-def setup_camera(bounds_min: Vector, bounds_max: Vector) -> None:
-    """智能机位: 依据包围盒自动计算 45° 俯角透视相机并对准场景中心。"""
-    center = (bounds_min + bounds_max) / 2
-    radius = (bounds_max - center).length  # 包围球半径
+def setup_camera(max_dim: float) -> None:
+    """安全机位: 相机置于斜上方 3 倍最大尺寸处, TRACK_TO 约束死盯世界原点。
+
+    不使用任何手算旋转公式, 镜头方向 100% 由约束保证。
+    """
+    # 注视目标: 世界原点处的空对象 (模型已居中, 原点即模型中心)
+    look_target = bpy.data.objects.new("LookTarget", None)
+    bpy.context.scene.collection.objects.link(look_target)
+    look_target.location = (0.0, 0.0, 0.0)
 
     cam_data = bpy.data.cameras.new("SmartCam")
     cam_data.type = "PERSP"
@@ -108,19 +153,23 @@ def setup_camera(bounds_min: Vector, bounds_max: Vector) -> None:
     cam_obj = bpy.data.objects.new("SmartCam", cam_data)
     bpy.context.scene.collection.objects.link(cam_obj)
 
-    # 45° 俯角 + 45° 方位角的单位方向向量
-    direction = Vector((0.5, 0.5, 0.7071))
-    # 依据垂直视场角计算距离, 保证包围球完整入画 (留 25% 边距)
-    fov_v = cam_data.angle
-    distance = (radius / math.sin(fov_v / 2)) * 1.25
-    cam_obj.location = center + direction * distance
-    # LookAt 场景中心
-    cam_obj.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
+    # 斜上方安全远点: (1,1,1) 方向 * 3 倍模型最大尺寸
+    direction = Vector((1.0, 1.0, 1.0)).normalized()
+    cam_obj.location = direction * (max_dim * CAMERA_DISTANCE_FACTOR)
 
+    # TRACK_TO 约束: 相机 -Z 轴死死对准目标
+    track = cam_obj.constraints.new(type="TRACK_TO")
+    track.target = look_target
+    track.track_axis = "TRACK_NEGATIVE_Z"
+    track.up_axis = "UP_Y"
+
+    # 强制激活相机
     bpy.context.scene.camera = cam_obj
+    active = bpy.context.scene.camera
     print(
-        f"[F8] 相机已放置: 中心=({center.x:.2f}, {center.y:.2f}, {center.z:.2f}) "
-        f"距离={distance:.2f}m",
+        f"[F8] 相机已激活: {active.name if active else '无'} "
+        f"| 位置={tuple(round(v, 2) for v in cam_obj.location)} "
+        f"| 距离={max_dim * CAMERA_DISTANCE_FACTOR:.2f}m | TRACK_TO→LookTarget",
         flush=True,
     )
 
@@ -141,28 +190,32 @@ def make_fire_material() -> bpy.types.Material:
 
 
 def spawn_fire_effects(
-    point_map: dict[int, tuple[float, float, float]], events: list[dict]
+    point_map: dict[int, tuple[float, float, float]],
+    events: list[dict],
+    offset: Vector,
 ) -> None:
     """按 timeline 事件生成火焰效果: 球体 + 点光源, 三路关键帧做 1 秒渐入。
 
     每个事件独立材质 (避免共享材质导致关键帧互相覆盖):
-      - 球体 Scale:  0 -> 1 (出现动画)
+      - 球体 Scale: 0 -> 1 (出现动画)
       - Emission 强度: 0 -> 全亮 (材质从原色渐变为发光红)
       - 点光源能量: 0 -> 全亮 (火焰照亮房间, 强化蔓延视觉)
-    事件时间 time 秒 -> 帧号 = time * FPS + 1; 之后 1 秒内渐入完成。
+    火点坐标统一叠加模型居中的偏移量, 与模型保持对齐。
     """
     for event in events:
         point_id = int(event["point"])
         if point_id not in point_map:
             print(f"[警告] 点位 {point_id} 在 points.json 中无坐标, 跳过", flush=True)
             continue
-        x, y, z = point_map[point_id]
+        position = Vector(point_map[point_id]) + offset
         start_frame = int(event["time"]) * FPS + 1
         ramp_frames = FPS  # 渐入时长 1 秒
         before_frame = max(1, start_frame - 1)
 
         # --- 火焰球体 ---
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=FIRE_RADIUS, location=(x, y, z))
+        bpy.ops.mesh.primitive_uv_sphere_add(
+            radius=FIRE_RADIUS, location=tuple(position)
+        )
         sphere = bpy.context.active_object
         sphere.name = f"Fire_{point_id}"
         material = make_fire_material()  # 每个事件独立材质
@@ -184,7 +237,9 @@ def spawn_fire_effects(
         )
 
         # --- 火焰点光源 ---
-        bpy.ops.object.light_add(type="POINT", location=(x, y, z + 0.3))
+        bpy.ops.object.light_add(
+            type="POINT", location=tuple(position + Vector((0.0, 0.0, 0.3)))
+        )
         light = bpy.context.active_object
         light.name = f"FireLight_{point_id}"
         light.data.color = (1.0, 0.4, 0.08)
@@ -198,26 +253,6 @@ def spawn_fire_effects(
     print(f"[F8] 已生成 {len(events)} 组火焰效果 (球体 + 点光源)", flush=True)
 
 
-def compute_scene_bounds(
-    point_map: dict[int, tuple[float, float, float]]
-) -> tuple[Vector, Vector]:
-    """计算场景包围盒: 优先取网格对象, 无网格时退回点位坐标。"""
-    corners: list[Vector] = []
-    for obj in bpy.data.objects:
-        if obj.type == "MESH":
-            for corner in obj.bound_box:
-                corners.append(obj.matrix_world @ Vector(corner))
-    if not corners:
-        corners = [Vector(pos) for pos in point_map.values()]
-    mins = Vector(
-        (min(v.x for v in corners), min(v.y for v in corners), min(v.z for v in corners))
-    )
-    maxs = Vector(
-        (max(v.x for v in corners), max(v.y for v in corners), max(v.z for v in corners))
-    )
-    return mins, maxs
-
-
 def setup_render(output_path: Path, frame_end: int) -> None:
     """Eevee + FFmpeg MP4 输出设置 (占位阶段用低分辨率加速)。"""
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -226,9 +261,9 @@ def setup_render(output_path: Path, frame_end: int) -> None:
     scene.render.fps = FPS
     scene.frame_start = 1
     scene.frame_end = frame_end
-    scene.render.resolution_x = 640   # 占位验证用低分辨率, 加速软渲染
+    scene.render.resolution_x = 640   # 占位验证用低分辨率, 加速渲染
     scene.render.resolution_y = 360
-    scene.eevee.taa_samples = 1      # 关闭多重采样 (软渲染下 16x 采样是最大瓶颈)
+    scene.eevee.taa_samples = 1      # 关闭多重采样
     scene.eevee.use_ssr = False      # 关闭屏幕空间反射
     scene.eevee.use_gtao = False     # 关闭环境光遮蔽
     scene.eevee.use_bloom = False    # 关闭泛光
@@ -268,11 +303,11 @@ def main() -> None:
 
     clear_scene()
     import_mesh(scene_dir / "mesh.obj")
-    bounds_min, bounds_max = compute_scene_bounds(point_map)
+    offset, max_dim = normalize_model(point_map)
     setup_world()
     setup_lighting()
-    setup_camera(bounds_min, bounds_max)
-    spawn_fire_effects(point_map, events)
+    setup_camera(max_dim)
+    spawn_fire_effects(point_map, events, offset)
 
     # 最后事件渐入 1 秒 + 观察尾帧 1 秒
     last_start = max(int(e["time"]) for e in events) * FPS + 1
