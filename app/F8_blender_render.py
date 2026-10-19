@@ -1,4 +1,4 @@
-"""F8 渲染层阶段四：电影级动态运镜 + 光影特效 (1080p)。
+"""F8 渲染层阶段四：电影级动态运镜 + 光影特效 (720p 预览档)。
 
 ⚠️ 仅供 Blender 内部 Python 以独立子进程方式执行，绝对禁止在常规后端代码中 import bpy。
 
@@ -310,15 +310,15 @@ def spawn_fire_effects(
 
 
 def setup_render(output_path: Path, frame_end: int) -> None:
-    """Eevee + Bloom + 1080p 高清 + FFmpeg 感知无损输出。"""
+    """Eevee + Bloom + 720p 预览档 + FFmpeg 感知无损输出。"""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     scene = bpy.context.scene
     scene.render.engine = "BLENDER_EEVEE_NEXT"  # Blender 4.2 的 Eevee
     scene.render.fps = FPS
     scene.frame_start = 1
     scene.frame_end = frame_end
-    scene.render.resolution_x = 1920          # 1080p 高清
-    scene.render.resolution_y = 1080
+    scene.render.resolution_x = 1280          # 720p 预览档 (快速看效果)
+    scene.render.resolution_y = 720
     scene.render.resolution_percentage = 100  # 100% 渲染百分比
     scene.eevee.taa_samples = 1
     scene.eevee.use_ssr = False
