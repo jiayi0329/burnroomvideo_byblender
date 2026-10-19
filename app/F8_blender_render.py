@@ -1,20 +1,21 @@
-"""F8 渲染层阶段三：鲁棒场景渲染 (防瞎版)。
+"""F8 渲染层阶段四：电影级动态运镜 + 光影特效 (1080p)。
 
 ⚠️ 仅供 Blender 内部 Python 以独立子进程方式执行，绝对禁止在常规后端代码中 import bpy。
 
 运行方式 (容器内):
     blender --background --python app/F8_blender_render.py -- --scene KK-EEz16cmU14
 
-防瞎策略 (本阶段核心):
-  1. 模型归一化: 导入后整体平移, 几何中心强制对齐世界原点, 打印实际尺寸
-  2. 安全机位: 相机置于斜上方 3 倍最大尺寸处, 用 TRACK_TO 约束死盯原点 (零手算角度)
-  3. 暴力提亮: 世界背景纯白 + 太阳光 (开阴影), 模型绝不可能一片黑/灰
-  4. 强制激活: 显式设置 scene.camera 并打印确认
+本阶段特性:
+  1. 动态运镜: 第 1 帧在起火点近景特写, 末帧拉远至全局广角, Location 打关键帧,
+     TRACK_TO 约束全程紧盯 (注视目标本身也随关键帧从起火点移到模型中心)
+  2. Bloom 泛光: 显式开启, 火源产生真实光晕
+  3. 高亮火源: Emission 强度 40 + 橙红色, 结合 Bloom 亮得刺眼
+  4. 压抑环境: 世界环境光调暗; 火源点光源能量随关键帧持续增大, 模拟火势变大
+  5. 1080p 高清 + FFmpeg 感知无损质量
+  6. 贴图兜底: 修复 MTL map_Ka 不被导入器支持的问题,
+     为缺失 Image Texture 的材质强制接上场景目录下的照片纹理
 
-蔓延动画: 按 timeline.json 事件生成火焰球体 + 点光源,
-Emission/能量/缩放三路关键帧 1 秒渐入, 火光燃起同时照亮房间。
-
-坐标系: points.json 与 mesh.obj 均为 Z-up; 模型居中偏移会同步应用到火点坐标。
+坐标系: points.json 与 mesh.obj 均为 Z-up; 模型居中偏移同步应用于火点坐标。
 """
 import argparse
 import json
@@ -25,10 +26,13 @@ import bpy
 from mathutils import Vector
 
 FPS = 24
-FIRE_RADIUS = 0.45            # 火焰球体半径 (米)
-FIRE_EMISSION_STRENGTH = 12.0  # 火焰材质发光强度
-FIRE_GLOW_ENERGY = 400.0      # 火焰点光源能量 (瓦)
-CAMERA_DISTANCE_FACTOR = 3.0  # 相机距离 = 模型最大尺寸 * 该系数 (安全远点)
+FIRE_RADIUS = 0.45             # 火焰球体半径 (米)
+FIRE_EMISSION_STRENGTH = 40.0  # 火焰材质发光强度 (高亮, 配合 Bloom)
+FIRE_ENERGY_INITIAL = 300.0    # 火焰点光源初始能量 (瓦)
+FIRE_ENERGY_GROWN = 900.0      # 火焰点光源成长后能量 (模拟火势变大)
+FIRE_GROW_SPAN_FRAMES = FPS * 2  # 光源能量成长时长 (2 秒)
+CAMERA_DISTANCE_FACTOR = 3.0   # 广角距离 = 模型最大尺寸 * 该系数
+CLOSEUP_DISTANCE_FACTOR = 0.6  # 近景距离 = 模型最大尺寸 * 该系数 (贴近起火点)
 DEFAULT_SCENE = "KK-EEz16cmU14"
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -59,6 +63,42 @@ def import_mesh(mesh_path: Path) -> None:
     print(f"[F8] 网格已导入: {mesh_path}", flush=True)
 
 
+def ensure_textures(scene_dir: Path) -> None:
+    """贴图兜底: 为缺失 Image Texture 的材质强制接上场景目录下的照片纹理。
+
+    背景: MTL 中贴图常声明在 map_Ka 通道, Blender OBJ 导入器不支持该通道,
+    导致模型只有几何轮廓没有纹理。此函数为没有贴图节点的材质补接 Base Color。
+    """
+    candidates = sorted(scene_dir.glob("*.jpg")) + sorted(scene_dir.glob("*.png"))
+    texture_path = next(
+        (p for p in candidates if p.name.lower().startswith("texture")),
+        candidates[0] if candidates else None,
+    )
+    if texture_path is None:
+        print("[警告] 场景目录下未找到任何贴图文件 (.jpg/.png)", flush=True)
+        return
+
+    image = bpy.data.images.load(str(texture_path))
+    fixed = 0
+    for mat in bpy.data.materials:
+        if not mat.use_nodes:
+            mat.use_nodes = True
+        tree = mat.node_tree
+        if any(node.type == "TEX_IMAGE" for node in tree.nodes):
+            continue  # 已有贴图节点, 不重复处理
+        bsdf = next(
+            (node for node in tree.nodes if node.type == "BSDF_PRINCIPLED"), None
+        )
+        if bsdf is None:
+            continue
+        tex_node = tree.nodes.new("ShaderNodeTexImage")
+        tex_node.image = image
+        tree.links.new(tex_node.outputs["Color"], bsdf.inputs["Base Color"])
+        fixed += 1
+
+    print(f"[F8] 贴图兜底: 已为 {fixed} 个材质强制接上 {texture_path.name}", flush=True)
+
+
 def build_point_map(points_path: Path) -> dict[int, tuple[float, float, float]]:
     """读取 points.json, 建立 device (图片编号) -> (x, y, z) 位姿映射。"""
     if not points_path.is_file():
@@ -81,9 +121,7 @@ def load_timeline(timeline_path: Path) -> dict:
 def normalize_model(point_map: dict[int, tuple[float, float, float]]) -> tuple[Vector, float]:
     """模型归一化: 重置缩放并把几何中心平移到世界原点 (0,0,0)。
 
-    返回 (offset, max_dim):
-      offset  —— 供火点坐标同步平移, 保证球体与模型仍对齐
-      max_dim —— 模型最大维度 (米), 供相机定距
+    返回 (offset, max_dim): offset 供火点坐标同步平移, max_dim 供相机定距。
     无网格时以点位坐标兜底。
     """
     corners: list[Vector] = []
@@ -105,7 +143,7 @@ def normalize_model(point_map: dict[int, tuple[float, float, float]]) -> tuple[V
     offset = -center
 
     for obj in mesh_objs:
-        obj.scale = (1.0, 1.0, 1.0)          # 重置缩放
+        obj.scale = (1.0, 1.0, 1.0)            # 重置缩放
         obj.matrix_world.translation += offset  # 整体平移居中
 
     print(
@@ -117,35 +155,38 @@ def normalize_model(point_map: dict[int, tuple[float, float, float]]) -> tuple[V
 
 
 def setup_world() -> None:
-    """暴力提亮: 世界背景纯白 + 强度 1.0, 确保模型绝不可能一片黑/灰。"""
+    """压抑环境光: 世界背景调暗, 突出火源的光影对比。"""
     world = bpy.context.scene.world
     world.use_nodes = True
     background = world.node_tree.nodes.get("Background")
     if background is None:
         background = world.node_tree.nodes.new("ShaderNodeBackground")
-    background.inputs["Color"].default_value = (1.0, 1.0, 1.0, 1.0)  # 纯白环境光
+    background.inputs["Color"].default_value = (0.25, 0.27, 0.30, 1.0)  # 暗蓝灰
     background.inputs["Strength"].default_value = 1.0
 
 
 def setup_lighting() -> None:
-    """太阳光从斜上方打光 (开阴影, 增强立体感)。"""
+    """太阳光从斜上方打光 (开阴影, 提供基础可见度)。"""
     bpy.ops.object.light_add(type="SUN", location=(0.0, 0.0, 10.0))
     sun = bpy.context.active_object
     sun.name = "SunLight"
     sun.rotation_euler = (0.9, 0.0, 0.5)  # 斜向下照射
-    sun.data.energy = 6.0
+    sun.data.energy = 4.0
     sun.data.use_shadow = True
 
 
-def setup_camera(max_dim: float) -> None:
-    """安全机位: 相机置于斜上方 3 倍最大尺寸处, TRACK_TO 约束死盯世界原点。
+def setup_camera_animation(
+    ignition_pos: Vector, max_dim: float, frame_end: int
+) -> None:
+    """动态运镜: 第 1 帧起火点近景特写, 末帧拉远至全局广角。
 
-    不使用任何手算旋转公式, 镜头方向 100% 由约束保证。
+    相机与注视目标 (LookTarget) 均打 Location 关键帧:
+      - 相机: 起火点斜上方近景 → 模型斜上方 3 倍尺寸广角
+      - 注视目标: 起火点 → 模型中心 (原点)
+    TRACK_TO 约束全程生效, 镜头方向零手算, 保证 100% 盯住目标。
     """
-    # 注视目标: 世界原点处的空对象 (模型已居中, 原点即模型中心)
     look_target = bpy.data.objects.new("LookTarget", None)
     bpy.context.scene.collection.objects.link(look_target)
-    look_target.location = (0.0, 0.0, 0.0)
 
     cam_data = bpy.data.cameras.new("SmartCam")
     cam_data.type = "PERSP"
@@ -153,11 +194,21 @@ def setup_camera(max_dim: float) -> None:
     cam_obj = bpy.data.objects.new("SmartCam", cam_data)
     bpy.context.scene.collection.objects.link(cam_obj)
 
-    # 斜上方安全远点: (1,1,1) 方向 * 3 倍模型最大尺寸
     direction = Vector((1.0, 1.0, 1.0)).normalized()
-    cam_obj.location = direction * (max_dim * CAMERA_DISTANCE_FACTOR)
+    close_pos = ignition_pos + direction * (max_dim * CLOSEUP_DISTANCE_FACTOR)
+    far_pos = direction * (max_dim * CAMERA_DISTANCE_FACTOR)
 
-    # TRACK_TO 约束: 相机 -Z 轴死死对准目标
+    # 第 1 帧: 近景特写起火点
+    cam_obj.location = close_pos
+    cam_obj.keyframe_insert(data_path="location", frame=1)
+    look_target.location = ignition_pos
+    look_target.keyframe_insert(data_path="location", frame=1)
+    # 末帧: 拉远至全局广角
+    cam_obj.location = far_pos
+    cam_obj.keyframe_insert(data_path="location", frame=frame_end)
+    look_target.location = (0.0, 0.0, 0.0)
+    look_target.keyframe_insert(data_path="location", frame=frame_end)
+
     track = cam_obj.constraints.new(type="TRACK_TO")
     track.target = look_target
     track.track_axis = "TRACK_NEGATIVE_Z"
@@ -167,22 +218,22 @@ def setup_camera(max_dim: float) -> None:
     bpy.context.scene.camera = cam_obj
     active = bpy.context.scene.camera
     print(
-        f"[F8] 相机已激活: {active.name if active else '无'} "
-        f"| 位置={tuple(round(v, 2) for v in cam_obj.location)} "
-        f"| 距离={max_dim * CAMERA_DISTANCE_FACTOR:.2f}m | TRACK_TO→LookTarget",
+        f"[F8] 动态运镜: 近景={tuple(round(v, 2) for v in close_pos)} "
+        f"→ 广角={tuple(round(v, 2) for v in far_pos)} ({frame_end} 帧) "
+        f"| 活动相机: {active.name if active else '无'}",
         flush=True,
     )
 
 
 def make_fire_material() -> bpy.types.Material:
-    """创建红色自发光材质 (Emission 强度初始为 0, 由关键帧驱动渐入)。"""
+    """创建橙红色高亮自发光材质 (Emission 强度初始为 0, 由关键帧驱动渐入)。"""
     mat = bpy.data.materials.new(name="FireGlow")
     mat.use_nodes = True
     tree = mat.node_tree
     for node in list(tree.nodes):
         tree.nodes.remove(node)
     emit = tree.nodes.new("ShaderNodeEmission")
-    emit.inputs["Color"].default_value = (1.0, 0.2, 0.02, 1.0)
+    emit.inputs["Color"].default_value = (1.0, 0.35, 0.05, 1.0)  # 耀眼橙红
     emit.inputs["Strength"].default_value = 0.0
     output = tree.nodes.new("ShaderNodeOutputMaterial")
     tree.links.new(emit.outputs["Emission"], output.inputs["Surface"])
@@ -194,13 +245,13 @@ def spawn_fire_effects(
     events: list[dict],
     offset: Vector,
 ) -> None:
-    """按 timeline 事件生成火焰效果: 球体 + 点光源, 三路关键帧做 1 秒渐入。
+    """按 timeline 事件生成火焰效果: 球体 + 点光源, 关键帧驱动渐入与成长。
 
-    每个事件独立材质 (避免共享材质导致关键帧互相覆盖):
+    每个事件独立材质:
       - 球体 Scale: 0 -> 1 (出现动画)
-      - Emission 强度: 0 -> 全亮 (材质从原色渐变为发光红)
-      - 点光源能量: 0 -> 全亮 (火焰照亮房间, 强化蔓延视觉)
-    火点坐标统一叠加模型居中的偏移量, 与模型保持对齐。
+      - Emission 强度: 0 -> 40 (材质从原色渐变为刺眼发光橙红)
+      - 点光源能量: 0 -> 300 -> 900 (火势变大, 照亮范围持续扩张)
+    火点坐标统一叠加模型居中偏移量, 与模型保持对齐。
     """
     for event in events:
         point_id = int(event["point"])
@@ -209,7 +260,7 @@ def spawn_fire_effects(
             continue
         position = Vector(point_map[point_id]) + offset
         start_frame = int(event["time"]) * FPS + 1
-        ramp_frames = FPS  # 渐入时长 1 秒
+        ramp_frames = FPS
         before_frame = max(1, start_frame - 1)
 
         # --- 火焰球体 ---
@@ -236,40 +287,51 @@ def spawn_fire_effects(
             data_path="default_value", frame=start_frame + ramp_frames
         )
 
-        # --- 火焰点光源 ---
+        # --- 火焰点光源: 能量随关键帧逐渐变大, 模拟火势扩张 ---
         bpy.ops.object.light_add(
             type="POINT", location=tuple(position + Vector((0.0, 0.0, 0.3)))
         )
         light = bpy.context.active_object
         light.name = f"FireLight_{point_id}"
         light.data.color = (1.0, 0.4, 0.08)
+        light.data.cutoff_distance = 15.0  # 照亮范围 15 米
         light.data.energy = 0.0
         light.data.keyframe_insert(data_path="energy", frame=before_frame)
-        light.data.energy = FIRE_GLOW_ENERGY
+        light.data.energy = FIRE_ENERGY_INITIAL
         light.data.keyframe_insert(
             data_path="energy", frame=start_frame + ramp_frames
         )
+        light.data.energy = FIRE_ENERGY_GROWN
+        light.data.keyframe_insert(
+            data_path="energy", frame=start_frame + ramp_frames + FIRE_GROW_SPAN_FRAMES
+        )
 
-    print(f"[F8] 已生成 {len(events)} 组火焰效果 (球体 + 点光源)", flush=True)
+    print(f"[F8] 已生成 {len(events)} 组火焰效果 (球体 + 动态点光源)", flush=True)
 
 
 def setup_render(output_path: Path, frame_end: int) -> None:
-    """Eevee + FFmpeg MP4 输出设置 (占位阶段用低分辨率加速)。"""
+    """Eevee + Bloom + 1080p 高清 + FFmpeg 感知无损输出。"""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     scene = bpy.context.scene
     scene.render.engine = "BLENDER_EEVEE_NEXT"  # Blender 4.2 的 Eevee
     scene.render.fps = FPS
     scene.frame_start = 1
     scene.frame_end = frame_end
-    scene.render.resolution_x = 640   # 占位验证用低分辨率, 加速渲染
-    scene.render.resolution_y = 360
-    scene.eevee.taa_samples = 1      # 关闭多重采样
-    scene.eevee.use_ssr = False      # 关闭屏幕空间反射
-    scene.eevee.use_gtao = False     # 关闭环境光遮蔽
-    scene.eevee.use_bloom = False    # 关闭泛光
+    scene.render.resolution_x = 1920          # 1080p 高清
+    scene.render.resolution_y = 1080
+    scene.render.resolution_percentage = 100  # 100% 渲染百分比
+    scene.eevee.taa_samples = 1
+    scene.eevee.use_ssr = False
+    scene.eevee.use_gtao = False
+    # 泛光特效: 火源高亮区域产生真实光晕
+    scene.eevee.use_bloom = True
+    scene.eevee.bloom_intensity = 1.0
+    scene.eevee.bloom_threshold = 0.6
+    # FFmpeg 输出: 感知无损最高质量
     scene.render.image_settings.file_format = "FFMPEG"
     scene.render.ffmpeg.format = "MPEG4"
     scene.render.ffmpeg.codec = "H264"
+    scene.render.ffmpeg.constant_rate_factor = "PERC_LOSSLESS"
     scene.render.filepath = str(output_path)
 
 
@@ -295,6 +357,7 @@ def main() -> None:
     point_map = build_point_map(points_path)
     timeline = load_timeline(timeline_path)
     events: list[dict] = timeline["spread_events"]
+    start_point_id = int(timeline.get("start_point", events[0]["point"]))
 
     # 覆盖机制: 强制清除旧产物, 保证每次生成的都是最新渲染的视频
     if output_path.exists():
@@ -303,22 +366,31 @@ def main() -> None:
 
     clear_scene()
     import_mesh(scene_dir / "mesh.obj")
+    ensure_textures(scene_dir)
     offset, max_dim = normalize_model(point_map)
-    setup_world()
-    setup_lighting()
-    setup_camera(max_dim)
-    spawn_fire_effects(point_map, events, offset)
+
+    # 起火点坐标 (与模型同步平移后); 缺失时退回模型中心
+    ignition_pos = (
+        Vector(point_map[start_point_id]) + offset
+        if start_point_id in point_map
+        else Vector((0.0, 0.0, 0.0))
+    )
 
     # 最后事件渐入 1 秒 + 观察尾帧 1 秒
     last_start = max(int(e["time"]) for e in events) * FPS + 1
     frame_end = last_start + FPS * 2
+
+    setup_world()
+    setup_lighting()
+    setup_camera_animation(ignition_pos, max_dim, frame_end)
+    spawn_fire_effects(point_map, events, offset)
     setup_render(output_path, frame_end)
     _register_frame_progress(frame_end)
 
     scene = bpy.context.scene
     print(
         f"[F8] 渲染配置: engine=Eevee(EEVEE_NEXT) 分辨率={scene.render.resolution_x}x{scene.render.resolution_y} "
-        f"fps={FPS} 帧范围=1-{frame_end} 事件数={len(events)} 输出={output_path}",
+        f"fps={FPS} 帧范围=1-{frame_end} 事件数={len(events)} 起火点={start_point_id} 输出={output_path}",
         flush=True,
     )
     bpy.ops.render.render(animation=True)
