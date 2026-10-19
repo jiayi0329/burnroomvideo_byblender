@@ -1,3 +1,19 @@
+# 写在最前面：冷启动步骤
+第 1 步：唤醒服务器
+ssh -p 7777 zhaojy@172.25.76.201 "docker ps"
+正常列出容器报 docker daemon 错误守护进程没跑
+第 2 步：本地推送新代码
+1. GitHub Desktop 按上面提交并 Push
+2. 跑 release/scripts/build.ps1 → release/scripts/deploy.ps1
+第 3 步：服务器重建 + 拉起 + 触发渲染
+cd ~/burnroom-prod/burnroom-deploy-package
+docker build -t burnroom-app:latest .        # 全缓存, 约 1-2 分钟 (新 F8 代码进镜像)
+docker compose up -d --force-recreate        # 按最新 compose 重建容器
+docker ps                                    # 两个容器开启
+curl -s http://localhost:8000/               # {"status":"Backend is running!"...}   # 触发渲染
+curl -s -X POST http://localhost:8000/api/render/KK-EEz16cmU14
+tail -f /data/zhaojy/burnroom-data/app-data/KK-EEz16cmU14/render.log
+
 # Burnroom — 火灾蔓延视频生成系统
 
 基于 4DKankan 室内全景资产（`mesh.obj` / 全景 jpg / `points.json`），自动识别起火点、
