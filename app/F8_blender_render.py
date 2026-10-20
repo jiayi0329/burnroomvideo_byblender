@@ -1,21 +1,22 @@
-"""F8 渲染层阶段四：电影级动态运镜 + 光影特效 (720p 预览档)。
+"""F8 渲染层阶段五：单房间聚焦 + 体积火焰 + 焦炭化动画 (P0 高保真)。
 
 ⚠️ 仅供 Blender 内部 Python 以独立子进程方式执行，绝对禁止在常规后端代码中 import bpy。
 
 运行方式 (容器内):
     blender --background --python app/F8_blender_render.py -- --scene KK-EEz16cmU14
 
-本阶段特性:
-  1. 动态运镜: 第 1 帧在起火点近景特写, 末帧拉远至全局广角, Location 打关键帧,
-     TRACK_TO 约束全程紧盯 (注视目标本身也随关键帧从起火点移到模型中心)
-  2. Bloom 泛光: 显式开启, 火源产生真实光晕
-  3. 高亮火源: Emission 强度 40 + 橙红色, 结合 Bloom 亮得刺眼
-  4. 压抑环境: 世界环境光调暗; 火源点光源能量随关键帧持续增大, 模拟火势变大
-  5. 1080p 高清 + FFmpeg 感知无损质量
-  6. 贴图兜底: 修复 MTL map_Ka 不被导入器支持的问题,
-     为缺失 Image Texture 的材质强制接上场景目录下的照片纹理
+本阶段三大核心逻辑 (对应 PRD_V1.1 P0 优先级):
+  1. 空间过滤: 解析 timeline 起火点位, 剔除远离燃烧区域的网格对象,
+     相机包围盒仅限燃烧房间局部, 大幅缩减渲染范围并聚焦视觉
+  2. 材质焦黑化: 燃烧强度达到峰值后, 用关键帧把保留房间材质的
+     Base Color 过渡为纯黑、Roughness 过渡为 1.0 (失去光泽的焦炭形态),
+     同时衰减火源发光强度
+  3. 体积火焰与烟雾: 起火点生成 Volume 对象 (Principled Volume),
+     Emission 表现火舌、Scatter 表现上方聚集的深灰烟雾,
+     密度与发光强度随 timeline 强度曲线动态变化 (0 → 峰值 → 衰减)
 
-坐标系: points.json 与 mesh.obj 均为 Z-up; 模型居中偏移同步应用于火点坐标。
+沿用特性: 动态运镜 (TRACK_TO 约束)、Bloom 泛光、贴图兜底、产物覆盖机制、
+逐帧进度日志、720p 预览档。
 """
 import argparse
 import json
@@ -26,13 +27,21 @@ import bpy
 from mathutils import Vector
 
 FPS = 24
-FIRE_RADIUS = 0.45             # 火焰球体半径 (米)
-FIRE_EMISSION_STRENGTH = 40.0  # 火焰材质发光强度 (高亮, 配合 Bloom)
+FIRE_RADIUS = 0.45             # 火焰核心球体半径 (米)
+FIRE_EMISSION_STRENGTH = 40.0  # 火焰材质峰值发光强度
+FIRE_EMISSION_DECAY = 5.0      # 衰减后的余烬发光强度
 FIRE_ENERGY_INITIAL = 300.0    # 火焰点光源初始能量 (瓦)
-FIRE_ENERGY_GROWN = 900.0      # 火焰点光源成长后能量 (模拟火势变大)
-FIRE_GROW_SPAN_FRAMES = FPS * 2  # 光源能量成长时长 (2 秒)
-CAMERA_DISTANCE_FACTOR = 3.0   # 广角距离 = 模型最大尺寸 * 该系数
-CLOSEUP_DISTANCE_FACTOR = 0.6  # 近景距离 = 模型最大尺寸 * 该系数 (贴近起火点)
+FIRE_ENERGY_GROWN = 900.0      # 火焰点光源峰值能量
+FIRE_ENERGY_DECAY = 120.0      # 衰减后的余烬光照能量
+FLAME_DENSITY_PEAK = 1.5       # 火舌体积峰值密度
+FLAME_DENSITY_DECAY = 0.3      # 火舌体积衰减后密度
+FLAME_EMISSION_PEAK = 80.0     # 火舌体积峰值发光强度
+FLAME_EMISSION_DECAY = 8.0     # 火舌体积衰减后发光强度
+SMOKE_DENSITY_PEAK = 0.5       # 烟雾体积峰值密度
+SMOKE_DENSITY_FINAL = 1.2      # 烟雾聚顶最终密度 (持续累积)
+BURN_REGION_MARGIN = 2.5       # 燃烧区域外扩边距 (米)
+CAMERA_DISTANCE_FACTOR = 3.0   # 广角距离 = 燃烧区域最大尺寸 * 该系数
+CLOSEUP_DISTANCE_FACTOR = 0.6  # 近景距离 = 燃烧区域最大尺寸 * 该系数
 DEFAULT_SCENE = "KK-EEz16cmU14"
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -57,18 +66,14 @@ def clear_scene() -> None:
 def import_mesh(mesh_path: Path) -> None:
     """导入 mesh.obj (保持原始 Z-up 坐标系, 与 points.json 一致)。"""
     if not mesh_path.is_file():
-        print(f"[警告] 未找到网格: {mesh_path}, 跳过 (仅渲染火焰球)", flush=True)
+        print(f"[警告] 未找到网格: {mesh_path}, 跳过 (仅渲染火焰)", flush=True)
         return
     bpy.ops.wm.obj_import(filepath=str(mesh_path), up_axis="Z", forward_axis="Y")
     print(f"[F8] 网格已导入: {mesh_path}", flush=True)
 
 
 def ensure_textures(scene_dir: Path) -> None:
-    """贴图兜底: 为缺失 Image Texture 的材质强制接上场景目录下的照片纹理。
-
-    背景: MTL 中贴图常声明在 map_Ka 通道, Blender OBJ 导入器不支持该通道,
-    导致模型只有几何轮廓没有纹理。此函数为没有贴图节点的材质补接 Base Color。
-    """
+    """贴图兜底: 为缺失 Image Texture 的材质强制接上场景目录下的照片纹理。"""
     candidates = sorted(scene_dir.glob("*.jpg")) + sorted(scene_dir.glob("*.png"))
     texture_path = next(
         (p for p in candidates if p.name.lower().startswith("texture")),
@@ -85,7 +90,7 @@ def ensure_textures(scene_dir: Path) -> None:
             mat.use_nodes = True
         tree = mat.node_tree
         if any(node.type == "TEX_IMAGE" for node in tree.nodes):
-            continue  # 已有贴图节点, 不重复处理
+            continue
         bsdf = next(
             (node for node in tree.nodes if node.type == "BSDF_PRINCIPLED"), None
         )
@@ -121,8 +126,7 @@ def load_timeline(timeline_path: Path) -> dict:
 def normalize_model(point_map: dict[int, tuple[float, float, float]]) -> tuple[Vector, float]:
     """模型归一化: 重置缩放并把几何中心平移到世界原点 (0,0,0)。
 
-    返回 (offset, max_dim): offset 供火点坐标同步平移, max_dim 供相机定距。
-    无网格时以点位坐标兜底。
+    返回 (offset, max_dim): offset 供火点坐标同步平移, max_dim 供参考。
     """
     corners: list[Vector] = []
     mesh_objs = [obj for obj in bpy.data.objects if obj.type == "MESH"]
@@ -143,8 +147,8 @@ def normalize_model(point_map: dict[int, tuple[float, float, float]]) -> tuple[V
     offset = -center
 
     for obj in mesh_objs:
-        obj.scale = (1.0, 1.0, 1.0)            # 重置缩放
-        obj.matrix_world.translation += offset  # 整体平移居中
+        obj.scale = (1.0, 1.0, 1.0)
+        obj.matrix_world.translation += offset
 
     print(
         f"[F8] 模型尺寸: X={dims.x:.2f} Y={dims.y:.2f} Z={dims.z:.2f} (米) "
@@ -154,6 +158,72 @@ def normalize_model(point_map: dict[int, tuple[float, float, float]]) -> tuple[V
     return offset, max(dims.x, dims.y, dims.z)
 
 
+def _near_burn_points(obj: bpy.types.Object, burn_points: list[Vector], margin: float) -> bool:
+    """判断网格对象包围盒是否靠近任一燃烧点位 (距离 <= margin)。"""
+    world_corners = [obj.matrix_world @ Vector(v) for v in obj.bound_box]
+    mins = Vector(
+        (min(c.x for c in world_corners), min(c.y for c in world_corners), min(c.z for c in world_corners))
+    )
+    maxs = Vector(
+        (max(c.x for c in world_corners), max(c.y for c in world_corners), max(c.z for c in world_corners))
+    )
+    for point in burn_points:
+        closest = Vector(
+            (max(mins.x, min(point.x, maxs.x)),
+             max(mins.y, min(point.y, maxs.y)),
+             max(mins.z, min(point.z, maxs.z)))
+        )
+        if (point - closest).length <= margin:
+            return True
+    return False
+
+
+def filter_to_burn_region(
+    point_map: dict[int, tuple[float, float, float]],
+    events: list[dict],
+    offset: Vector,
+) -> tuple[list[bpy.types.Object], list[Vector]]:
+    """空间过滤: 删除远离燃烧区域的网格对象, 仅保留起火房间局部。
+
+    返回 (保留的网格对象列表, 燃烧点位列表[居中坐标系])。
+    """
+    burn_points = [
+        Vector(point_map[int(e["point"])]) + offset
+        for e in events
+        if int(e["point"]) in point_map
+    ]
+    if not burn_points:
+        burn_points = [Vector(pos) + offset for pos in point_map.values()]
+
+    kept: list[bpy.types.Object] = []
+    removed = 0
+    for obj in [o for o in bpy.data.objects if o.type == "MESH"]:
+        if _near_burn_points(obj, burn_points, BURN_REGION_MARGIN):
+            kept.append(obj)
+        else:
+            bpy.data.objects.remove(obj, do_unlink=True)
+            removed += 1
+
+    print(
+        f"[F8] 空间过滤: 保留 {len(kept)} 个网格对象, 剔除 {removed} 个远离燃烧区域的网格 "
+        f"(边距 {BURN_REGION_MARGIN}m, 燃烧点位 {len(burn_points)} 个)",
+        flush=True,
+    )
+    return kept, burn_points
+
+
+def burn_region_bounds(burn_points: list[Vector]) -> tuple[Vector, Vector]:
+    """燃烧区域包围盒 (外扩边距), 供相机取景聚焦。"""
+    mins = Vector(
+        (min(p.x for p in burn_points), min(p.y for p in burn_points), min(p.z for p in burn_points))
+    )
+    maxs = Vector(
+        (max(p.x for p in burn_points), max(p.y for p in burn_points), max(p.z for p in burn_points))
+    )
+    pad = Vector((BURN_REGION_MARGIN, BURN_REGION_MARGIN, BURN_REGION_MARGIN))
+    return mins - pad, maxs + pad
+
+
 def setup_world() -> None:
     """压抑环境光: 世界背景调暗, 突出火源的光影对比。"""
     world = bpy.context.scene.world
@@ -161,7 +231,7 @@ def setup_world() -> None:
     background = world.node_tree.nodes.get("Background")
     if background is None:
         background = world.node_tree.nodes.new("ShaderNodeBackground")
-    background.inputs["Color"].default_value = (0.25, 0.27, 0.30, 1.0)  # 暗蓝灰
+    background.inputs["Color"].default_value = (0.25, 0.27, 0.30, 1.0)
     background.inputs["Strength"].default_value = 1.0
 
 
@@ -170,7 +240,7 @@ def setup_lighting() -> None:
     bpy.ops.object.light_add(type="SUN", location=(0.0, 0.0, 10.0))
     sun = bpy.context.active_object
     sun.name = "SunLight"
-    sun.rotation_euler = (0.9, 0.0, 0.5)  # 斜向下照射
+    sun.rotation_euler = (0.9, 0.0, 0.5)
     sun.data.energy = 4.0
     sun.data.use_shadow = True
 
@@ -178,12 +248,9 @@ def setup_lighting() -> None:
 def setup_camera_animation(
     ignition_pos: Vector, max_dim: float, frame_end: int
 ) -> None:
-    """动态运镜: 第 1 帧起火点近景特写, 末帧拉远至全局广角。
+    """动态运镜: 第 1 帧起火点近景特写, 末帧拉远至燃烧区域广角。
 
-    相机与注视目标 (LookTarget) 均打 Location 关键帧:
-      - 相机: 起火点斜上方近景 → 模型斜上方 3 倍尺寸广角
-      - 注视目标: 起火点 → 模型中心 (原点)
-    TRACK_TO 约束全程生效, 镜头方向零手算, 保证 100% 盯住目标。
+    相机与注视目标均打 Location 关键帧, TRACK_TO 约束全程盯住目标。
     """
     look_target = bpy.data.objects.new("LookTarget", None)
     bpy.context.scene.collection.objects.link(look_target)
@@ -198,12 +265,11 @@ def setup_camera_animation(
     close_pos = ignition_pos + direction * (max_dim * CLOSEUP_DISTANCE_FACTOR)
     far_pos = direction * (max_dim * CAMERA_DISTANCE_FACTOR)
 
-    # 第 1 帧: 近景特写起火点
     cam_obj.location = close_pos
     cam_obj.keyframe_insert(data_path="location", frame=1)
     look_target.location = ignition_pos
     look_target.keyframe_insert(data_path="location", frame=1)
-    # 末帧: 拉远至全局广角
+
     cam_obj.location = far_pos
     cam_obj.keyframe_insert(data_path="location", frame=frame_end)
     look_target.location = (0.0, 0.0, 0.0)
@@ -214,7 +280,6 @@ def setup_camera_animation(
     track.track_axis = "TRACK_NEGATIVE_Z"
     track.up_axis = "UP_Y"
 
-    # 强制激活相机
     bpy.context.scene.camera = cam_obj
     active = bpy.context.scene.camera
     print(
@@ -226,32 +291,102 @@ def setup_camera_animation(
 
 
 def make_fire_material() -> bpy.types.Material:
-    """创建橙红色高亮自发光材质 (Emission 强度初始为 0, 由关键帧驱动渐入)。"""
+    """创建橙红色高亮自发光材质 (Emission 强度初始为 0, 由关键帧驱动)。"""
     mat = bpy.data.materials.new(name="FireGlow")
     mat.use_nodes = True
     tree = mat.node_tree
     for node in list(tree.nodes):
         tree.nodes.remove(node)
     emit = tree.nodes.new("ShaderNodeEmission")
-    emit.inputs["Color"].default_value = (1.0, 0.35, 0.05, 1.0)  # 耀眼橙红
+    emit.inputs["Color"].default_value = (1.0, 0.35, 0.05, 1.0)
     emit.inputs["Strength"].default_value = 0.0
     output = tree.nodes.new("ShaderNodeOutputMaterial")
     tree.links.new(emit.outputs["Emission"], output.inputs["Surface"])
     return mat
 
 
+def char_room_materials(
+    kept_objects: list[bpy.types.Object], char_start: int, frame_end: int
+) -> None:
+    """材质焦黑化动画 (完全燃烧态): 燃烧峰值过后房间材质过渡为焦炭。
+
+    - Base Color 逐渐过渡为纯黑 (0,0,0,1): 带贴图的材质插入 MixRGB 混合节点,
+      无贴图的直接关键帧 default_value
+    - Roughness 过渡为 1.0 (失去光泽)
+    关键帧: 第 1 帧与 char_start 帧保持原值, frame_end 帧为焦炭终态。
+    """
+    materials = {
+        slot
+        for obj in kept_objects
+        for slot in obj.data.materials
+        if slot is not None
+    }
+    if not materials:
+        print("[警告] 保留网格没有任何材质, 跳过焦黑化", flush=True)
+        return
+
+    charred = 0
+    for mat in materials:
+        if not mat.use_nodes:
+            mat.use_nodes = True
+        tree = mat.node_tree
+        bsdf = next(
+            (node for node in tree.nodes if node.type == "BSDF_PRINCIPLED"), None
+        )
+        if bsdf is None:
+            continue
+        base_in = bsdf.inputs["Base Color"]
+        rough_in = bsdf.inputs["Roughness"]
+
+        # --- Base Color → 纯黑 ---
+        if base_in.is_linked:
+            # 带贴图的材质: 插入 MixRGB, 用 Fac 关键帧混合到黑色
+            src_socket = base_in.links[0].from_socket
+            mix = tree.nodes.new("ShaderNodeMixRGB")
+            mix.blend_type = "MIX"
+            mix.inputs["Color2"].default_value = (0.0, 0.0, 0.0, 1.0)
+            mix.inputs["Fac"].default_value = 0.0
+            for link in list(base_in.links):
+                tree.links.remove(link)
+            tree.links.new(src_socket, mix.inputs["Color1"])
+            tree.links.new(mix.outputs["Color"], base_in)
+            mix.inputs["Fac"].keyframe_insert(data_path="default_value", frame=1)
+            mix.inputs["Fac"].keyframe_insert(data_path="default_value", frame=char_start)
+            mix.inputs["Fac"].default_value = 1.0
+            mix.inputs["Fac"].keyframe_insert(data_path="default_value", frame=frame_end)
+        else:
+            base_in.keyframe_insert(data_path="default_value", frame=1)
+            base_in.keyframe_insert(data_path="default_value", frame=char_start)
+            base_in.default_value = (0.0, 0.0, 0.0, 1.0)
+            base_in.keyframe_insert(data_path="default_value", frame=frame_end)
+
+        # --- Roughness → 1.0 (失去光泽) ---
+        rough_in.keyframe_insert(data_path="default_value", frame=1)
+        rough_in.keyframe_insert(data_path="default_value", frame=char_start)
+        rough_in.default_value = 1.0
+        rough_in.keyframe_insert(data_path="default_value", frame=frame_end)
+
+        charred += 1
+
+    print(
+        f"[F8] 焦黑化动画: {charred} 个材质将于帧 {char_start}-{frame_end} "
+        f"过渡为纯黑焦炭 (Roughness 1.0)",
+        flush=True,
+    )
+
+
 def spawn_fire_effects(
     point_map: dict[int, tuple[float, float, float]],
     events: list[dict],
     offset: Vector,
+    frame_end: int,
 ) -> None:
-    """按 timeline 事件生成火焰效果: 球体 + 点光源, 关键帧驱动渐入与成长。
+    """生成火焰核心: 球体 + 点光源, 关键帧驱动渐入、峰值与余烬衰减。
 
     每个事件独立材质:
       - 球体 Scale: 0 -> 1 (出现动画)
-      - Emission 强度: 0 -> 40 (材质从原色渐变为刺眼发光橙红)
-      - 点光源能量: 0 -> 300 -> 900 (火势变大, 照亮范围持续扩张)
-    火点坐标统一叠加模型居中偏移量, 与模型保持对齐。
+      - Emission 强度: 0 -> 峰值 -> 余烬 (40 -> 5)
+      - 点光源能量: 0 -> 300 -> 900 -> 120 (火势变大后衰减)
     """
     for event in events:
         point_id = int(event["point"])
@@ -262,20 +397,21 @@ def spawn_fire_effects(
         start_frame = int(event["time"]) * FPS + 1
         ramp_frames = FPS
         before_frame = max(1, start_frame - 1)
+        peak_frame = start_frame + ramp_frames
 
-        # --- 火焰球体 ---
+        # --- 火焰核心球体 ---
         bpy.ops.mesh.primitive_uv_sphere_add(
             radius=FIRE_RADIUS, location=tuple(position)
         )
         sphere = bpy.context.active_object
         sphere.name = f"Fire_{point_id}"
-        material = make_fire_material()  # 每个事件独立材质
+        material = make_fire_material()
         sphere.data.materials.append(material)
 
         sphere.scale = (0.0, 0.0, 0.0)
         sphere.keyframe_insert(data_path="scale", frame=before_frame)
         sphere.scale = (1.0, 1.0, 1.0)
-        sphere.keyframe_insert(data_path="scale", frame=start_frame + ramp_frames)
+        sphere.keyframe_insert(data_path="scale", frame=peak_frame)
 
         emit_node = material.node_tree.nodes["Emission"]
         emit_node.inputs["Strength"].default_value = 0.0
@@ -284,50 +420,153 @@ def spawn_fire_effects(
         )
         emit_node.inputs["Strength"].default_value = FIRE_EMISSION_STRENGTH
         emit_node.inputs["Strength"].keyframe_insert(
-            data_path="default_value", frame=start_frame + ramp_frames
+            data_path="default_value", frame=peak_frame
+        )
+        emit_node.inputs["Strength"].default_value = FIRE_EMISSION_DECAY
+        emit_node.inputs["Strength"].keyframe_insert(
+            data_path="default_value", frame=frame_end
         )
 
-        # --- 火焰点光源: 能量随关键帧逐渐变大, 模拟火势扩张 ---
+        # --- 火焰点光源: 渐入 -> 峰值 -> 余烬 ---
         bpy.ops.object.light_add(
             type="POINT", location=tuple(position + Vector((0.0, 0.0, 0.3)))
         )
         light = bpy.context.active_object
         light.name = f"FireLight_{point_id}"
         light.data.color = (1.0, 0.4, 0.08)
-        light.data.cutoff_distance = 15.0  # 照亮范围 15 米
+        light.data.cutoff_distance = 15.0
         light.data.energy = 0.0
         light.data.keyframe_insert(data_path="energy", frame=before_frame)
         light.data.energy = FIRE_ENERGY_INITIAL
-        light.data.keyframe_insert(
-            data_path="energy", frame=start_frame + ramp_frames
-        )
+        light.data.keyframe_insert(data_path="energy", frame=peak_frame)
         light.data.energy = FIRE_ENERGY_GROWN
-        light.data.keyframe_insert(
-            data_path="energy", frame=start_frame + ramp_frames + FIRE_GROW_SPAN_FRAMES
-        )
+        light.data.keyframe_insert(data_path="energy", frame=peak_frame + FPS * 2)
+        light.data.energy = FIRE_ENERGY_DECAY
+        light.data.keyframe_insert(data_path="energy", frame=frame_end)
 
-    print(f"[F8] 已生成 {len(events)} 组火焰效果 (球体 + 动态点光源)", flush=True)
+    print(f"[F8] 已生成 {len(events)} 组火焰核心 (球体 + 动态点光源)", flush=True)
+
+
+def make_volume_material(
+    name: str,
+    color: tuple[float, float, float],
+    density: float,
+    emission_strength: float,
+) -> tuple[bpy.types.Material, bpy.types.Node]:
+    """创建体积材质 (Principled Volume), 返回 (材质, 体积节点)。"""
+    mat = bpy.data.materials.new(name=name)
+    mat.use_nodes = True
+    tree = mat.node_tree
+    for node in list(tree.nodes):
+        tree.nodes.remove(node)
+    volume = tree.nodes.new("ShaderNodeVolumePrincipled")
+    volume.inputs["Color"].default_value = (*color, 1.0)
+    volume.inputs["Density"].default_value = density
+    volume.inputs["Emission Strength"].default_value = emission_strength
+    output = tree.nodes.new("ShaderNodeOutputMaterial")
+    tree.links.new(volume.outputs["Volume"], output.inputs["Volume"])
+    return mat, volume
+
+
+def spawn_fire_volumes(
+    point_map: dict[int, tuple[float, float, float]],
+    events: list[dict],
+    offset: Vector,
+    frame_end: int,
+) -> None:
+    """体积火焰与烟雾: 每个起火点生成火舌体积 + 烟雾聚顶体积。
+
+    密度与发光强度按 timeline 强度曲线关键帧驱动:
+      火舌: 0 -> 峰值 (1.5 / 80) -> 衰减 (0.3 / 8)
+      烟雾: 0 -> 0.5 -> 1.2 (持续累积, 表现烟雾聚顶)
+    """
+    count = 0
+    for event in events:
+        point_id = int(event["point"])
+        if point_id not in point_map:
+            continue
+        position = Vector(point_map[point_id]) + offset
+        start_frame = int(event["time"]) * FPS + 1
+        before_frame = max(1, start_frame - 1)
+        peak_frame = start_frame + FPS
+
+        # --- 火舌体积 (竖直拉伸, 橙色 Emission) ---
+        flame_mat, flame_node = make_volume_material(
+            f"FlameVol_{point_id}", (1.0, 0.35, 0.05), 0.0, 0.0
+        )
+        bpy.ops.mesh.primitive_cube_add(
+            size=1.0, location=tuple(position + Vector((0.0, 0.0, 1.2)))
+        )
+        flame_obj = bpy.context.active_object
+        flame_obj.name = f"Flame_{point_id}"
+        flame_obj.scale = (1.0, 1.0, 2.4)  # 竖直拉伸成火舌
+        flame_obj.data.materials.append(flame_mat)
+
+        den = flame_node.inputs["Density"]
+        em = flame_node.inputs["Emission Strength"]
+        den.default_value = 0.0
+        em.default_value = 0.0
+        den.keyframe_insert(data_path="default_value", frame=before_frame)
+        em.keyframe_insert(data_path="default_value", frame=before_frame)
+        den.default_value = FLAME_DENSITY_PEAK
+        em.default_value = FLAME_EMISSION_PEAK
+        den.keyframe_insert(data_path="default_value", frame=peak_frame)
+        em.keyframe_insert(data_path="default_value", frame=peak_frame)
+        den.default_value = FLAME_DENSITY_DECAY
+        em.default_value = FLAME_EMISSION_DECAY
+        den.keyframe_insert(data_path="default_value", frame=frame_end)
+        em.keyframe_insert(data_path="default_value", frame=frame_end)
+
+        # --- 烟雾聚顶体积 (更大, 深灰, 密度持续累积) ---
+        smoke_mat, smoke_node = make_volume_material(
+            f"SmokeVol_{point_id}", (0.15, 0.15, 0.16), 0.0, 0.0
+        )
+        bpy.ops.mesh.primitive_cube_add(
+            size=1.0, location=tuple(position + Vector((0.0, 0.0, 2.8)))
+        )
+        smoke_obj = bpy.context.active_object
+        smoke_obj.name = f"Smoke_{point_id}"
+        smoke_obj.scale = (2.2, 2.2, 2.6)
+        smoke_obj.data.materials.append(smoke_mat)
+
+        smoke_den = smoke_node.inputs["Density"]
+        smoke_den.default_value = 0.0
+        smoke_den.keyframe_insert(data_path="default_value", frame=before_frame)
+        smoke_den.default_value = SMOKE_DENSITY_PEAK
+        smoke_den.keyframe_insert(data_path="default_value", frame=peak_frame)
+        smoke_den.default_value = SMOKE_DENSITY_FINAL
+        smoke_den.keyframe_insert(data_path="default_value", frame=frame_end)
+
+        count += 1
+
+    print(f"[F8] 已生成 {count} 组体积火焰与烟雾 (Principled Volume)", flush=True)
 
 
 def setup_render(output_path: Path, frame_end: int) -> None:
-    """Eevee + Bloom + 720p 预览档 + FFmpeg 感知无损输出。"""
+    """Eevee + 体积渲染参数 + Bloom + 720p 预览 + FFmpeg 感知无损输出。"""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     scene = bpy.context.scene
     scene.render.engine = "BLENDER_EEVEE_NEXT"  # Blender 4.2 的 Eevee
     scene.render.fps = FPS
     scene.frame_start = 1
     scene.frame_end = frame_end
-    scene.render.resolution_x = 1280          # 720p 预览档 (快速看效果)
+    scene.render.resolution_x = 1280          # 720p 预览档
     scene.render.resolution_y = 720
-    scene.render.resolution_percentage = 100  # 100% 渲染百分比
+    scene.render.resolution_percentage = 100
     scene.eevee.taa_samples = 1
     scene.eevee.use_ssr = False
     scene.eevee.use_gtao = False
-    # 泛光特效: 火源高亮区域产生真实光晕
+    # 泛光特效
     scene.eevee.use_bloom = True
     scene.eevee.bloom_intensity = 1.0
     scene.eevee.bloom_threshold = 0.6
-    # FFmpeg 输出: 感知无损最高质量
+    # 体积渲染参数 (火舌/烟雾)
+    scene.eevee.volumetric_tile_size = 8
+    scene.eevee.volumetric_samples = 24
+    scene.eevee.volumetric_shadow_samples = 8
+    scene.eevee.volumetric_start = 0.1
+    scene.eevee.volumetric_end = 60.0
+    # FFmpeg 输出
     scene.render.image_settings.file_format = "FFMPEG"
     scene.render.ffmpeg.format = "MPEG4"
     scene.render.ffmpeg.codec = "H264"
@@ -359,7 +598,7 @@ def main() -> None:
     events: list[dict] = timeline["spread_events"]
     start_point_id = int(timeline.get("start_point", events[0]["point"]))
 
-    # 覆盖机制: 强制清除旧产物, 保证每次生成的都是最新渲染的视频
+    # 覆盖机制: 强制清除旧产物
     if output_path.exists():
         output_path.unlink()
         print(f"[F8] 已删除旧产物: {output_path}", flush=True)
@@ -367,30 +606,42 @@ def main() -> None:
     clear_scene()
     import_mesh(scene_dir / "mesh.obj")
     ensure_textures(scene_dir)
-    offset, max_dim = normalize_model(point_map)
+    offset, _ = normalize_model(point_map)
 
-    # 起火点坐标 (与模型同步平移后); 缺失时退回模型中心
+    # ---- 空间过滤: 仅保留燃烧区域局部 ----
+    kept_objects, burn_points = filter_to_burn_region(point_map, events, offset)
+    bounds_min, bounds_max = burn_region_bounds(burn_points)
+    max_dim = max(
+        bounds_max.x - bounds_min.x,
+        bounds_max.y - bounds_min.y,
+        bounds_max.z - bounds_min.z,
+    )
+
     ignition_pos = (
         Vector(point_map[start_point_id]) + offset
         if start_point_id in point_map
         else Vector((0.0, 0.0, 0.0))
     )
 
-    # 最后事件渐入 1 秒 + 观察尾帧 1 秒
+    # 时间轴: 最后事件渐入 1 秒, 之后 2 秒为焦黑化/余烬衰减窗口
     last_start = max(int(e["time"]) for e in events) * FPS + 1
-    frame_end = last_start + FPS * 2
+    frame_end = last_start + FPS * 3
+    char_start = last_start + FPS  # 峰值过后开始焦黑化
 
     setup_world()
     setup_lighting()
     setup_camera_animation(ignition_pos, max_dim, frame_end)
-    spawn_fire_effects(point_map, events, offset)
+    char_room_materials(kept_objects, char_start, frame_end)
+    spawn_fire_effects(point_map, events, offset, frame_end)
+    spawn_fire_volumes(point_map, events, offset, frame_end)
     setup_render(output_path, frame_end)
     _register_frame_progress(frame_end)
 
     scene = bpy.context.scene
     print(
         f"[F8] 渲染配置: engine=Eevee(EEVEE_NEXT) 分辨率={scene.render.resolution_x}x{scene.render.resolution_y} "
-        f"fps={FPS} 帧范围=1-{frame_end} 事件数={len(events)} 起火点={start_point_id} 输出={output_path}",
+        f"fps={FPS} 帧范围=1-{frame_end} 事件数={len(events)} 起火点={start_point_id} "
+        f"焦黑化起点=帧{char_start} 输出={output_path}",
         flush=True,
     )
     bpy.ops.render.render(animation=True)
