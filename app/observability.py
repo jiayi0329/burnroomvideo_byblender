@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import Callable
 
 GPU_SAMPLE_INTERVAL_SECONDS = 5.0
+GPU_TEMP_WARN_C = 85.0  # GPU 温度告警阈值 (℃)
+GPU_TEMP_KILL_C = 90.0  # GPU 温度终止阈值 (℃), 超过则自动终止渲染
 # nvidia-smi 查询语句 (CSV 无表头输出, 便于解析)
 NVIDIA_SMI_QUERY = [
     "nvidia-smi",
@@ -101,10 +103,11 @@ def verify_output(scene_dir: Path) -> Path | None:
     return None
 
 
-def sample_gpu_metrics(scene_dir: Path) -> bool:
+def sample_gpu_metrics(scene_dir: Path) -> float | None:
     """调用 nvidia-smi 采集一次 GPU 指标, 写入 metrics/gpu_metrics.jsonl。
 
-    返回 False 表示 GPU 不可用 (无 nvidia-smi / 无 GPU), 调用方应停止采样。
+    返回本次采样中所有 GPU 的最高温度 (℃); None 表示 GPU 不可用 (无 nvidia-smi
+    或无 GPU), 调用方应停止采样。
     """
     try:
         result = subprocess.run(
@@ -112,41 +115,67 @@ def sample_gpu_metrics(scene_dir: Path) -> bool:
         )
     except (FileNotFoundError, subprocess.TimeoutExpired):
         append_log(scene_dir, "[gpu] nvidia-smi 不可用, 跳过 GPU 指标采样")
-        return False
+        return None
     if result.returncode != 0 or not result.stdout.strip():
         append_log(
             scene_dir,
             f"[gpu] nvidia-smi 返回异常: {result.stderr.strip() or '无输出'}",
         )
-        return False
+        return None
 
+    max_temp = 0.0
     for line in result.stdout.strip().splitlines():
         parts = [p.strip() for p in line.split(",")]
         if len(parts) < 5:
             continue
+        temp_c = int(parts[4])
+        max_temp = max(max_temp, float(temp_c))
         record = {
             "ts": now_iso(),
             "gpu": int(parts[0]),
             "util_pct": int(parts[1]),
             "mem_used_mb": int(parts[2]),
             "mem_total_mb": int(parts[3]),
-            "temp_c": int(parts[4]),
+            "temp_c": temp_c,
         }
         _append_line(
             scene_dir / "metrics" / "gpu_metrics.jsonl",
             json.dumps(record, ensure_ascii=False),
         )
-    return True
+    return max_temp
 
 
 def start_gpu_sampler(
-    scene_dir: Path, is_running: Callable[[], bool]
+    scene_dir: Path,
+    is_running: Callable[[], bool],
+    on_overheat: Callable[[float], None] | None = None,
 ) -> threading.Thread:
-    """启动后台采样线程: 渲染期间每 GPU_SAMPLE_INTERVAL_SECONDS 采一次 GPU 指标。"""
+    """启动后台采样线程: 渲染期间周期采样 GPU 指标并守护温度。
+
+    温度达到 GPU_TEMP_WARN_C 时记录告警; 达到 GPU_TEMP_KILL_C 时记录事件
+    并调用 on_overheat 回调 (通常用于终止渲染进程)。
+    """
     def _loop() -> None:
         gpu_available = True
         while is_running() and gpu_available:
-            gpu_available = sample_gpu_metrics(scene_dir)
+            max_temp = sample_gpu_metrics(scene_dir)
+            if max_temp is None:
+                gpu_available = False
+                continue
+            if max_temp >= GPU_TEMP_WARN_C:
+                append_log(
+                    scene_dir,
+                    f"[gpu/告警] 最高温度 {max_temp:.0f}°C 超过告警阈值 {GPU_TEMP_WARN_C:.0f}°C",
+                )
+                if max_temp >= GPU_TEMP_KILL_C:
+                    write_event(
+                        scene_dir, "process", "gpu_overheat_abort",
+                        status="failed",
+                        detail=f"最高温度 {max_temp:.0f}°C >= {GPU_TEMP_KILL_C:.0f}°C, 自动终止渲染",
+                    )
+                    if on_overheat is not None:
+                        on_overheat(max_temp)
+                    return
             threading.Event().wait(GPU_SAMPLE_INTERVAL_SECONDS)
 
     thread = threading.Thread(

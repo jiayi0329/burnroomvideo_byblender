@@ -10,6 +10,8 @@ services:
     environment:
       # MinIO 数据流转连接配置 (凭证由 prod.env 注入容器)
       - MINIO_ENDPOINT=minio-oss:9000
+      # 产物公开分享链接使用的对外端点 (V6.0 老师看片入口, 需管理员放行 9000 端口)
+      - MINIO_PUBLIC_ENDPOINT=http://172.25.76.201:9000
     depends_on:
       - minio-oss
     volumes:

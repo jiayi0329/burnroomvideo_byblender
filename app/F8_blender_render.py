@@ -54,6 +54,10 @@ def parse_args() -> argparse.Namespace:
         argv = argv[argv.index("--") + 1:]
     parser = argparse.ArgumentParser(description="F8 火灾蔓延渲染")
     parser.add_argument("--scene", default=DEFAULT_SCENE, help="场景 code")
+    parser.add_argument(
+        "--quality", choices=["preview", "final"], default="preview",
+        help="渲染档位: preview=720p 快速验证 / final=1080p 正式出片",
+    )
     return parser.parse_args(argv)
 
 
@@ -542,16 +546,23 @@ def spawn_fire_volumes(
     print(f"[F8] 已生成 {count} 组体积火焰与烟雾 (Principled Volume)", flush=True)
 
 
-def setup_render(output_path: Path, frame_end: int) -> None:
-    """Eevee + 体积渲染参数 + Bloom + 720p 预览 + FFmpeg 感知无损输出。"""
+def setup_render(output_path: Path, frame_end: int, quality: str = "preview") -> None:
+    """Eevee + 体积渲染参数 + Bloom + FFmpeg 感知无损输出。
+
+    quality: preview=1280x720 快速验证 / final=1920x1080 正式出片 (V6.0 参数化)。
+    """
     output_path.parent.mkdir(parents=True, exist_ok=True)
     scene = bpy.context.scene
     scene.render.engine = "BLENDER_EEVEE_NEXT"  # Blender 4.2 的 Eevee
     scene.render.fps = FPS
     scene.frame_start = 1
     scene.frame_end = frame_end
-    scene.render.resolution_x = 1280          # 720p 预览档
-    scene.render.resolution_y = 720
+    if quality == "final":
+        scene.render.resolution_x = 1920
+        scene.render.resolution_y = 1080
+    else:
+        scene.render.resolution_x = 1280
+        scene.render.resolution_y = 720
     scene.render.resolution_percentage = 100
     scene.eevee.taa_samples = 1
     scene.eevee.use_ssr = False
@@ -561,7 +572,7 @@ def setup_render(output_path: Path, frame_end: int) -> None:
     scene.eevee.bloom_intensity = 1.0
     scene.eevee.bloom_threshold = 0.6
     # 体积渲染参数 (火舌/烟雾)
-    scene.eevee.volumetric_tile_size = 8
+    scene.eevee.volumetric_tile_size = "8"  # Blender 4.2 为字符串枚举: '2'/'4'/'8'/'16'
     scene.eevee.volumetric_samples = 24
     scene.eevee.volumetric_shadow_samples = 8
     scene.eevee.volumetric_start = 0.1
@@ -634,13 +645,13 @@ def main() -> None:
     char_room_materials(kept_objects, char_start, frame_end)
     spawn_fire_effects(point_map, events, offset, frame_end)
     spawn_fire_volumes(point_map, events, offset, frame_end)
-    setup_render(output_path, frame_end)
+    setup_render(output_path, frame_end, args.quality)
     _register_frame_progress(frame_end)
 
     scene = bpy.context.scene
     print(
         f"[F8] 渲染配置: engine=Eevee(EEVEE_NEXT) 分辨率={scene.render.resolution_x}x{scene.render.resolution_y} "
-        f"fps={FPS} 帧范围=1-{frame_end} 事件数={len(events)} 起火点={start_point_id} "
+        f"档位={args.quality} fps={FPS} 帧范围=1-{frame_end} 事件数={len(events)} 起火点={start_point_id} "
         f"焦黑化起点=帧{char_start} 输出={output_path}",
         flush=True,
     )

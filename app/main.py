@@ -20,7 +20,12 @@ from app.observability import (
     write_failure,
     write_render_status,
 )
-from app.s3_io import download_scene_assets, upload_output
+from app.s3_io import (
+    download_scene_assets,
+    get_share_url,
+    set_bucket_public_read,
+    upload_output,
+)
 
 app = FastAPI(title="火灾蔓延视频生成系统 API")
 
@@ -58,6 +63,16 @@ def download_scene_files(scene_code: str):
     save_dir = f"/app/data/{scene_code}"
     os.makedirs(save_dir, exist_ok=True)
     downloaded_files = []
+
+    # 缓存去重 (V6.0): 核心资产 (网格+点位) 已存在则跳过下载, 秒级返回
+    if os.path.exists(os.path.join(save_dir, "mesh.obj")) and os.path.exists(
+        os.path.join(save_dir, "points.json")
+    ):
+        return {
+            "status": "已缓存, 跳过下载 (核心资产齐全)",
+            "sceneCode": scene_code,
+            "详细信息": ["mesh.obj + points.json 已存在, 未重复下载"],
+        }
 
     try:
         # 1. 下载全景图
@@ -142,11 +157,16 @@ def generate_timeline(scene_code: str) -> SpreadTimeline:
 
 
 @app.post("/api/render/{scene_code}")
-def start_render(scene_code: str) -> dict:
+def start_render(scene_code: str, quality: str = "preview") -> dict:
     """F8 渲染接口: 拉取资产 -> 启动 Blender 子进程 -> 后台守护线程完成验证与上传。
 
     铁律: 绝不 import bpy, Blender 通过 subprocess 完全独立运行。
+    quality: preview=720p 快速验证 / final=1080p 正式出片 (V6.0 参数化)。
     """
+    if quality not in ("preview", "final"):
+        raise HTTPException(
+            status_code=400, detail=f"quality 仅支持 preview/final: {quality}"
+        )
     scene_dir = DATA_ROOT / scene_code
     if not scene_dir.is_dir():
         raise HTTPException(status_code=404, detail=f"场景目录不存在: {scene_code}")
@@ -182,7 +202,7 @@ def start_render(scene_code: str) -> dict:
     cmd = [
         BLENDER_BIN, "--background",
         "--python", str(RENDER_SCRIPT_PATH),
-        "--", "--scene", scene_code,
+        "--", "--scene", scene_code, "--quality", quality,
     ]
     log_file = (scene_dir / "render.log").open("w", encoding="utf-8")
     proc = subprocess.Popen(
@@ -204,7 +224,11 @@ def start_render(scene_code: str) -> dict:
     )
 
     # ---- 后台守护: GPU 指标采样线程 + 结果验证与上传线程 ----
-    start_gpu_sampler(scene_dir, is_running=lambda: proc.poll() is None)
+    start_gpu_sampler(
+        scene_dir,
+        is_running=lambda: proc.poll() is None,
+        on_overheat=lambda _temp: proc.terminate(),  # GPU 超温自动终止渲染
+    )
     threading.Thread(
         target=_watch_render,
         args=(proc, scene_dir, scene_code),
@@ -283,3 +307,57 @@ def get_render_status(scene_code: str) -> dict:
             status = {**status, "status": final_status, "finished_at": now_iso()}
             write_render_status(scene_dir, **status)
     return status
+
+
+@app.get("/api/render/{scene_code}/share")
+def get_render_share(scene_code: str) -> dict:
+    """V6.0: 获取产物公开分享链接 (MinIO Public/Read-only 策略 + 直连 URL)。"""
+    scene_dir = DATA_ROOT / scene_code
+    if verify_output(scene_dir) is None:
+        raise HTTPException(status_code=404, detail=f"场景 {scene_code} 尚无渲染产物")
+    try:
+        set_bucket_public_read()
+        url = get_share_url(scene_code)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"生成分享链接失败: {exc}")
+    write_event(scene_dir, "share", "share_url_created", detail=url)
+    return {"scene_code": scene_code, "url": url}
+
+
+@app.post("/api/pipeline/{scene_code}")
+def run_pipeline(scene_code: str, quality: str = "preview") -> dict:
+    """V6.0 流水线编排: 一键执行 下载(缓存去重) -> 起火点与时序 -> 渲染。"""
+    scene_dir = DATA_ROOT / scene_code
+    steps: dict = {}
+
+    # 1. 资产就位 (download 接口内部自带缓存去重)
+    try:
+        assets = download_scene_files(scene_code)
+        steps["assets"] = assets.get("status", "ok")
+    except HTTPException as exc:
+        return {
+            "scene_code": scene_code, "status": "failed",
+            "step": "download", "detail": exc.detail,
+        }
+
+    # 2. 蔓延时序就位 (已存在则复用)
+    if not (scene_dir / "timeline.json").is_file():
+        try:
+            generate_timeline(scene_code)
+        except HTTPException as exc:
+            return {
+                "scene_code": scene_code, "status": "failed",
+                "step": "timeline", "detail": exc.detail,
+            }
+    steps["timeline"] = "ready"
+
+    # 3. 异步拉起渲染
+    render_result = start_render(scene_code, quality)
+    steps["render"] = render_result.get("status")
+
+    return {
+        "scene_code": scene_code,
+        "status": "running",
+        "steps": steps,
+        "status_endpoint": f"/api/render/{scene_code}/status",
+    }

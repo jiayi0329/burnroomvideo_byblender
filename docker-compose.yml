@@ -13,6 +13,8 @@ services:
       - MINIO_ENDPOINT=minio-oss:9000
       - MINIO_ROOT_USER=${MINIO_ROOT_USER:-admin_blender}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+      # 产物公开分享链接使用的对外端点 (本地开发指向 localhost)
+      - MINIO_PUBLIC_ENDPOINT=http://localhost:9000
     depends_on:
       - minio-oss
     volumes:

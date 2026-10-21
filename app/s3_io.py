@@ -5,6 +5,7 @@
   burnroom-outputs  渲染产物 (对象键: {scene_code}/output.mp4)
 连接配置从容器环境变量注入 (MINIO_ENDPOINT / MINIO_ROOT_USER / MINIO_ROOT_PASSWORD)。
 """
+import json
 import os
 from pathlib import Path
 
@@ -63,3 +64,29 @@ def upload_output(scene_code: str, local_mp4: Path) -> str:
     object_name = f"{scene_code}/output.mp4"
     client.fput_object(OUTPUTS_BUCKET, object_name, str(local_mp4))
     return object_name
+
+
+def set_bucket_public_read(bucket: str = OUTPUTS_BUCKET) -> None:
+    """把产物桶设为公开只读 (Public/Read-only), 使对象可免认证访问。"""
+    client = get_minio_client()
+    ensure_buckets(client)
+    policy = json.dumps(
+        {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Principal": {"AWS": ["*"]},
+                    "Action": ["s3:GetObject"],
+                    "Resource": [f"arn:aws:s3:::{bucket}/*"],
+                }
+            ],
+        }
+    )
+    client.set_bucket_policy(bucket, policy)
+
+
+def get_share_url(scene_code: str, bucket: str = OUTPUTS_BUCKET) -> str:
+    """生成产物公开访问链接 (对外端点由环境变量 MINIO_PUBLIC_ENDPOINT 配置)。"""
+    endpoint = os.getenv("MINIO_PUBLIC_ENDPOINT", "http://172.25.76.201:9000")
+    return f"{endpoint.rstrip('/')}/{bucket}/{scene_code}/output.mp4"
