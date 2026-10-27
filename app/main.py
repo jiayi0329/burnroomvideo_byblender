@@ -21,9 +21,10 @@ from app.observability import (
     write_render_status,
 )
 from app.s3_io import (
+    SHARE_EXPIRES_SECONDS,
     download_scene_assets,
+    ensure_share_output,
     get_share_url,
-    set_bucket_public_read,
     upload_output,
 )
 
@@ -56,6 +57,25 @@ def get_all_scenes():
         return {"status": "success", "总数量": response["data"]["total"], "场景列表": scenes}
     raise HTTPException(status_code=400, detail="获取失败")
 
+def scene_assets_cached(scene_dir: Path) -> bool:
+    """核心资产和点位对应的全景图均非空时，才允许跳过下载。"""
+    mesh = scene_dir / "mesh.obj"
+    points = scene_dir / "points.json"
+    try:
+        if not mesh.is_file() or mesh.stat().st_size == 0 or not points.is_file():
+            return False
+        raw_points = json.loads(points.read_text(encoding="utf-8"))
+        if not isinstance(raw_points, list) or not raw_points:
+            return False
+        for point in raw_points:
+            pano = scene_dir / f"{int(point['device'])}.jpg"
+            if not pano.is_file() or pano.stat().st_size == 0:
+                return False
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+    return True
+
+
 @app.get("/api/download_scene/{scene_code}")
 def download_scene_files(scene_code: str):
     '''终极版：下载场景全景图、模型，并额外保存点位信息 points.json'''
@@ -64,14 +84,12 @@ def download_scene_files(scene_code: str):
     os.makedirs(save_dir, exist_ok=True)
     downloaded_files = []
 
-    # 缓存去重 (V6.0): 核心资产 (网格+点位) 已存在则跳过下载, 秒级返回
-    if os.path.exists(os.path.join(save_dir, "mesh.obj")) and os.path.exists(
-        os.path.join(save_dir, "points.json")
-    ):
+    # F6 依赖全景图，不能只凭 mesh.obj + points.json 判断缓存完整。
+    if scene_assets_cached(Path(save_dir)):
         return {
             "status": "已缓存, 跳过下载 (核心资产齐全)",
             "sceneCode": scene_code,
-            "详细信息": ["mesh.obj + points.json 已存在, 未重复下载"],
+            "详细信息": ["mesh.obj + points.json + 点位全景图完整, 未重复下载"],
         }
 
     try:
@@ -82,7 +100,7 @@ def download_scene_files(scene_code: str):
             for link in pano_res["data"]:
                 filename = link.split("/")[-1]
                 filepath = os.path.join(save_dir, filename)
-                if not os.path.exists(filepath): # 如果已经下载过就不重复下载了，节省时间
+                if not os.path.isfile(filepath) or os.path.getsize(filepath) == 0:
                     urllib.request.urlretrieve(link, filepath)
                 downloaded_files.append(f"全景图已存: {filename}")
 
@@ -93,7 +111,7 @@ def download_scene_files(scene_code: str):
             for link in obj_res["data"]:
                 filename = link.split("/")[-1]
                 filepath = os.path.join(save_dir, filename)
-                if not os.path.exists(filepath):
+                if not os.path.isfile(filepath) or os.path.getsize(filepath) == 0:
                     urllib.request.urlretrieve(link, filepath)
                 downloaded_files.append(f"模型已存: {filename}")
 
@@ -311,22 +329,44 @@ def get_render_status(scene_code: str) -> dict:
 
 @app.get("/api/render/{scene_code}/share")
 def get_render_share(scene_code: str) -> dict:
-    """V6.0: 获取产物公开分享链接 (MinIO Public/Read-only 策略 + 直连 URL)。"""
+    """V6.0: 复用已有成片，补齐 MinIO 对象并生成七天预签名播放链接。"""
+    if not scene_code.isascii() or not all(c.isalnum() or c in "-_" for c in scene_code):
+        raise HTTPException(status_code=400, detail="无效的场景编号")
     scene_dir = DATA_ROOT / scene_code
-    if verify_output(scene_dir) is None:
+    status = read_render_status(scene_dir)
+    if status and status.get("status") == "running":
+        raise HTTPException(status_code=409, detail="渲染仍在进行，请完成后再分享")
+    output_path = verify_output(scene_dir)
+    if output_path is None:
         raise HTTPException(status_code=404, detail=f"场景 {scene_code} 尚无渲染产物")
     try:
-        set_bucket_public_read()
+        object_name = ensure_share_output(scene_code, output_path)
         url = get_share_url(scene_code)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"生成分享链接失败: {exc}")
-    write_event(scene_dir, "share", "share_url_created", detail=url)
-    return {"scene_code": scene_code, "url": url}
+        # 不把带凭证的请求 URL 或底层异常文本写入公开响应/日志。
+        write_event(
+            scene_dir, "share", "share_url_failed",
+            status="failed", detail=type(exc).__name__,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="生成分享链接失败，请检查 MinIO 连接、凭证及对外端点配置",
+        ) from None
+    write_event(
+        scene_dir, "share", "share_url_created",
+        detail=f"object={object_name} expires_in_seconds={SHARE_EXPIRES_SECONDS}",
+    )
+    return {
+        "scene_code": scene_code, "url": url,
+        "expires_in_seconds": SHARE_EXPIRES_SECONDS,
+    }
 
 
 @app.post("/api/pipeline/{scene_code}")
 def run_pipeline(scene_code: str, quality: str = "preview") -> dict:
     """V6.0 流水线编排: 一键执行 下载(缓存去重) -> 起火点与时序 -> 渲染。"""
+    if quality not in ("preview", "final"):
+        raise HTTPException(status_code=400, detail="quality 仅支持 preview/final")
     scene_dir = DATA_ROOT / scene_code
     steps: dict = {}
 
@@ -357,7 +397,7 @@ def run_pipeline(scene_code: str, quality: str = "preview") -> dict:
 
     return {
         "scene_code": scene_code,
-        "status": "running",
+        "status": render_result.get("status", "running"),
         "steps": steps,
         "status_endpoint": f"/api/render/{scene_code}/status",
     }

@@ -7,13 +7,16 @@
 """
 import json
 import os
+from datetime import timedelta
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from minio import Minio
 from minio.error import S3Error
 
 ASSETS_BUCKET = "burnroom-assets"
 OUTPUTS_BUCKET = "burnroom-outputs"
+SHARE_EXPIRES_SECONDS = 7 * 24 * 60 * 60
 
 
 def get_minio_client() -> Minio:
@@ -62,8 +65,25 @@ def upload_output(scene_code: str, local_mp4: Path) -> str:
     client = get_minio_client()
     ensure_buckets(client)
     object_name = f"{scene_code}/output.mp4"
-    client.fput_object(OUTPUTS_BUCKET, object_name, str(local_mp4))
+    client.fput_object(
+        OUTPUTS_BUCKET, object_name, str(local_mp4), content_type="video/mp4"
+    )
     return object_name
+
+
+def ensure_share_output(scene_code: str, local_mp4: Path) -> str:
+    """复用已有视频；对象缺失、大小或媒体类型不一致时补传，不触发渲染。"""
+    client = get_minio_client()
+    object_name = f"{scene_code}/output.mp4"
+    try:
+        obj = client.stat_object(OUTPUTS_BUCKET, object_name)
+    except S3Error as exc:
+        if exc.code not in ("NoSuchKey", "NoSuchObject", "NoSuchBucket"):
+            raise
+    else:
+        if obj.size == local_mp4.stat().st_size and obj.content_type == "video/mp4":
+            return object_name
+    return upload_output(scene_code, local_mp4)
 
 
 def set_bucket_public_read(bucket: str = OUTPUTS_BUCKET) -> None:
@@ -87,6 +107,34 @@ def set_bucket_public_read(bucket: str = OUTPUTS_BUCKET) -> None:
 
 
 def get_share_url(scene_code: str, bucket: str = OUTPUTS_BUCKET) -> str:
-    """生成产物公开访问链接 (对外端点由环境变量 MINIO_PUBLIC_ENDPOINT 配置)。"""
-    endpoint = os.getenv("MINIO_PUBLIC_ENDPOINT", "http://172.25.76.201:9000")
-    return f"{endpoint.rstrip('/')}/{bucket}/{scene_code}/output.mp4"
+    """按浏览器可达主机签名，生成七天有效的直接播放链接。"""
+    endpoint = os.getenv("MINIO_PUBLIC_ENDPOINT", "http://172.25.76.201:9000").strip()
+    parsed = urlsplit(endpoint)
+    if (
+        parsed.scheme not in ("http", "https")
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path not in ("", "/")
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ValueError("MINIO_PUBLIC_ENDPOINT 必须是 http(s)://主机[:端口]，不含路径或凭证")
+    # 显式指定区域使签名在本地完成，避免从容器访问对外入口查询区域。
+    client = Minio(
+        parsed.netloc,
+        access_key=os.getenv("MINIO_ROOT_USER", "admin_blender"),
+        secret_key=os.getenv("MINIO_ROOT_PASSWORD", ""),
+        secure=parsed.scheme == "https",
+        region=os.getenv("MINIO_REGION", "us-east-1"),
+    )
+    if not os.getenv("MINIO_ROOT_PASSWORD"):
+        raise ValueError("未配置 MinIO 签名凭证")
+    return client.presigned_get_object(
+        bucket, f"{scene_code}/output.mp4",
+        expires=timedelta(seconds=SHARE_EXPIRES_SECONDS),
+        response_headers={
+            "response-content-type": "video/mp4",
+            "response-content-disposition": 'inline; filename="output.mp4"',
+        },
+    )
