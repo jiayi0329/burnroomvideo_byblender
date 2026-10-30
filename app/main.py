@@ -10,6 +10,7 @@ from pathlib import Path
 
 from app.F6_detect import find_ignition_point
 from app.F7_spread import SpreadTimeline, bfs_spread, load_adjacency
+from app.room_api import router as room_router
 from app.observability import (
     append_log,
     now_iso,
@@ -29,6 +30,8 @@ from app.s3_io import (
 )
 
 app = FastAPI(title="火灾蔓延视频生成系统 API")
+
+app.include_router(room_router)
 
 BASE_URL = "https://api.4dkankan.com"
 APP_KEY = os.getenv("DK_APPKEY")

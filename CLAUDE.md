@@ -9,7 +9,7 @@
 - **数据 I/O与持久化**: 
   - 摒弃本地文件系统，输入资产与输出视频全部通过 S3 SDK 与 `minio-oss` 容器交互。
   - 生产环境 MinIO 数据强制挂载至服务器独立数据盘: `/data/zhaojy/burnroom-data/minio`。
-- **无状态设计**: 禁止使用 Redis/MySQL，任务流转状态通过 MinIO 或本地简单 JSON 文件维系。
+- **数据关系（2026-10-30 用户确认变更）**: 允许 PostgreSQL 保存房间/点位/文件关系和任务摘要；Redis/MySQL 不引入。渲染运行状态首期仍以 JSON 为准，数据库摘要不是独立状态机；Blender 只读取文件，不直接连接数据库。数据库仅 Docker 内部访问，数据落独立数据盘。
 
 ## 2. CI/CD 自动化部署规范 (Strict Rules)
 - **交付流**: Local Pack (`build.ps1`) -> SCP Transfer (`deploy.ps1`) -> Remote SSH Extract -> Docker Compose Up。

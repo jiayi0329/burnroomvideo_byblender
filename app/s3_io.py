@@ -106,8 +106,8 @@ def set_bucket_public_read(bucket: str = OUTPUTS_BUCKET) -> None:
     client.set_bucket_policy(bucket, policy)
 
 
-def get_share_url(scene_code: str, bucket: str = OUTPUTS_BUCKET) -> str:
-    """按浏览器可达主机签名，生成七天有效的直接播放链接。"""
+def get_public_minio_client() -> Minio:
+    """使用浏览器可达端点创建签名客户端；显式区域避免联网查询。"""
     endpoint = os.getenv("MINIO_PUBLIC_ENDPOINT", "http://172.25.76.201:9000").strip()
     parsed = urlsplit(endpoint)
     if (
@@ -130,7 +130,12 @@ def get_share_url(scene_code: str, bucket: str = OUTPUTS_BUCKET) -> str:
     )
     if not os.getenv("MINIO_ROOT_PASSWORD"):
         raise ValueError("未配置 MinIO 签名凭证")
-    return client.presigned_get_object(
+    return client
+
+
+def get_share_url(scene_code: str, bucket: str = OUTPUTS_BUCKET) -> str:
+    """为现有视频生成七天有效的 inline 播放链接。"""
+    return get_public_minio_client().presigned_get_object(
         bucket, f"{scene_code}/output.mp4",
         expires=timedelta(seconds=SHARE_EXPIRES_SECONDS),
         response_headers={

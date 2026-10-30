@@ -30,3 +30,18 @@ services:
     command: server /data --console-address ":9001"
     volumes:
       - /data/zhaojy/burnroom-data/minio:/data  # 生产环境建议挂载到服务器的绝对路径下
+
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    # 不发布 5432，后端通过 Compose 网络访问。
+    environment:
+      POSTGRES_DB: burnroom
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in remote .env}
+    volumes:
+      - /data/zhaojy/burnroom-data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d burnroom"]
+      interval: 10s
+      timeout: 5s
+      retries: 10

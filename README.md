@@ -106,5 +106,5 @@ docker pull docker.1panel.live/minio/minio:latest   # MinIO 走国内代理源
 1. **绝对禁止在 FastAPI 或业务逻辑中 `import bpy`**。
    Blender 必须通过 `subprocess.run` 作为独立子进程调用：
    `blender --background --python app/F8_blender_render.py -- --scene <code>`
-2. 数据 I/O 走 S3 SDK 与 MinIO；任务状态用 MinIO 或 JSON 文件维系，禁用 Redis/MySQL
+2. 数据 I/O 走 S3 SDK 与 MinIO；运行状态首期仍以 JSON 为准。PostgreSQL 管理房间/点位/文件关系及任务查询摘要，不引入 Redis/MySQL。数据库部署与导入见 [数据库操作说明](docs/database.md)。
 3. Python 规范：完整类型提示、pydantic 数据类、`pathlib` 替代 `os.path`、函数单一职责

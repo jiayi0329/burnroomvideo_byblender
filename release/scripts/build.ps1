@@ -25,6 +25,10 @@ Copy-Item -Path "$ProjectRoot\app" -Destination $StagingDir -Recurse
 if (Test-Path "$StagingDir\app\__pycache__") { Remove-Item "$StagingDir\app\__pycache__" -Recurse -Force }
 Copy-Item -Path "$ProjectRoot\Dockerfile" -Destination $StagingDir
 Copy-Item -Path "$ProjectRoot\requirements.txt" -Destination $StagingDir
+Copy-Item -Path "$ProjectRoot\docs" -Destination $StagingDir -Recurse
+New-Item -ItemType Directory -Path "$StagingDir/test" | Out-Null
+Copy-Item -Path "$ProjectRoot\test\test_room_database.py" -Destination "$StagingDir/test"
+Copy-Item -Path "$ProjectRoot\test\__init__.py" -Destination "$StagingDir/test"
 
 Write-Host "===> [3/4] 注入生产环境配置..." -ForegroundColor Cyan
 # 提取 release 中的服务器专属配置，并重命名为标准名称供服务器直接使用
