@@ -1,2 +1,4 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+# Remote Bash scripts must remain runnable after a Windows checkout.
+*.sh text eol=lf

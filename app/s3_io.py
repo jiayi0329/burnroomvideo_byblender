@@ -45,7 +45,12 @@ def download_scene_assets(scene_code: str, scene_dir: Path) -> dict:
     for obj in client.list_objects(
         ASSETS_BUCKET, prefix=f"{scene_code}/", recursive=True
     ):
-        filename = Path(obj.object_name).name
+        # Legacy render inputs live directly below the scene prefix. Never
+        # flatten catalog/history subdirectories into the active work directory.
+        relative_name = obj.object_name.removeprefix(f"{scene_code}/")
+        if relative_name in ("", ".", "..") or "/" in relative_name or "\\" in relative_name:
+            continue
+        filename = relative_name
         local_path = scene_dir / filename
         if local_path.is_file():
             summary["skipped"] += 1

@@ -29,16 +29,18 @@
 |---|---|---|---|
 | PRD 2.1、architecture 3.1：源数据核验与版本 | app/import_rooms.py | test_room_database.py | 离线校验已覆盖；真实数据库需远端执行 |
 | PRD 2.1：房间/点位/文件查询 | app/room_api.py | test_room_api.py | HTTP 替身测试；不证明生产权限与文件可达 |
-| PRD V6.0：分享、缓存；architecture 2.3 | app/main.py、app/s3_io.py | test_v6_share.py | 新目录上传与旧下载的兼容性还需补充回归 |
+| PRD V6.0：分享、缓存；architecture 2.3 | app/main.py、app/s3_io.py | test_v6_share.py、test_catalog_deployment.py | 根目录下载与 catalog/history 隔离；远端对象访问仍需验收 |
 | PRD 户型核验、architecture F5/F8 边界 | app/analyze_floorplan.py、app/probe_floorplan.py | test_analyze_floorplan.py、test_probe_floorplan.py | 不等于三维裁切或渲染验收 |
 | PRD 2.1：数据库部署与持久化 | app/database.py、app/db/*.sql | test_room_database.py | 迁移幂等、应用账号授权和恢复后查询还需单独补测 |
+| PRD 2.1、architecture 3.1：应用账号核验 | app/check_catalog.py | test_catalog_deployment.py | 离线连接替身测试；远端用实际应用账号执行 check_catalog 与导入 |
+| PRD 2.1、architecture 2.3：部署保护 | .dockerignore、release/scripts/ | test_release_safety.py | 临时目录真实打包、模拟外部命令失败；不启动 Docker，不连接 SSH；远端备份/回退待实测 |
 
 ## 命令与执行边界
 
 本地 PowerShell、项目目录、已安装相应依赖的 Python：
 
 ```powershell
-python -m unittest test.test_room_database test.test_room_api test.test_analyze_floorplan test.test_probe_floorplan test.test_v6_share test.test_f7 -v
+python -m unittest test.test_room_database test.test_room_api test.test_analyze_floorplan test.test_probe_floorplan test.test_v6_share test.test_f7 test.test_catalog_deployment test.test_release_safety -v
 ```
 
 `ROOM_DB_INTEGRATION` 默认不启用。缺少本地依赖或 Python 版本与生产不一致时，要如实说明，不以替代环境代表生产通过。
@@ -49,7 +51,7 @@ python -m unittest test.test_room_database test.test_room_api test.test_analyze_
 docker compose exec -T -e ROOM_DB_INTEGRATION=1 app-server python3 -m unittest test.test_room_database -v
 ```
 
-不要直接在生产数据上运行全目录自动发现：现有 `test_api.py` 会调用生成时序接口并写入真实 `timeline.json`。未完成隔离前应显式选择测试模块。当前打包脚本只携带数据库测试及包初始化文件，其他测试在远端运行前需确认文件已随包提供。
+不要直接在生产数据上运行全目录自动发现：现有 `test_api.py` 会调用生成时序接口并写入真实 `timeline.json`。未完成隔离前应显式选择测试模块。当前打包脚本携带全部测试，但仍需按上述名单选择；Windows 打包子进程测试在 Linux 上会跳过。
 
 ## 每次交付记录
 

@@ -108,6 +108,8 @@
 
 新增内部 postgres 服务及八张核心表，详见 PRD 2.1 与 `docs/database.md`。户型版本绑定源数据指纹；点位归属同时保留算法结果和人工结果。文件实际留在 MinIO/工作目录，库中只记路径与关联；渲染任务通过配置 JSON 向引擎交付。本轮不自动迁移旧任务状态，不更改 F6/F7/F8。
 
+部署前 prepare_deploy.sh 拒绝 running 任务并备份当前代码/配置、镜像标签与成片；镜像由 .dockerignore 默认拒绝非源码文件。旧下载只接收场景根目录文件，不展开 catalog/history。app/check_catalog.py 使用实际应用账号只读校验权限及导入数量，配合应用账号导入验证；远端部署和恢复步骤见 docs/database.md。app 功能变更需新增追溯 PRD/架构的测试，见 test/README.md。
+
 ---
 
 ## 4. 版本路线图与架构组件映射

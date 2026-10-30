@@ -1,0 +1,18 @@
+# Default deny: only application source, synthetic tests and dependencies enter images.
+**
+!Dockerfile
+!.dockerignore
+!requirements.txt
+!app/
+!app/**
+!test/
+!test/**
+# Re-exclude secrets/caches even if accidentally placed inside allowed directories.
+**/.env
+**/.env.*
+**/prod.env
+**/*secret*
+**/__pycache__/
+**/*.pyc
+**/*.pem
+**/*.key
