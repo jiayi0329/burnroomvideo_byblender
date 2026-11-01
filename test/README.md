@@ -37,6 +37,8 @@
 
 ## 命令与执行边界
 
+房间资产裁切前核验对应 PRD 2.2、architecture 3.2：`test_inspect_room_asset.py` 使用合成 OBJ/MTL/UV 验证坐标逆变换、竖直交点、候选高度、输入不变和通用房间参数。对 Blender 专用诊断仅作静态禁止裁切/渲染/覆盖保存检查；实际导入坐标和材质需在远端 Blender 验证，不能用静态测试代替。运行 `python -m unittest test.test_inspect_room_asset -v`。
+
 本地 PowerShell、项目目录、已安装相应依赖的 Python：
 
 ```powershell
