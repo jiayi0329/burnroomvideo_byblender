@@ -37,6 +37,8 @@
 
 ## 命令与执行边界
 
+`test_room_demo_plan.py`、`test_room_demo.py` 追溯 PRD 2.2 / architecture 3.2 的既有 Room8 展示修正与火灾预览。覆盖 UV 缝处位置连接、孤块默认保留/显式隐藏、内部子图禁止经外部桥接、多级渐变，以及离线节点替身验证橙红发光/动态噪声密度/非发光深色烟和派生输出隔离。命令：`python -m unittest test.test_room_demo_plan test.test_room_demo -v`。不启动 Blender，不将节点替身测试等同于 Blender API 或画面验收；真实三视图、火灾样帧/短片和耗时按 docs/room_display.md 在远端确认。
+
 `test_prepare_room_asset.py` 对应 PRD 2.2、architecture 3.2：离线执行 F8-B 的辅助函数，验证源点位不变、内部与门口关联互斥、重载点位位置/归属核对、相机高度与火源参考高度分离、剖面副本 UV 插值、凹房间内部镜头候选以及 F8-A/B/C 头部标记。使用 AST 提取函数与合成对象替身，不导入 bpy；不能作为 Blender 运行、GLB 或图片视觉验收。命令：`python -m unittest test.test_prepare_room_asset -v`。
 
 `test_room_candidate.py` 对应 PRD 2.2（2026-11-02 近似策略）、architecture 3.2：合成数据验证凹多边形裁切排除凹口、UV/Z 线性插值、竖直边界面保留/重复面面积、细小边、显式近似接受、指纹变更拒绝、版本隔离及原始文件不变。对 Blender 新脚本仅静态检查保存→重新加载→检查图的顺序，不代表 Blender 运行通过。运行 `python -m unittest test.test_room_candidate -v`。实际 Blender 重载、GLB 和三视图需远端按 docs/room_candidate.md 验收。

@@ -5,8 +5,9 @@
 | 标记 | 文件 | 职责及输入输出 | 当前是否运行 |
 |---|---|---|---|
 | F8-A 前置检查 | F8_inspect_room_import.py | 读 inspection.json，核对原始完整模型导入坐标/UV/材质/贴图，写独立 blender_import.json；不裁切、不出图 | 已通过，输入未变无需重跑 |
-| **F8-B 当前检查图** | **F8_prepare_room_asset.py** | 读 candidate.json 和源资产，保存房间 blend/GLB，重载基础 blend 核验，派生三视图和剖面副本 | **本次只运行它** |
+| F8-B 资产生成 | F8_prepare_room_asset.py | 读 candidate.json 和源资产，保存房间 blend/GLB，重载基础 blend 核验，派生三视图和剖面副本 | 已生成，无需重跑 |
 | F8-C 旧视频入口 | F8_blender_render.py | 旧 timeline.json → 火焰/烟雾/运镜 → 根目录 output.mp4；旧 API 仍调用它，可能删除旧视频 | 本次不运行；尚未接入新房间资产 |
+| **F8-D 当前展示/火灾预览** | **F8_room_demo.py** | 只读取已通过检查的 room.blend，另存展示修正版；inspect 三视图、samples 火灾样帧、short ≤8秒短片 | **本轮使用它，操作见 docs/room_display.md** |
 
 | 相关普通 Python 工具 | 职责 | 当前关系 |
 |---|---|---|
@@ -17,6 +18,7 @@
 | room_section_geometry.py / room_section_plots.py | 断面几何与 PNG 绘制辅助 | 被诊断入口调用 |
 | prepare_room_candidate.py | 用已核验多边形实际裁切，写独立 candidate.json，记录显式近似策略 | 本地已完成 |
 | room_clip_geometry.py | 凹多边形面级裁切及 UV 插值算法 | 被 candidate 工具调用，无 bpy |
+| room_demo_plan.py | 展示连接分量分析、房间内部子图 BFS 和渐变时序 | F8-D 使用，无 bpy；小块默认不删除 |
 
 本次链路：已核验户型 → prepare_room_candidate.py → candidate.json → **F8-B** → room.blend / room.glb / 三视图 → 人工验收 → 后续火灾效果阶段。
 
