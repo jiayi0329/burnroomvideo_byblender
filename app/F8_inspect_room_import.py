@@ -1,4 +1,9 @@
-"""Blender-only diagnostic, not a business module. Import with F8 axes; never cut/render/save a blend.
+"""【F8-A｜前置检查，已通过】原始完整模型的 Blender 导入核验。
+
+输入 inspection.json；检查导入坐标、UV、材质和贴图；输出 blender_import.json。
+不裁切、不保存房间模型、不渲染图片或视频。源资产未变时不必重复运行。
+当前要生成房间与三张检查图，应运行 F8_prepare_room_asset.py（F8-B）。
+仅供远端 Blender 独立执行，不可由业务模块 import；脚本索引见 app/README.md。
 
 Run remotely: blender --background --factory-startup --python this_file -- --report inspection.json
 """

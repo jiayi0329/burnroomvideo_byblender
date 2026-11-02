@@ -37,6 +37,10 @@
 
 ## 命令与执行边界
 
+`test_prepare_room_asset.py` 对应 PRD 2.2、architecture 3.2：离线执行 F8-B 的辅助函数，验证源点位不变、内部与门口关联互斥、重载点位位置/归属核对、相机高度与火源参考高度分离、剖面副本 UV 插值、凹房间内部镜头候选以及 F8-A/B/C 头部标记。使用 AST 提取函数与合成对象替身，不导入 bpy；不能作为 Blender 运行、GLB 或图片视觉验收。命令：`python -m unittest test.test_prepare_room_asset -v`。
+
+`test_room_candidate.py` 对应 PRD 2.2（2026-11-02 近似策略）、architecture 3.2：合成数据验证凹多边形裁切排除凹口、UV/Z 线性插值、竖直边界面保留/重复面面积、细小边、显式近似接受、指纹变更拒绝、版本隔离及原始文件不变。对 Blender 新脚本仅静态检查保存→重新加载→检查图的顺序，不代表 Blender 运行通过。运行 `python -m unittest test.test_room_candidate -v`。实际 Blender 重载、GLB 和三视图需远端按 docs/room_candidate.md 验收。
+
 房间资产裁切前核验对应 PRD 2.2、architecture 3.2：`test_inspect_room_asset.py` 使用合成 OBJ/MTL/UV 验证坐标逆变换、竖直交点、候选高度、输入不变和通用房间参数。对 Blender 专用诊断仅作静态禁止裁切/渲染/覆盖保存检查；实际导入坐标和材质需在远端 Blender 验证，不能用静态测试代替。运行 `python -m unittest test.test_inspect_room_asset -v`。
 
 `test_room_sections.py` 对应相同章节，覆盖平面/三角面求交、共面/不相交、凹房间区间、正反向边界法线、同高度连通与跳变、墙面搜索范围、邻房侵入及“候选间距不自动等于墙厚”。合成资产端到端生成 PNG/报告并校验源文件哈希，要求安装 requirements-diagnostics.txt；未安装时图片测试跳过，不能计作通过。运行 `python -m unittest test.test_room_sections -v`。不调用 bpy、Docker、远程服务或数据库。

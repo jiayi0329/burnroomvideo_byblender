@@ -113,6 +113,16 @@
 ---
 
 ### 3.2 独立房间资产准备与诊断
+**2026-11-02 当前实施策略**：Room8 使用显式接受的平层近似（主导下包络参考 `floor_z=-1.35m`），不再等待物理地板/顶部/墙厚精确语义。旧诊断和人工核验只读保留。新候选的 ready_for_cut 表示工程演示允许试裁切，physical_semantics_verified 始终为 false；火灾效果接入仍须独立资产重载检查及人工画面验收，不伪造旧报告通过。
+
+脚本标记：F8-A 原模型导入检查，F8-B 独立房间与三视图（当前入口），F8-C 旧完整视频（未接入新资产）。索引见 app/README.md，不改文件名和旧 API 绑定。F8-B 将选定点位保存为 Empty，重载后核对原始相机 XYZ、归属、独立火源参考 Z 和坐标来源元数据；manifest 记录来源文件指纹和裁切多边形/缓冲/面数。基础 blend 重载通过与人工画面验收分开；GLB 当前只做自包含结构检查，不声称已完成 GLB 重载验收。
+
+app/room_clip_geometry.py 使用凹多边形耳切分解与逐三角面半平面裁切，保留 XYZ 和逐角 UV 的线性插值及源材质/面编号；零外扩，无全局高度截断，允许开放切口，不声称水密或完整墙厚。app/prepare_room_candidate.py 复用已绑定指纹的核验输入，不连接数据库，输出独立 rooms/{room}/{UTC_UUID}/candidate.json，记录近似依据、坐标映射、内点与门口边界点；原始点位的镜头 Z 不作为火源高度。
+
+Blender 专用 app/F8_prepare_room_asset.py 沿用已验证的 OBJ 导入轴向读取材质，重建候选网格、打包贴图、另加演示地板，保存 room.blend 后重新打开，对几何/UV/材质索引/变换和贴图检查，再导出自包含 room.glb。blend 保留原始 XYZ；GLB 标准 Y-up 映射记入 manifest。基础房间不去顶；派生展示几何在人工展示高度剖切，保存 section_preview.blend 和三张 PNG，manifest/validation 保留 visual_review_required=true、ready_for_fire_effects=false。输出不使用旧 output.mp4 或 render_status.json；失败输出 failure.json，保留现场，不覆盖重跑。远端执行与验收见 docs/room_candidate.md。
+
+以下保留前阶段诊断设计；其“仅诊断、等待完整物理语义”的阶段限制不再阻止上述候选资产流程：
+
 
 原始 OBJ/MTL/贴图保持只读；户型坐标经逆变换进入原始 OBJ XY 后检查房间几何。高度先作射线交点上下包络采样，不将其自动解释为物理地板/天花板。诊断目录与正式 rooms/{room}/{version} 资产目录分离，矩阵与逆矩阵随资产保存；本轮只输出 diagnostics，不产生裁切产物。
 
