@@ -5,6 +5,7 @@ minio_data/
 
 # 缓存与编译文件
 __pycache__/
+/.venv-diagnostics/
 *.pyc
 .DS_Store
 

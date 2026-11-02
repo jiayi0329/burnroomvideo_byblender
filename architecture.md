@@ -118,6 +118,8 @@
 
 app/inspect_room_asset.py 是无 bpy/数据库依赖的离线检查；app/F8_inspect_room_import.py 与 F8 一样仅由 Blender 自带 Python 独立子进程执行，业务模块不 import 它。远端检查采用与现有 F8 相同的 OBJ 导入轴向，比对世界坐标、面数、UV、材质、图片和输入文件哈希。核验、裁切、独立保存/重新加载、展示剖面、火灾效果按顺序推进，基础模型和剖面派生分开。
 
+app/diagnose_room_sections.py 绑定通过的导入报告与本地检查 SHA256，使用 app/room_section_geometry.py 做三角面/平面求交、网格采样连通性和逐边平行表面探测。app/room_section_plots.py 用可选 Matplotlib Agg 输出诊断 PNG 和本地索引，不调用 Blender 渲染。requirements-diagnostics.txt 与生产 requirements.txt 分离，现有 F8/数据库接口不依赖该绘图库。诊断前后校验源文件和历史视频指纹，输出目录独立；报告保留未确认参数及门禁，不自动修正坐标、墙边或高度。
+
 ## 4. 版本路线图与架构组件映射
 
 | 版本 | 架构动作 | 涉及模块 |

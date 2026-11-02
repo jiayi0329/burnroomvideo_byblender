@@ -1,0 +1,2 @@
+# Optional offline PNG diagnostics; keep separate from the production render image.
+matplotlib==3.10.0
