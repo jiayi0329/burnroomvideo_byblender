@@ -45,7 +45,7 @@ class Nodes(list):
 
 
 class DemoTests(unittest.TestCase):
-    def volume(self,smoke: bool) -> tuple:
+    def volume(self,smoke: bool,config: dict | None=None) -> tuple:
         nodes=Nodes(); links=[]
         mat=SimpleNamespace(node_tree=SimpleNamespace(nodes=nodes,links=SimpleNamespace(new=lambda a,b:links.append((a,b))),
             animation_data=SimpleNamespace(action=SimpleNamespace(fcurves=[]))))
@@ -54,7 +54,7 @@ class DemoTests(unittest.TestCase):
         function=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='volume_material')
         scope={'bpy':bpy}
         exec(compile(ast.Module(body=[function],type_ignores=[]),str(PATH),'exec'),scope)
-        config=__import__('json').loads(STYLE.with_name('room_fire_round1.json').read_text(encoding='utf-8'))
+        if config is None:config=__import__('json').loads(STYLE.with_name('room_fire_round1.json').read_text(encoding='utf-8'))
         scope['volume_material']('synthetic',smoke,config,.5,253)
         return nodes,links
 

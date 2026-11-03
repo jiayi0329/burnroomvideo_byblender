@@ -1,4 +1,4 @@
-"""PRD 2.2 round-one art/events/quality configuration and deterministic geometry.
+"""PRD 2.2 art/events/quality configuration and deterministic effect geometry.
 
 Pure stdlib, usable by offline tests and Blender Python; no bpy/DB dependency.
 """
@@ -28,6 +28,25 @@ def validate(c: dict) -> None:
             raise ValueError('Nonfinite configuration')
     finite(c)
     art,events,q=c['art'],c['events'],c['quality']; f=art['flame']; s=art['smoke']
+    revision=art.get('revision',1)
+    if type(revision) is not int or revision not in (1,2):raise ValueError('Unsupported style revision')
+    if revision==2:
+        if f['primary_tongues']!=4 or f['secondary_tongues']!=2:raise ValueError('Round two keeps 4/2 tongues')
+        profile=f['density_layers']
+        if len(profile)!=4 or [p[0] for p in profile]!=[0,.28,.68,1]:raise ValueError('Invalid density layer positions')
+        if any(not 0<=p[1]<=1 for p in profile) or not profile[0][1]<profile[1][1]<profile[3][1]<profile[2][1]:
+            raise ValueError('Density must retain a thin edge and thickest body')
+        if not 0<f['density_noise_floor']<1:raise ValueError('Invalid body noise floor')
+        if not 0<=art['area_volume_factor']<=1 or not 0<=f['light_volume_factor']<=1:
+            raise ValueError('Invalid volume illumination factor')
+        if s['shape']!='curled_plume' or type(s['rings']) is not int or type(s['sides']) is not int or not 8<=s['rings']<=20 or not 8<=s['sides']<=24:
+            raise ValueError('Invalid plume mesh budget')
+        if not 0<s['base_radius_ratio']<.4 or not 0<s['curl']<=.5 or not 0<s['absorption_ratio']<=2:
+            raise ValueError('Invalid plume taper/curl/absorption')
+        if not 0<s['emitter_height_ratio']<=.6 or not .5<=s['secondary_scale']<=1:
+            raise ValueError('Invalid smoke emitter/secondary scale')
+        if not 0<s['density_noise_floor']<1 or any(v>.08 for color in (s['dark_color'],s['edge_color']) for v in color[:3]):
+            raise ValueError('Round two smoke must remain dark with a continuous body')
     if events['layer_seconds']!=1.5 or events['excluded_devices']!=[32,42]:
         raise ValueError('Round one preserves the existing Room8 BFS policy')
     expected=[[0,0],[.9,.25],[1.9,.6],[3,1],[4.5,.6],[6,.2],[8,0]]
@@ -126,3 +145,44 @@ def flame_mesh(specs: list[dict], rings: int, sides: int) -> tuple[list,list]:
                 faces.append((a,b,b+sides,a+sides))
         faces.append(tuple(first+(rings-1)*sides+i for i in range(sides)))
     return vertices,faces
+
+
+def plume_mesh(config: dict, phase: float) -> tuple[list,list]:
+    """Closed unit-height plume: narrow base, broad rolling upper body, soft tip.
+
+    Object scale supplies metres. No source room mesh or coordinates are changed.
+    """
+    s=config['art']['smoke']; rings=s['rings']; sides=s['sides']; vertices=[]; faces=[]
+    for ring in range(rings):
+        t=ring/(rings-1)
+        # Upper roll tapers only at the final tip; never an ellipsoid/sphere.
+        radius=(s['base_radius_ratio']+1.1*t**.75)*(1-.96*t**12)
+        cx=s['curl']*t*math.sin(7*t+phase)
+        cy=s['curl']*t*math.cos(9*t+phase*.7)
+        for side in range(sides):
+            angle=2*math.pi*side/sides
+            ripple=1+.18*math.sin(3*angle+9*t+phase)+.09*math.cos(5*angle-12*t+phase)
+            vertices.append([cx+radius*ripple*math.cos(angle),cy+radius*ripple*math.sin(angle),t])
+    faces.append(tuple(reversed(range(sides))))
+    for ring in range(rings-1):
+        for side in range(sides):
+            a=ring*sides+side; b=ring*sides+(side+1)%sides
+            faces.append((a,b,b+sides,a+sides))
+    faces.append(tuple((rings-1)*sides+i for i in range(sides)))
+    return vertices,faces
+
+
+def smoke_state(config: dict, age: float, primary: bool) -> dict:
+    """Independent smoke evolution, anchored near the fire, rising through stretch/flow.
+
+    The base does not drift upward with the whole object (the old floating-ball effect).
+    Texture advection animates upward flow; vertical extent grows in metres.
+    """
+    s=config['art']['smoke']; f=config['art']['flame']; elapsed=max(0,age)
+    growth=curve_value(s['growth_curve'],elapsed)
+    factor=1 if primary else s['secondary_scale']
+    return {'density':s['density']*curve_value(s['density_curve'],age),
+        'radius':s['radius']*growth*factor,
+        'height':(s['height']*growth+s['rise_speed']*elapsed)*factor,
+        'emitter_offset':f['primary_height' if primary else 'secondary_height']*s['emitter_height_ratio'],
+        'growth':growth}

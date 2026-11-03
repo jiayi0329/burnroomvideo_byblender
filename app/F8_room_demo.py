@@ -1,9 +1,9 @@
 """【F8-D｜当前展示修正/火灾预览】只加载已生成的 room.blend，另存派生版。
 
-inspect: 更新三视图；samples: 中近景/总览六张对比样帧。第一轮禁用动画入口。
+inspect: 更新三视图；samples: 中近景/总览六张对比样帧。静帧审核期间禁用动画入口。
 复用 F8-B 的 UV 保留建网格/展示截断，不重做户型对齐或房间平面裁切。
 不修改基础 room.blend/glb、数据库、源模型、核验记录或历史视频。
-远端 Blender 4.2 独立执行；风格及配置辅助文件见 docs/room_style_round1.md。
+远端 Blender 4.2 独立执行；当前第二轮操作见 docs/room_style_round2.md。
 """
 from __future__ import annotations
 
@@ -114,7 +114,7 @@ def ray_probe(scene: bpy.types.Scene, objects: list) -> dict:
 
 def run(args: argparse.Namespace) -> Path:
     started=time.perf_counter()
-    if args.mode not in ('inspect','samples'):raise ValueError('Round one only permits still images; animation is paused')
+    if args.mode not in ('inspect','samples'):raise ValueError('Only still images permitted; animation is paused')
     config=load_config(args.config)
     if args.mode=='samples' and args.points is None:raise ValueError('--points required for fire samples')
     asset=args.asset.resolve()
@@ -140,7 +140,8 @@ def run(args: argparse.Namespace) -> Path:
         if digest(candidate)!=manifest['candidate_sha256']:raise ValueError('Bound candidate differs')
         guards[candidate]=digest(candidate)
         ignition=json.loads(candidate.read_text(encoding='utf-8'))['ignition_device']
-    output=asset.parent/'style_round1'/(datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')+'_'+uuid.uuid4().hex[:8])
+    revision=config['art'].get('revision',1)
+    output=asset.parent/('style_round'+str(revision))/(datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')+'_'+uuid.uuid4().hex[:8])
     output.mkdir(parents=True,exist_ok=False)
     dump(output/'requested_config.json',config)
     samples=[]
@@ -162,6 +163,7 @@ def run(args: argparse.Namespace) -> Path:
         lo=[min(v[k] for v in polygon) for k in (0,1)]; hi=[max(v[k] for v in polygon) for k in (0,1)]
         cx,cy=[(lo[k]+hi[k])/2 for k in (0,1)]; span=max(hi[k]-lo[k] for k in (0,1))
         actual=configure_render(scene,config)
+        actual['style_revision']=revision
         actual['lighting']=lighting(scene,[cx,cy,floor+.4],span,config)
         dump(output/'effective_settings.json',actual)
         ix,iy=interior_camera(polygon)
@@ -173,6 +175,7 @@ def run(args: argparse.Namespace) -> Path:
             'components':groups,'removed_component_ids':args.drop_component,
             'new_cut_caps_created':False,'base_asset_modified':False,
             'code_fingerprints':code_hashes,'config_sha256':digest(args.config),
+            'style_revision':revision,
             'changes':['Exposure -0.5 / world .15 / soft lights 500,150,300 candidate profile',
                 'deterministic curved multi-tongue cluster; independent emission/density',
                 'independent persistent rising smoke; paired closeup/overview stills'],
@@ -184,6 +187,13 @@ def run(args: argparse.Namespace) -> Path:
             timeline=room_timeline(points,metadata['interior_devices'],ignition,config['events']['layer_seconds'])
             dump(output/'room_timeline.json',timeline)
             effects=add_fire(scene,timeline,points,floor,[display,floor_obj],config,closest_hit)
+            actual['effects']=effects
+            dump(output/'effective_settings.json',actual)
+            if revision==2:
+                report['changes']=['Preserve round-one tongue topology, color ramp, emission, exposure and surface lighting',
+                    'Primary height x1.75 / radius x1.45; secondary height x1.3; four radial density layers',
+                    'Replace smoke spheres with curled narrow-base plumes; independent extinction and growth',
+                    'Reduce volume illumination only; fire light cutoff 5m, energy unchanged; closeup 30mm/target 1.3m']
             report['effects']=effects
             report['timeline']=timeline
             anchor=next(p for p in effects['anchors'] if p['device']==ignition)
@@ -230,10 +240,10 @@ def run(args: argparse.Namespace) -> Path:
 
 
 def main() -> None:
-    p=argparse.ArgumentParser(description='Round-one paired stills only; animation paused pending review')
+    p=argparse.ArgumentParser(description='Versioned paired stills only; animation paused pending review')
     p.add_argument('--asset',type=Path,required=True)
     p.add_argument('--mode',choices=('inspect','samples'),default='samples')
-    p.add_argument('--config',type=Path,default=Path(__file__).with_name('room_fire_round1.json'))
+    p.add_argument('--config',type=Path,default=Path(__file__).with_name('room_fire_round2.json'))
     p.add_argument('--wall-height',type=float,default=1.1)
     p.add_argument('--drop-component',type=int,action='append',default=[])
     p.add_argument('--points',type=Path)

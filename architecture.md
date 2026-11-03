@@ -113,6 +113,10 @@
 ---
 
 ### 3.2 独立房间资产准备与诊断
+2026-11-03 第二轮静帧：沿用F8-D及两个辅助模块，不新增引擎入口。room_fire_round2.json通过art.revision=2选择新分支，第一轮JSON未改；输出按已校验revision隔离style_round1/2。保持accepted火舌几何算法与发光路径，放大名义尺寸并新增独立FlameDensityLayers/FlameBodyNoise径向主体密度，不把密度变化耦合到Emission。smoke_state/plume_mesh为纯stdlib：固定火源附近窄底、不规则卷曲扩散上体、独立浓度/成长和向上纹理平移；R2不调用球体烟分支。深色Principled散射叠加无发光VolumeAbsorption，面光/点光显式设置并回读Blender4.2的volume_factor，以降低烟雾被照成浅灰的风险，实际仍需看图。
+
+effective_settings包含回读材质密度层、吸收比、噪声保底、光照系数及生成尺寸；sample_manifest每图回读灯功率/体积系数、密度/发光包络、烟柱变换与世界Z包围盒，并记录耗时。请求系数与逐帧实际值分开；不声称静帧已验证运动连续性。体积对象仍每点2个、总26个，采样/分辨率不增，但覆盖范围增大会增加逐像素体积工作量，耗时须实测。13点BFS、展示几何、基础资产保护和仅静帧门禁保持。操作见docs/room_style_round2.md，新增测试test/test_room_fire_round2.py追溯PRD2.2/本节；禁止以替身节点测试冒充Blender远端验收。
+
 2026-11-03 第一轮风格优化：F8-D保留既有资产只读加载及展示截断方式，不改基础房间/点位归属；CLI只允许inspect/samples，删除当前入口的动画执行分支。room_fire_round1.json按art/events/quality分组，room_fire_config.py仅stdlib，生成固定种子的曲线火舌闭合网格；F8_room_fire_style.py仅供Blender内部导入，负责独立密度/发光节点、四层颜色、向上噪声、多舌合并对象、独立持续烟与实际设置回读。多舌体积用ACCURATE交界模式及显式深度预算，避免重叠内表面沿用FAST假定；烟为单一闭合球体。保留13点子图BFS，禁止改1.5秒间隔和32/42排除策略。配置及Blender属性读回失败会在出图前中止；每张图记录运行态镜头/灯光/密度与发光控制值和耗时。style_round1独立输出请求配置、生效设置、6图、指纹和派生blend；不覆盖旧display_versions、不进入数据库或旧视频入口。远端API/视觉/耗时仍需按docs/room_style_round1.md验收，离线替身测试不能代表成片通过。
 
 当前既有资产展示修正入口为 F8-D app/F8_room_demo.py，复用 F8-B 的 UV 保留网格构建和仅 Z 展示截断；读取并核对 room.blend/GLB/既有检查产物指纹，不重做 XY 裁切。输出为该资产同级独立 display_versions/{UTC_UUID}。app/room_demo_plan.py 提供无 bpy 的合并位置连接分量、显式隐藏列表、内部点诱导子图 BFS 和多级强度曲线；分量小不等于无用。灰色排查用有限射线命中/背面和材质节点证据，默认不替换源贴图；原模型无新封盖面。inspect 输出修正版视图，samples/short 在展示接受后写独立 room_timeline.json 和预览产物；--points 显式指定并校验源点位指纹，旧时序/视频不写。火源位置可在展示表面上做可见性贴合，参考地板及原点位坐标保持并记录。详见 docs/room_display.md 与两份新增测试。
