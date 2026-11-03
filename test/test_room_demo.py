@@ -11,6 +11,7 @@ from types import SimpleNamespace
 import unittest
 
 PATH=Path(__file__).resolve().parents[1]/'app/F8_room_demo.py'
+STYLE=PATH.with_name('F8_room_fire_style.py')
 
 
 class Socket:
@@ -29,8 +30,13 @@ class Sockets(dict):
 class Node:
     def __init__(self,kind: str) -> None:
         self.kind=kind; self.inputs=Sockets(); self.outputs=Sockets()
-        self.color_ramp=SimpleNamespace(elements=[SimpleNamespace(position=0),SimpleNamespace(position=1)])
+        self.color_ramp=SimpleNamespace(elements=Elements([SimpleNamespace(position=0),SimpleNamespace(position=1)]))
         self.inputs['Absorption Color']=Socket()
+
+
+class Elements(list):
+    def new(self,position: float) -> object:
+        value=SimpleNamespace(position=position); self.append(value); return value
 
 
 class Nodes(list):
@@ -41,21 +47,28 @@ class Nodes(list):
 class DemoTests(unittest.TestCase):
     def volume(self,smoke: bool) -> tuple:
         nodes=Nodes(); links=[]
-        mat=SimpleNamespace(node_tree=SimpleNamespace(nodes=nodes,links=SimpleNamespace(new=lambda a,b:links.append((a,b)))))
+        mat=SimpleNamespace(node_tree=SimpleNamespace(nodes=nodes,links=SimpleNamespace(new=lambda a,b:links.append((a,b))),
+            animation_data=SimpleNamespace(action=SimpleNamespace(fcurves=[]))))
         bpy=SimpleNamespace(data=SimpleNamespace(materials=SimpleNamespace(new=lambda name:mat)))
-        tree=ast.parse(PATH.read_text(encoding='utf-8'))
+        tree=ast.parse(STYLE.read_text(encoding='utf-8'))
         function=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='volume_material')
         scope={'bpy':bpy}
         exec(compile(ast.Module(body=[function],type_ignores=[]),str(PATH),'exec'),scope)
-        scope['volume_material']('synthetic',smoke)
+        config=__import__('json').loads(STYLE.with_name('room_fire_round1.json').read_text(encoding='utf-8'))
+        scope['volume_material']('synthetic',smoke,config,.5,253)
         return nodes,links
 
-    def test_flame_density_is_linked_and_emission_explicitly_orange(self) -> None:
+    def test_flame_density_and_emission_have_independent_controls(self) -> None:
         nodes,links=self.volume(False)
         volume=next(n for n in nodes if n.kind=='ShaderNodeVolumePrincipled')
         self.assertIn(volume.inputs['Density'],[b for _,b in links])
         self.assertIn(volume.inputs['Emission Strength'],[b for _,b in links])
-        self.assertEqual(volume.inputs['Emission Color'].default_value,(1,.14,.008,1))
+        self.assertIn(volume.inputs['Emission Color'],[b for _,b in links])
+        density=next(n for n in nodes if getattr(n,'name','')=='DensityOnly')
+        emission=next(n for n in nodes if getattr(n,'name','')=='EmissionIndependentOfDensity')
+        self.assertNotIn((density.outputs[0],emission.inputs[0]),links)
+        self.assertNotIn((density.outputs[0],emission.inputs[1]),links)
+        self.assertEqual(len(next(n for n in nodes if getattr(n,'name','')=='EffectColors').color_ramp.elements),4)
         self.assertEqual(volume.inputs['Blackbody Intensity'].default_value,0)
         noise=next(n for n in nodes if n.kind=='ShaderNodeTexNoise')
         self.assertEqual(noise.noise_dimensions,'4D')
@@ -64,9 +77,12 @@ class DemoTests(unittest.TestCase):
     def test_smoke_is_dark_absorption_white_and_non_emissive(self) -> None:
         nodes,links=self.volume(True)
         volume=next(n for n in nodes if n.kind=='ShaderNodeVolumePrincipled')
-        self.assertEqual(volume.inputs['Color'].default_value,(.07,.055,.045,1))
+        self.assertIn(volume.inputs['Color'],[b for _,b in links])
+        colors=next(n for n in nodes if getattr(n,'name','')=='EffectColors')
+        self.assertEqual(colors.color_ramp.elements[1].color,[.025,.03,.035,1])
         self.assertEqual(volume.inputs['Absorption Color'].default_value,(1,1,1,1))
-        self.assertNotIn('Emission Strength',volume.inputs)
+        self.assertEqual(volume.inputs['Emission Strength'].default_value,0)
+        self.assertNotIn(volume.inputs['Emission Strength'],[b for _,b in links])
 
     def test_existing_asset_loaded_and_only_preview_output_names_used(self) -> None:
         text=PATH.read_text(encoding='utf-8'); tree=ast.parse(text)
@@ -75,10 +91,12 @@ class DemoTests(unittest.TestCase):
         self.assertNotIn('bpy.ops.wm.obj_import',calls)
         self.assertNotIn('clip_mesh',calls)
         self.assertNotIn('unlink',calls)
-        self.assertIn("output/'fire_short.mp4'",text)
+        self.assertNotIn("output/'fire_short.mp4'",text)
         self.assertIn("output/'display.blend'",text)
         self.assertIn("output/'room_timeline.json'",text)
-        self.assertIn('0<args.duration<=8',text)
+        self.assertIn("choices=('inspect','samples')",text)
+        self.assertIn("f'overview_{seconds:g}s'",text)
+        self.assertIn("f'closeup_{ignition}_{seconds:g}s'",text)
         for n in ast.walk(tree):
             if isinstance(n,ast.Call) and isinstance(n.func,ast.Name) and n.func.id=='print':
                 self.assertTrue(any(k.arg=='flush' and isinstance(k.value,ast.Constant) and k.value.value is True for k in n.keywords))

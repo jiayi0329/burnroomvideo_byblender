@@ -113,6 +113,8 @@
 ---
 
 ### 3.2 独立房间资产准备与诊断
+2026-11-03 第一轮风格优化：F8-D保留既有资产只读加载及展示截断方式，不改基础房间/点位归属；CLI只允许inspect/samples，删除当前入口的动画执行分支。room_fire_round1.json按art/events/quality分组，room_fire_config.py仅stdlib，生成固定种子的曲线火舌闭合网格；F8_room_fire_style.py仅供Blender内部导入，负责独立密度/发光节点、四层颜色、向上噪声、多舌合并对象、独立持续烟与实际设置回读。多舌体积用ACCURATE交界模式及显式深度预算，避免重叠内表面沿用FAST假定；烟为单一闭合球体。保留13点子图BFS，禁止改1.5秒间隔和32/42排除策略。配置及Blender属性读回失败会在出图前中止；每张图记录运行态镜头/灯光/密度与发光控制值和耗时。style_round1独立输出请求配置、生效设置、6图、指纹和派生blend；不覆盖旧display_versions、不进入数据库或旧视频入口。远端API/视觉/耗时仍需按docs/room_style_round1.md验收，离线替身测试不能代表成片通过。
+
 当前既有资产展示修正入口为 F8-D app/F8_room_demo.py，复用 F8-B 的 UV 保留网格构建和仅 Z 展示截断；读取并核对 room.blend/GLB/既有检查产物指纹，不重做 XY 裁切。输出为该资产同级独立 display_versions/{UTC_UUID}。app/room_demo_plan.py 提供无 bpy 的合并位置连接分量、显式隐藏列表、内部点诱导子图 BFS 和多级强度曲线；分量小不等于无用。灰色排查用有限射线命中/背面和材质节点证据，默认不替换源贴图；原模型无新封盖面。inspect 输出修正版视图，samples/short 在展示接受后写独立 room_timeline.json 和预览产物；--points 显式指定并校验源点位指纹，旧时序/视频不写。火源位置可在展示表面上做可见性贴合，参考地板及原点位坐标保持并记录。详见 docs/room_display.md 与两份新增测试。
 
 **2026-11-02 当前实施策略**：Room8 使用显式接受的平层近似（主导下包络参考 `floor_z=-1.35m`），不再等待物理地板/顶部/墙厚精确语义。旧诊断和人工核验只读保留。新候选的 ready_for_cut 表示工程演示允许试裁切，physical_semantics_verified 始终为 false；火灾效果接入仍须独立资产重载检查及人工画面验收，不伪造旧报告通过。

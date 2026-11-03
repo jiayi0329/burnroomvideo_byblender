@@ -1,9 +1,9 @@
 """【F8-D｜当前展示修正/火灾预览】只加载已生成的 room.blend，另存派生版。
 
-inspect: 更新三视图；samples: 三张火灾样帧；short: 最长8秒短片。
+inspect: 更新三视图；samples: 中近景/总览六张对比样帧。第一轮禁用动画入口。
 复用 F8-B 的 UV 保留建网格/展示截断，不重做户型对齐或房间平面裁切。
 不修改基础 room.blend/glb、数据库、源模型、核验记录或历史视频。
-远端 Blender 4.2 独立执行；同目录需 F8_prepare_room_asset.py、room_demo_plan.py。
+远端 Blender 4.2 独立执行；风格及配置辅助文件见 docs/room_style_round1.md。
 """
 from __future__ import annotations
 
@@ -21,7 +21,9 @@ from mathutils import Vector
 
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from F8_prepare_room_asset import below, digest, dump, make_mesh, interior_camera
-from room_demo_plan import display_faces, room_timeline, envelope
+from room_demo_plan import display_faces, room_timeline
+from room_fire_config import load_config
+from F8_room_fire_style import configure_render, lighting, add_fire, snapshot_settings
 
 
 def mesh_faces(obj: bpy.types.Object) -> list[dict]:
@@ -110,122 +112,11 @@ def ray_probe(scene: bpy.types.Scene, objects: list) -> dict:
             'samples':records,'note':'Sparse geometric evidence, not pixel color classification'}
 
 
-def lighting(scene: bpy.types.Scene, center: list, span: float) -> None:
-    scene.render.engine = 'BLENDER_EEVEE_NEXT'
-    scene.render.resolution_x,scene.render.resolution_y,scene.render.resolution_percentage = 960,540,100
-    scene.world = bpy.data.worlds.new('DemoWorld')
-    scene.world.use_nodes = True
-    scene.world.node_tree.nodes['Background'].inputs['Color'].default_value = (.32,.36,.42,1)
-    scene.world.node_tree.nodes['Background'].inputs['Strength'].default_value = .8
-    scene.view_settings.exposure = .8
-    for name,offset,energy in [('Key',(0,0,5),1800),('Fill',(-3,-2,3),1000),('Rim',(3,2,4),800)]:
-        data = bpy.data.lights.new('Demo'+name,'AREA')
-        data.energy,data.size = energy,max(4,span*.7)
-        obj = bpy.data.objects.new(data.name,data)
-        scene.collection.objects.link(obj)
-        obj.location = Vector(center)+Vector(offset)
-        obj.rotation_euler = (Vector(center)-obj.location).to_track_quat('-Z','Y').to_euler()
-
-
-def volume_material(name: str, smoke: bool) -> tuple:
-    mat = bpy.data.materials.new(name)
-    mat.use_nodes = True
-    nodes = mat.node_tree.nodes; nodes.clear()
-    links = mat.node_tree.links
-    out = nodes.new('ShaderNodeOutputMaterial')
-    volume = nodes.new('ShaderNodeVolumePrincipled')
-    links.new(volume.outputs['Volume'],out.inputs['Volume'])
-    volume.inputs['Color'].default_value = (.07,.055,.045,1) if smoke else (1,.18,.015,1)
-    if 'Absorption Color' in volume.inputs:volume.inputs['Absorption Color'].default_value=(1,1,1,1)
-    volume.inputs['Anisotropy'].default_value = .2
-    coord=nodes.new('ShaderNodeTexCoord'); noise=nodes.new('ShaderNodeTexNoise')
-    noise.noise_dimensions='4D'
-    noise.inputs['Scale'].default_value=5 if smoke else 3
-    noise.inputs['Detail'].default_value=5
-    links.new(coord.outputs['Generated'],noise.inputs['Vector'])
-    for frame,value in ((1,0),(145,3)):
-        noise.inputs['W'].default_value=value; noise.inputs['W'].keyframe_insert('default_value',frame=frame)
-    ramp=nodes.new('ShaderNodeValToRGB')
-    ramp.color_ramp.elements[0].position=.42 if smoke else .4
-    ramp.color_ramp.elements[1].position=.68
-    links.new(noise.outputs['Fac'],ramp.inputs['Fac'])
-    separate=nodes.new('ShaderNodeSeparateXYZ'); links.new(coord.outputs['Generated'],separate.inputs[0])
-    fade=nodes.new('ShaderNodeMath'); fade.operation='SUBTRACT'; fade.inputs[0].default_value=1
-    links.new(separate.outputs['Z'],fade.inputs[1])
-    mask=nodes.new('ShaderNodeMath'); mask.operation='MULTIPLY'
-    links.new(ramp.outputs['Color'],mask.inputs[0]); links.new(fade.outputs[0],mask.inputs[1])
-    # Smooth the radial edge as well as the height; avoid a hard solid container silhouette.
-    squares=[]
-    for axis in ('X','Y'):
-        offset=nodes.new('ShaderNodeMath'); offset.operation='SUBTRACT'; offset.inputs[1].default_value=.5
-        links.new(separate.outputs[axis],offset.inputs[0])
-        square=nodes.new('ShaderNodeMath'); square.operation='MULTIPLY'
-        links.new(offset.outputs[0],square.inputs[0]); links.new(offset.outputs[0],square.inputs[1]); squares.append(square)
-    radius=nodes.new('ShaderNodeMath'); radius.operation='ADD'
-    for i,node in enumerate(squares):links.new(node.outputs[0],radius.inputs[i])
-    scale=nodes.new('ShaderNodeMath'); scale.operation='MULTIPLY'; scale.inputs[1].default_value=4
-    links.new(radius.outputs[0],scale.inputs[0])
-    radial=nodes.new('ShaderNodeMath'); radial.operation='SUBTRACT'; radial.inputs[0].default_value=1; radial.use_clamp=True
-    links.new(scale.outputs[0],radial.inputs[1])
-    soft=nodes.new('ShaderNodeMath'); soft.operation='MULTIPLY'
-    links.new(mask.outputs[0],soft.inputs[0]); links.new(radial.outputs[0],soft.inputs[1])
-    amount=nodes.new('ShaderNodeValue'); amount.outputs[0].default_value=0
-    density=nodes.new('ShaderNodeMath'); density.operation='MULTIPLY'
-    links.new(soft.outputs[0],density.inputs[0]); links.new(amount.outputs[0],density.inputs[1])
-    links.new(density.outputs[0],volume.inputs['Density'])
-    if not smoke:
-        volume.inputs['Emission Color'].default_value=(1,.14,.008,1)
-        volume.inputs['Blackbody Intensity'].default_value=0
-        emission=nodes.new('ShaderNodeMath'); emission.operation='MULTIPLY'; emission.inputs[1].default_value=9
-        links.new(density.outputs[0],emission.inputs[0]); links.new(emission.outputs[0],volume.inputs['Emission Strength'])
-    return mat,amount
-
-
-def add_fire(scene: bpy.types.Scene, timeline: dict, points: list[dict], floor: float, surfaces: list) -> list[dict]:
-    positions={int(p['device']):p['pose']['translation'] for p in points}
-    anchors=[]
-    for event in timeline['spread_events']:
-        device=event['point']; p=positions[device]; start=event['time']; keys=envelope(start,scene.render.fps)
-        hit=closest_hit(Vector((p['x'],p['y'],floor+1.15)),Vector((0,0,-1)),surfaces)
-        base=max(floor,hit[1].z+.015) if hit else floor
-        anchors.append({'device':device,'reference_floor_z':floor,'display_fire_base_z':base,
-                        'note':'Visibility anchor on existing display surface; not physical floor identification'})
-        for smoke in (False,True):
-            if smoke:
-                bpy.ops.mesh.primitive_uv_sphere_add(segments=16,ring_count=8,radius=1,
-                                                    location=(p['x'],p['y'],base+1.9))
-            else:
-                bpy.ops.mesh.primitive_cone_add(vertices=16,radius1=.36,radius2=.035,depth=1.7,
-                                               location=(p['x'],p['y'],base+.85))
-            obj=bpy.context.object; obj.name=('Smoke_' if smoke else 'Flame_')+str(device)
-            mat,amount=volume_material(obj.name,smoke); obj.data.materials.append(mat)
-            for frame,value in keys:
-                amount.outputs[0].default_value=value*(3.5 if smoke else 1.1)
-                amount.outputs[0].keyframe_insert('default_value',frame=frame)
-                growth=.03+value*.97
-                obj.scale=(growth*.65,growth*.65,growth*1.25) if smoke else (growth,growth,growth)
-                obj.keyframe_insert('scale',frame=frame)
-                if smoke:
-                    obj.location.z=base+1.4+max(0,(frame-keys[0][0])/scene.render.fps)*.12
-                else:
-                    obj.location.z=base+.85*growth
-                obj.keyframe_insert('location',frame=frame)
-        light=bpy.data.lights.new('FireLight_'+str(device),'POINT')
-        light.color=(1,.18,.02); light.shadow_soft_size=.45
-        lamp=bpy.data.objects.new(light.name,light); scene.collection.objects.link(lamp)
-        lamp.location=(p['x'],p['y'],base+.8)
-        for frame,value in keys:
-            light.energy=100*value; light.keyframe_insert('energy',frame=frame)
-    # Prevent default Bezier handles from overshooting density/scale below zero.
-    for action in bpy.data.actions:
-        for curve in action.fcurves:
-            for key in curve.keyframe_points:
-                key.interpolation='BEZIER'; key.handle_left_type=key.handle_right_type='AUTO_CLAMPED'
-    return anchors
-
-
 def run(args: argparse.Namespace) -> Path:
     started=time.perf_counter()
+    if args.mode not in ('inspect','samples'):raise ValueError('Round one only permits still images; animation is paused')
+    config=load_config(args.config)
+    if args.mode=='samples' and args.points is None:raise ValueError('--points required for fire samples')
     asset=args.asset.resolve()
     manifest=json.loads((asset/'manifest.json').read_text(encoding='utf-8'))
     validation=json.loads((asset/'validation.json').read_text(encoding='utf-8'))
@@ -234,10 +125,25 @@ def run(args: argparse.Namespace) -> Path:
     for name,h in manifest['artifacts'].items():
         path=(asset/name).resolve()
         if not path.is_relative_to(asset) or digest(path)!=h:raise ValueError('Base artifact fingerprint differs: '+name)
-    if args.mode!='inspect' and not args.accept_display:raise ValueError('Inspect views first, then pass --accept-display')
-    if not 0<args.duration<=8:raise ValueError('Short preview duration must be 0..8 seconds')
-    output=asset.parent/'display_versions'/(datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')+'_'+uuid.uuid4().hex[:8])
+    guards[args.config.resolve()]=digest(args.config)
+    code_files=('F8_room_demo.py','F8_room_fire_style.py','room_fire_config.py','room_demo_plan.py','F8_prepare_room_asset.py')
+    code_hashes={name:digest(Path(__file__).resolve().parent/name) for name in code_files}
+    points=None; ignition=None
+    if args.mode=='samples':
+        points_path=args.points.resolve()
+        if digest(points_path)!=manifest['source_fingerprints']['points.json']:raise ValueError('Points fingerprint mismatch')
+        for name in manifest['source_fingerprints']:
+            path=(points_path.parent/name).resolve()
+            if path.parent==points_path.parent and path.is_file():guards[path]=digest(path)
+        points=json.loads(points_path.read_text(encoding='utf-8'))
+        candidate=asset.parent/'candidate.json'
+        if digest(candidate)!=manifest['candidate_sha256']:raise ValueError('Bound candidate differs')
+        guards[candidate]=digest(candidate)
+        ignition=json.loads(candidate.read_text(encoding='utf-8'))['ignition_device']
+    output=asset.parent/'style_round1'/(datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')+'_'+uuid.uuid4().hex[:8])
     output.mkdir(parents=True,exist_ok=False)
+    dump(output/'requested_config.json',config)
+    samples=[]
     try:
         bpy.ops.wm.open_mainfile(filepath=str(asset/'room.blend'))
         scene=bpy.context.scene
@@ -246,88 +152,75 @@ def run(args: argparse.Namespace) -> Path:
         audit=material_audit(source)
         floor_obj=bpy.data.objects['DemoFloorApproximation']
         audit += material_audit(floor_obj)
-        materials={m.name:m for m in bpy.data.materials}
-        # Recreate only the former DISPLAY cut for the baseline probes, not the full roofed room.
-        baseline=make_mesh('BaselineDisplay',below(faces,manifest['previews']['display_cut_z']),materials)
-        old=next(v for v in manifest['previews']['views'] if v['image']=='interior.png')
-        # Match F8-B's former 800x600 / 20mm view for a comparable baseline.
-        scene.render.resolution_x,scene.render.resolution_y,scene.render.resolution_percentage=800,600,100
-        camera(scene,old['camera_raw_xyz'],old['target_raw_xyz']).data.lens=20
-        baseline_probe=ray_probe(scene,[baseline,floor_obj])
-        bpy.data.objects.remove(baseline,do_unlink=True)
         selected,groups=display_faces(faces,args.drop_component)
-        for group in groups:
-            group['small_elevated_candidate'] = group['diagonal_m']<.5 and group['bounds_min'][2]>floor+.25
         source.hide_render=True; source.hide_viewport=True
+        materials={m.name:m for m in bpy.data.materials}
         display=make_mesh('RoomDisplay',below(selected,floor+args.wall_height),materials)
         # Copy shaders solely for the display derivative; both sides of scan planes remain visible.
         for i,mat in enumerate(display.data.materials):
             copy=mat.copy(); copy.use_backface_culling=False; display.data.materials[i]=copy
         lo=[min(v[k] for v in polygon) for k in (0,1)]; hi=[max(v[k] for v in polygon) for k in (0,1)]
         cx,cy=[(lo[k]+hi[k])/2 for k in (0,1)]; span=max(hi[k]-lo[k] for k in (0,1))
-        lighting(scene,[cx,cy,floor+.4],span)
+        actual=configure_render(scene,config)
+        actual['lighting']=lighting(scene,[cx,cy,floor+.4],span,config)
+        dump(output/'effective_settings.json',actual)
         ix,iy=interior_camera(polygon)
         views=[('top',(cx,cy,floor+span*1.5),(cx,cy,floor),True),
                ('oblique',(cx+span*.5,cy-span*.65,floor+span*.95),(cx,cy,floor+.3),True),
                ('interior',(ix,iy,floor+4.5),(cx,cy,floor+.2),False)]
-        scene.render.image_settings.file_format='PNG'
-        for name,position,target,ortho in views:
-            camera(scene,position,target,ortho,span)
-            scene.render.filepath=str(output/(name+'.png')); bpy.ops.render.render(write_still=True)
-        updated_probe=ray_probe(scene,[display,floor_obj])
         report={'mode':args.mode,'base_asset':str(asset),'base_room_sha256':guards[asset/'room.blend'],
             'floor_z':floor,'display_cut_z':floor+args.wall_height,'source_material_audit':audit,
-            'baseline_interior_rays':baseline_probe,'updated_interior_rays':updated_probe,
             'components':groups,'removed_component_ids':args.drop_component,
-            'gray_surface_findings':'Use ray hits to separate world/geometry; inspect UV/image/normals. No missing-texture assumption.',
             'new_cut_caps_created':False,'base_asset_modified':False,
-            'changes':['higher downward internal camera','lower display wall cut only','soft area fill + exposure',
-                       'two-sided display material copies; source shaders preserved'],
-            'visual_review_required':True}
-        if args.mode!='inspect':
-            if args.points is None:raise ValueError('--points must explicitly name source points.json for fire preview')
-            points_path=args.points.resolve()
-            if digest(points_path)!=manifest['source_fingerprints']['points.json']:raise ValueError('Points fingerprint mismatch')
-            guards[points_path]=digest(points_path)
-            # Guard current source/history files too; no original file is used as an output.
-            for name in manifest['source_fingerprints']:
-                path=(points_path.parent/name).resolve()
-                if path.parent==points_path.parent and path.is_file():guards[path]=digest(path)
-            points=json.loads(points_path.read_text(encoding='utf-8'))
-            candidate=asset.parent/'candidate.json'
-            if digest(candidate)!=manifest['candidate_sha256']:raise ValueError('Bound candidate differs')
-            ignition=json.loads(candidate.read_text(encoding='utf-8'))['ignition_device']
-            timeline=room_timeline(points,metadata['interior_devices'],ignition)
+            'code_fingerprints':code_hashes,'config_sha256':digest(args.config),
+            'changes':['Exposure -0.5 / world .15 / soft lights 500,150,300 candidate profile',
+                'deterministic curved multi-tongue cluster; independent emission/density',
+                'independent persistent rising smoke; paired closeup/overview stills'],
+            'visual_review_required':True,'animation_enabled':False,'effective_settings':actual}
+        requests=[]
+        if args.mode=='samples':
+            if set(metadata['interior_devices']) & set(config['events']['excluded_devices']):
+                raise ValueError('Room memberships include an excluded propagation point')
+            timeline=room_timeline(points,metadata['interior_devices'],ignition,config['events']['layer_seconds'])
             dump(output/'room_timeline.json',timeline)
-            scene.render.fps=12
-            report['fire_visibility_anchors']=add_fire(scene,timeline,points,floor,[display,floor_obj])
-            # Use the full-room elevated view so individual events remain visible.
-            camera(scene,views[1][1],views[1][2],True,span)
-            scene.render.resolution_x,scene.render.resolution_y=640,360
-            if args.mode=='samples':
-                for seconds in (1,3.5,6):
-                    scene.frame_set(round(seconds*12)+1)
-                    scene.render.filepath=str(output/f'fire_{seconds:g}s.png'); bpy.ops.render.render(write_still=True)
-            else:
-                scene.frame_start,scene.frame_end=1,round(args.duration*12)
-                scene.render.image_settings.file_format='FFMPEG'; scene.render.ffmpeg.format='MPEG4'
-                scene.render.ffmpeg.codec='H264'; scene.render.filepath=str(output/'fire_short.mp4')
-                bpy.ops.render.render(animation=True)
+            effects=add_fire(scene,timeline,points,floor,[display,floor_obj],config,closest_hit)
+            report['effects']=effects
             report['timeline']=timeline
+            anchor=next(p for p in effects['anchors'] if p['device']==ignition)
+            point=next(p for p in points if int(p['device'])==ignition)['pose']['translation']
+            close=config['art']['closeup']; base=anchor['display_fire_base_z']
+            close_position=[point['x']+close['offset'][0],point['y']+close['offset'][1],base+close['offset'][2]]
+            close_target=[point['x'],point['y'],base+close['target_height']]
+            for seconds in config['quality']['sample_times']:
+                frame=round(seconds*scene.render.fps)+1
+                requests.extend([(f'overview_{seconds:g}s',frame,views[1][1],views[1][2],True,None),
+                    (f'closeup_{ignition}_{seconds:g}s',frame,close_position,close_target,False,close['lens'])])
+        else:
+            requests=[(name,1,position,target,ortho,None) for name,position,target,ortho in views]
+        for name,frame,position,target,ortho,lens in requests:
+            scene.frame_set(frame)
+            cam=camera(scene,position,target,ortho,span)
+            cam.data.dof.use_dof=False
+            if lens is not None:cam.data.lens=lens
+            scene.render.filepath=str(output/(name+'.png'))
+            before=time.perf_counter()
+            bpy.ops.render.render(write_still=True)
+            path=output/(name+'.png')
+            if not path.is_file() or path.stat().st_size<100:raise ValueError('Missing sample: '+name)
+            samples.append({'image':path.name,'seconds':(frame-1)/scene.render.fps,
+                'render_seconds':round(time.perf_counter()-before,3),'sha256':digest(path),
+                'effective':snapshot_settings(scene)})
+            dump(output/'sample_manifest.json',{'status':'partial','samples':samples})
+            print(f'[room-demo] sample={name} render_seconds={samples[-1]["render_seconds"]}',flush=True)
         bpy.ops.wm.save_as_mainfile(filepath=str(output/'display.blend'))
         if any(digest(p)!=h for p,h in guards.items()):raise ValueError('Base file changed')
         report['guarded_files']={str(p):h for p,h in guards.items()}
         report['guarded_files_unchanged']=True
-        required=['top.png','oblique.png','interior.png','display.blend']
-        if args.mode=='samples':required += ['fire_1s.png','fire_3.5s.png','fire_6s.png']
-        if args.mode=='short':required += ['fire_short.mp4']
-        if any(not (output/name).is_file() or (output/name).stat().st_size<100 for name in required):
-            raise ValueError('Expected preview artifact missing/empty')
         report['elapsed_seconds']=round(time.perf_counter()-started,3)
-        report['render_config']={'resolution':[scene.render.resolution_x,scene.render.resolution_y],
-            'fps':scene.render.fps,'animation_frames':round(args.duration*12) if args.mode=='short' else 0,
-            'engine':scene.render.engine}
+        report['total_still_render_seconds']=sum(item['render_seconds'] for item in samples)
+        report['samples']=samples
         report['artifacts']={p.name:digest(p) for p in output.iterdir() if p.is_file()}
+        dump(output/'sample_manifest.json',{'status':'awaiting_visual_review','samples':samples})
         dump(output/'repair_report.json',report)
         print(f'[room-demo] mode={args.mode} output={output} base_unchanged=true',flush=True)
         return output
@@ -337,14 +230,13 @@ def run(args: argparse.Namespace) -> Path:
 
 
 def main() -> None:
-    p=argparse.ArgumentParser(description='Existing room asset -> display views, fire stills or <=8s preview')
+    p=argparse.ArgumentParser(description='Round-one paired stills only; animation paused pending review')
     p.add_argument('--asset',type=Path,required=True)
-    p.add_argument('--mode',choices=('inspect','samples','short'),default='inspect')
+    p.add_argument('--mode',choices=('inspect','samples'),default='samples')
+    p.add_argument('--config',type=Path,default=Path(__file__).with_name('room_fire_round1.json'))
     p.add_argument('--wall-height',type=float,default=1.1)
     p.add_argument('--drop-component',type=int,action='append',default=[])
     p.add_argument('--points',type=Path)
-    p.add_argument('--accept-display',action='store_true')
-    p.add_argument('--duration',type=float,default=4)
     args=p.parse_args(sys.argv[sys.argv.index('--')+1:])
     if not math.isfinite(args.wall_height) or not .3<=args.wall_height<=2.4:p.error('Display wall height must be .3..2.4m')
     run(args)
