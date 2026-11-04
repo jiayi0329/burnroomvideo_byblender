@@ -37,6 +37,8 @@
 
 ## 命令与执行边界
 
+2026-11-04 A阶段：新增`test_room_animation.py`，追溯PRD2.3/architecture3.3，覆盖三个新增动画文件及EffectFlow稳定节点名。24项临时资产/进程/编码/Blender/Linux锁替身测试，验证48帧与9额外检查渲染、24秒288/576帧生命周期、冻结配置/指纹、13点排除策略、目录隔离、可复用帧与损坏拒绝、失败保留、H.264/ffprobe契约、逐帧统计与推算标签、具名人工审核/质量preset与实际证据绑定、无审批不创建正式目录、任务锁/已有GPU进程检查、温度终止、任意顺序跳帧一致、可选真实渲染器信息与软件渲染识别、启动器成功止于审核及失败报告。命令：`python -m unittest test.test_room_animation -v`；加原静帧/资产/户型回归共98项通过。本地没有运行Blender/ffmpeg/Linux锁实机，不访问数据库或远程数据；GPU、真实视频连续性/耗时及正式出片门禁需按docs/room_animation.md在远端验收。模拟进程返回的秒数不是远端性能数据。
+
 2026-11-03第三轮：新增`test_room_fire_round3.py`，对应PRD2.2/architecture3.2；6项核对火焰参数/火舌网格、烟柱几何/成长、BFS/机位/质量均不变；曝光/背景及薄层颜色小幅提升；离线执行lighting函数确认逐灯体积倍率和烟柱高度目标真正应用/记录；第三轮仍走分层火体/吸收烟柱分支；实际设置回读曝光；无效倍率/目标/版本拒绝。相关回归共74项通过。命令：`python -m unittest test.test_room_fire_round3 test.test_room_fire_round2 test.test_room_fire_config test.test_room_fire_style test.test_room_demo test.test_room_demo_plan -v`。全为离线替身及合成几何，不渲染/不写数据库；六张真实图片/耗时需按docs/room_style_round3.md远端验收。
 
 2026-11-03第二轮：新增`test_room_fire_round2.py`，对应PRD2.2/architecture3.2；8项覆盖主/次火尺寸比例且风格/事件/质量不变、表面照明保持但体积照亮受控、卷曲烟柱闭合/不规则/窄底宽顶、独立成长/升高/消退及固定烟底、主体密度不耦合发光、深色非发光散射和额外吸收连线、无效参数拒绝、分轮独立目录和静帧门禁。复用原节点替身，无Blender/数据库/资产写入。命令：`python -m unittest test.test_room_fire_round2 test.test_room_fire_config test.test_room_fire_style test.test_room_demo test.test_room_demo_plan -v`。与房间资产/户型相关回归共68项离线通过；远端六张图片、API兼容和耗时仍按docs/room_style_round2.md验收，不宣称已出新图。

@@ -140,6 +140,16 @@ app/inspect_room_asset.py 是无 bpy/数据库依赖的离线检查；app/F8_ins
 
 app/diagnose_room_sections.py 绑定通过的导入报告与本地检查 SHA256，使用 app/room_section_geometry.py 做三角面/平面求交、网格采样连通性和逐边平行表面探测。app/room_section_plots.py 用可选 Matplotlib Agg 输出诊断 PNG 和本地索引，不调用 Blender 渲染。requirements-diagnostics.txt 与生产 requirements.txt 分离，现有 F8/数据库接口不依赖该绘图库。诊断前后校验源文件和历史视频指纹，输出目录独立；报告保留未确认参数及门禁，不自动修正坐标、墙边或高度。
 
+### 3.3 A阶段独立动画任务（2026-11-04）
+
+run_room_animation.py（普通Python，无bpy/DB）→Linux内核排他锁/已有进程检查→F8_room_animation.py（Blender专用F8-E）→PNG→独立FFmpeg编码/ffprobe核验→等待人工审核。room_animation_job.py为纯stdlib文件契约、冻结指纹、绝对时间状态、输出约束/统计/推算与审批门禁；不引入后端任务队列或数据库。复用F8-D的mesh_faces/camera/closest_hit与F8-B的below/make_mesh，当前展示截断不变；复用现有F8_room_fire_style的configure_render/lighting/add_fire，只给既有流动节点增加稳定名称EffectFlow，无艺术参数改动。F8-D静帧执行分支不改。
+
+任务根为基础资产版本的上一级Room8/render_jobs，独立UTC_UUID。配置快照及输入/脚本哈希绑定工作；检查原资产/历史视频/原timeline不变。Blender逐帧scene.frame_set后，用绝对时间公式重新赋值火焰包络/闪烁/变换、烟成长/密度、点光及4D噪声W/坐标，避免依赖前一帧/模拟缓存。沿用第三轮总览和近景机位，短片固定总览，近景仅用于验收；不实现Hybrid或火烟墙面遮罩。GPU粒度保守为所有可见卡串行，锁描述符继承到worker；旧API与外部非协作任务不能被此锁控制，启动前探测并要求本阶段不同时手动开任务。监控可用时85/90°C告警/终止，数据不可用保留原因。
+
+frame_NNNNNN.png只在校验后从本次attempt暂存目录转入frames，每完成一项原子更新manifest。续跑校验固定快照、代码、输入和PNG哈希；异常文件不删除不替换。每次attempt有独立blender.log/encode.log/failure日志和计时；根status/timing_report为最新尝试视图，历史尝试保留。确认48视频帧及9额外渲染/2复制参考图齐全后，FFmpeg以-n写本次暂存MP4，ffprobe确认4秒48帧H.264/RGB转换yuv420p/faststart，再发布本任务视频及回执。失败保留所有已产出文件，不覆盖历史任务。
+
+报告覆盖启动/加载/初始化、逐帧/阶段统计、额外检查、编码/验证、GPU显存利用率和本次总耗时；续跑复用帧的原始计时与本次墙钟时间区分。全片24秒，依据3+20+1生命周期；正式720p24fps576帧的耗时只做启发式估算，直到远端全片实测前不得声称达标。短片结束仅awaiting_visual_review，审批文件需明确允许preset，所有人工核验项为true，并校验绑定配置/输入/代码/机位、报告/视频和帧证据。没有从short自动跳final的分支。详见PRD2.3、docs/room_animation.md、test/test_room_animation.py；本地替身测试不是Linux锁/Blender/FFmpeg实机或视觉验收。
+
 ## 4. 版本路线图与架构组件映射
 
 | 版本 | 架构动作 | 涉及模块 |

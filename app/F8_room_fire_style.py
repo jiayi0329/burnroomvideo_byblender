@@ -101,7 +101,7 @@ def volume_material(name: str, smoke: bool, config: dict, phase: float, end_fram
     stretch=nodes.new('ShaderNodeVectorMath'); stretch.operation='MULTIPLY'
     stretch.inputs[1].default_value=(1,1,style['stretch_z'])
     links.new(coord.outputs['Generated'],stretch.inputs[0])
-    flow=nodes.new('ShaderNodeVectorMath'); flow.operation='ADD'; links.new(stretch.outputs['Vector'],flow.inputs[0])
+    flow=nodes.new('ShaderNodeVectorMath'); flow.name='EffectFlow'; flow.operation='ADD'; links.new(stretch.outputs['Vector'],flow.inputs[0])
     noise=nodes.new('ShaderNodeTexNoise'); noise.name='EffectNoise'; noise.noise_dimensions='4D'
     noise.inputs['Scale'].default_value=style['noise_scale']; noise.inputs['Detail'].default_value=style['noise_detail']
     noise.inputs['Roughness'].default_value=style['noise_roughness']; noise.inputs['Distortion'].default_value=style['noise_distortion']
