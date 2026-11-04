@@ -21,11 +21,11 @@ import uuid
 if __package__:
     from .room_animation_job import (preflight, build_spec, create_job, check_resume, check_guards,
         read_json, write_json, digest, confined, requests, verified_record, summarize, estimate_full,
-        encoding_command, verify_video, approval_template, verify_approval, historical_summary, verify_effective_cameras)
+        encoding_command, verify_video, approval_template, verify_approval, historical_summary, verify_effective_cameras, verify_nvidia_renderer)
 else:
     from room_animation_job import (preflight, build_spec, create_job, check_resume, check_guards,
         read_json, write_json, digest, confined, requests, verified_record, summarize, estimate_full,
-        encoding_command, verify_video, approval_template, verify_approval, historical_summary, verify_effective_cameras)
+        encoding_command, verify_video, approval_template, verify_approval, historical_summary, verify_effective_cameras, verify_nvidia_renderer)
 
 
 @contextmanager
@@ -125,10 +125,16 @@ def encode(job: Path, attempt_dir: Path, spec: dict) -> tuple[dict,float,float]:
     probe_command=['ffprobe','-v','error','-count_frames','-show_streams','-show_format','-of','json',str(temporary)]
     probe=json.loads(subprocess.run(probe_command,capture_output=True,text=True,check=True).stdout)
     actual=verify_video(probe,spec); probe_seconds=time.perf_counter()-before
+    before=time.perf_counter()
+    decode_command=['ffmpeg','-v','error','-xerror','-i',str(temporary),'-map','0:v:0','-f','null','-']
+    with (attempt_dir/'decode.log').open('w',encoding='utf-8') as stream:
+        subprocess.run(decode_command,stdout=stream,stderr=subprocess.STDOUT,check=True)
+    decode_seconds=time.perf_counter()-before
     if final.exists():raise ValueError('Refusing to overwrite existing video')
     temporary.replace(final)
     actual.update({'file':name,'bytes':final.stat().st_size,'sha256':digest(final),'encoding_command':command,
-                   'encoding_seconds':encoding_seconds,'probe_seconds':probe_seconds})
+                   'encoding_seconds':encoding_seconds,'probe_seconds':probe_seconds,
+                   'full_decode_passed':True,'decode_seconds':decode_seconds,'decode_command':decode_command})
     write_json(receipt,actual)
     return actual,encoding_seconds,probe_seconds
 
@@ -141,11 +147,13 @@ def execute(args: argparse.Namespace) -> Path:
     inputs=preflight(args.asset,args.points,args.config,code_root,
                      reference_manifest=getattr(args,'reference_samples',None),require_reference=args.stage=='camera_check' and mode=='overview')
     spec=build_spec(inputs,args.stage,args.preset,args.wall_height,args.drop_component,
-                    camera_mode=mode)
+                    camera_mode=mode,direct_final=getattr(args,'direct_final',False))
     root=args.asset.resolve().parent.parent/'render_jobs'; data_root=args.points.resolve().parent.parent
     # Approval checked before creating a final directory or starting Blender.
     approval=None
-    if args.stage=='final':
+    if getattr(args,'direct_final',False) and args.approval is not None:
+        raise ValueError('Choose --direct-final or --approval, not both')
+    if args.stage=='final' and not getattr(args,'direct_final',False):
         if args.approval is None:raise ValueError('Final rendering requires --approval from an explicitly reviewed short job')
         approval=verify_approval(args.approval,root,spec)
     with gpu_lock(data_root) as lock_fd:
@@ -181,17 +189,19 @@ def execute(args: argparse.Namespace) -> Path:
             manifest=read_json(job/'render_manifest.json')
             if manifest.get('worker_complete') is not True:raise RuntimeError('Worker did not finish all requested outputs')
             verify_effective_cameras(manifest['frames'],spec)
+            worker=read_json(attempt_dir/'worker_timing.json')
+            if spec['animation'].get('require_nvidia_graphics'):verify_nvidia_renderer(worker.get('renderer',{}))
             if args.stage=='camera_check':
                 video=None; encoding_seconds=probe_seconds=0.0
             else:
                 write_json(job/'status.json',{'state':'encoding','attempt':attempt})
                 video,encoding_seconds,probe_seconds=encode(job,attempt_dir,spec)
             check_guards(inputs)
-            worker=read_json(attempt_dir/'worker_timing.json')
             stats=summarize(manifest['frames'],spec)
             prep=preparation+worker['blender_startup_and_import_seconds']+worker['worker_prepare_seconds']
             original_encoding=video['encoding_seconds'] if video else 0.0
-            estimate=estimate_full(stats,spec,prep,original_encoding)
+            estimate=({'status':'not_requested','reason':'Final job records actual delivery timings; no performance pretest or estimate'}
+                      if args.stage=='final' else estimate_full(stats,spec,prep,original_encoding))
             gpu_rows=[g for s in samples for g in s.get('gpus',[])]
             costs={'preparation':prep,'png_rendering':stats['video_frames'].get('sum_seconds',0)+stats['extra_keyframes'].get('sum_seconds',0),
                    'encoding':original_encoding}
@@ -212,7 +222,8 @@ def execute(args: argparse.Namespace) -> Path:
                 'full_video_estimate':estimate,'review_required':True,
                 'bottleneck_hint':max(costs,key=costs.get)}
             write_json(attempt_dir/'timing_report.json',report); write_json(job/'timing_report.json',report)
-            manifest.update(technical_complete=True,video=video,guarded_files_unchanged=True,review_required=True)
+            manifest.update(technical_complete=True,video=video,guarded_files_unchanged=True,review_required=True,
+                            authorization=spec['animation'].get('authorization',{'mode':'short_review' if approval else 'preview'}))
             write_json(job/'render_manifest.json',manifest)
             write_json(job/'status.json',{'state':'awaiting_visual_review','attempt':attempt,'automatic_final_render':False})
             if args.stage=='short':write_json(job/'approval_template.json',approval_template(job,spec))
@@ -244,6 +255,8 @@ def main() -> None:
     parser.add_argument('--report-job',type=Path,help='Read historical timing/camera evidence only; no GPU lock or render')
     parser.add_argument('--preset',choices=('test','final'),default='test')
     parser.add_argument('--approval',type=Path); parser.add_argument('--resume',type=Path)
+    parser.add_argument('--direct-final',action='store_true',
+                        help='Explicitly authorized 24s / 720p / 24fps overview delivery, without a short-job review file')
     parser.add_argument('--wall-height',type=float,default=1.1)
     parser.add_argument('--drop-component',type=int,action='append',default=[])
     args=parser.parse_args()

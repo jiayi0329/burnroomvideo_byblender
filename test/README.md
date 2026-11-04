@@ -75,4 +75,12 @@ docker compose exec -T -e ROOM_DB_INTEGRATION=1 app-server python3 -m unittest t
 
 ## 每次交付记录
 
+GPU修复后相关回归共120项通过（前次114项加6项GPU守卫测试）；未运行真实Blender/GPU或远端任务，实际L20上下文须在正式任务首帧后确认。
+
+GPU修复新增 `test_room_gpu_rendering.py`（6项），追溯PRD2.3/architecture3.3：NVIDIA上下文通过，软件/未知/非NVIDIA拒绝；执行真实worker AST守卫并验证失败前留证、发布帧前阻断；final强制GPU且旧CPU契约无法续跑；生产与覆盖配置仅请求所需图形能力。正式流程进程替身补充合成NVIDIA证据，避免测试默许CPU。命令：`python -m unittest test.test_room_gpu_rendering test.test_room_animation_final test.test_room_animation_camera test.test_room_animation -v`。未在本地运行Docker/Blender/GPU，不安装驱动。
+
+本次直接正式出片相关回归：114项通过（包含静帧、火烟、相机、动画、资产和户型测试）；新增直接出片测试5项。真实576帧视频及远端耗时尚未运行，由用户按正式命令执行后验收。
+
+2026-11-04 直接正式出片：新增 `test_room_animation_final.py`（5项），对应PRD 2.3 / architecture 3.3。验证显式直接出片授权、冻结风格、24秒720p24fps576个纯总览帧、错误模式拒绝、续跑授权一致、保留冲突检查、不调用短片审核/耗时预估、完整解码通过才发布、解码失败保留帧和编码产物。原编码替身适配新增解码步骤；不运行真实Blender/ffmpeg。命令：`python -m unittest test.test_room_animation_final test.test_room_animation_camera test.test_room_animation -v`。模拟耗时与视频字节不是服务器实测或真实成片。
+
 说明新增测试名称、对应需求、命令、通过/失败/跳过数量、未验证项及原因。涉及 app 行为修改但缺少对应新增测试时，不标记该功能为完成。本规范目前是开发约定，尚未添加自动 CI 强制检查。

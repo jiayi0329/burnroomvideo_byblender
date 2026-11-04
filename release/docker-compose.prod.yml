@@ -8,6 +8,9 @@ services:
     env_file:
       - prod.env                # 引用生产环境的专属密码文件 (含 MINIO_ROOT_USER/PASSWORD)
     environment:
+      # EEVEE needs NVIDIA OpenGL/EGL libraries, not only CUDA and nvidia-smi.
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
       # MinIO 数据流转连接配置 (凭证由 prod.env 注入容器)
       - MINIO_ENDPOINT=minio-oss:9000
       # 产物公开分享链接使用的对外端点 (V6.0 老师看片入口, 需管理员放行 9000 端口)

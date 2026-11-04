@@ -172,7 +172,7 @@ class AnimationJobs(unittest.TestCase):
     def test_encoder_isolated_success_and_failure_preserve_pngs(self) -> None:
         job=self.new_job(); self.populate_frames(job); attempt=job/'attempts/first'; attempt.mkdir()
         def fake_run(command: list,**kwargs: object) -> object:
-            if command[0]=='ffmpeg':Path(command[-1]).write_bytes(b'encoded fixture')
+            if command[0]=='ffmpeg' and command[-1]!='-':Path(command[-1]).write_bytes(b'encoded fixture')
             return SimpleNamespace(stdout=json.dumps(self.probe()),returncode=0)
         with patch.object(launcher.subprocess,'run',side_effect=fake_run):
             result,_,_=launcher.encode(job,attempt,self.spec)
@@ -236,7 +236,7 @@ class AnimationJobs(unittest.TestCase):
             def wait(self,**kwargs: object) -> int:return code
             def poll(self) -> int:return code
         def run(command: list,**kwargs: object) -> object:
-            if command[0]=='ffmpeg':Path(command[-1]).write_bytes(b'video fixture')
+            if command[0]=='ffmpeg' and command[-1]!='-':Path(command[-1]).write_bytes(b'video fixture')
             return SimpleNamespace(stdout=json.dumps(self.probe()),returncode=0)
         return Process,run
 

@@ -142,6 +142,10 @@ app/diagnose_room_sections.py 绑定通过的导入报告与本地检查 SHA256�
 
 ### 3.3 A阶段独立动画任务（2026-11-04）
 
+**NVIDIA图形能力修正**：release/docker-compose.prod.yml显式请求compute,utility,graphics；临时远端修复使用release/docker-compose.gpu.yml叠加现有生产compose，只重建app-server容器、不重建镜像，保留所有既有生产env/卷。NVIDIA驱动库由容器运行时从宿主机挂载，不在容器内另装显卡驱动。require_nvidia_graphics写入所有final任务契约；第一帧后、发布PNG前校验gpu.platform实际renderer/vendor/device_type，拒绝软件/未知/非NVIDIA；保存attempts/<attempt>/renderer.json及manifest.renderer供失败排查。正式编码前再次核验worker_timing中的实际渲染器；全部帧复用的续跑读取同任务既有renderer证据，无证据则拒绝。旧CPU任务与新GPU任务分目录，不续跑代码/契约不同的旧任务；火烟/灯光/机位参数不变。test_room_gpu_rendering.py验证驱动配置、真实worker守卫分支与软件拒绝，不等于实机GPU验证。
+
+**正式出片策略更新（2026-11-04，用户明确授权，优先于下述旧短片门禁）**：`--stage final --preset final --camera-mode overview --direct-final` 直接生成24秒、1280×720、24fps、576帧；不要求新短片审核文件、GPU性能排查或耗时预估。授权模式写入配置快照与manifest并纳入续跑一致性检查；未指定直接出片选项时仍保留原审核路径。第三轮风格指纹、13点BFS和独立总览相机不变；本模式只渲染576个总览视频帧，不追加近景样帧。启动排他锁和已有任务检查、温度保护、逐帧记录、输入指纹保护、失败保留及续跑保持生效。编码后先由ffprobe核对576帧/720p/24fps/24秒，再完整解码通过才发布fire_final.mp4和video_receipt.json；耗时报告仅记录实测。完成状态awaiting_visual_review表示技术交付完成、待人工播放查看，不会再自动启动任务。新增test_room_animation_final.py对应这些行为；远端操作见docs/room_animation_final.md。
+
 相机回归修复：F8-D camera()为当前相机修改器，F8-E不能把它两次返回值当成两个相机。现在通过independent_camera先清空scene.camera再调用原helper，创建独立对象、data、TRACK_TO target；派生场景marker camera解绑，原资产不保存。activate_camera在每次绝对时间seek后选机位并检查独立性/类型，渲染后记录实际相机，编码前核对有效帧相机；camera_mode显式进入快照、manifest、审批绑定。总览位置/目标沿用R3，fit_overview利用实际view_frame画幅/投影检查房间及峰值火焰覆盖，只增大尺度不动模型/位置/目标；两机位不再相互覆盖。
 
 新增camera_check stage，CLI默认该档：一张3.5秒动画总览，不进入编码或短片审批模板。camera_reference绑定原R3样帧/配置/基础资产SHA，源文件纳入只读guards，比较图和并排HTML在独立新任务输出，位姿/类型偏离原参考报错；正交尺度若为覆盖检查放大则明确记录并等待人工构图验收。旧错误任务的video/timing_manifest保留，不续跑旧错误帧；historical_summary和--report-job只读提取，标出标签overview/实际PERSP不符，不把旧CPU近景耗时视为总览或L20性能。用户报告显示llvmpipe/SOFTWARE，本轮不更改GPU后端。新增test_room_animation_camera.py追溯PRD2.3，含真实旧camera helper的别名复现与修复回归、投影余量、参考指纹、一帧无编码流程及报告只读；离线测试不代表远端新构图已通过。当前操作以docs/room_animation_camera_fix.md为准。

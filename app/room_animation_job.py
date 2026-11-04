@@ -141,7 +141,7 @@ def check_guards(inputs: dict) -> None:
 
 
 def build_spec(inputs: dict, stage: str, preset: str='test', wall_height: float=1.1,
-               drops: list[int] | None=None, camera_mode: str='overview') -> dict:
+               drops: list[int] | None=None, camera_mode: str='overview', direct_final: bool=False) -> dict:
     if stage not in ('camera_check','short','final') or preset not in ('test','final'):raise ValueError('Invalid stage/preset')
     if camera_mode not in ('overview','closeup'):raise ValueError('Invalid camera mode')
     if stage in ('camera_check','short') and preset!='test':raise ValueError('Camera/short baseline is 960x540 / 12fps')
@@ -151,6 +151,12 @@ def build_spec(inputs: dict, stage: str, preset: str='test', wall_height: float=
     animation={'stage':stage,'preset':preset,'fps':fps,'resolution':resolution,'duration_seconds':duration,
                'frame_count':1 if stage=='camera_check' else duration*fps,'camera_mode':camera_mode,
                'wall_height':wall_height,'drop_components':sorted(set(drops or []))}
+    if stage=='final':animation['require_nvidia_graphics']=True
+    if direct_final:
+        if (stage,preset,camera_mode,duration)!=('final','final','overview',24):
+            raise ValueError('Direct final requires final stage/preset, overview and the frozen 24-second timeline')
+        animation['authorization']={'mode':'explicit_direct_final','short_review_required':False,
+                                    'performance_pretest_required':False}
     spec={'schema_version':1,'inputs':inputs,'animation':animation}
     spec['signature']=fingerprint(spec)
     return spec
@@ -164,6 +170,17 @@ def create_job(root: Path, spec: dict) -> Path:
     write_json(job/'config_snapshot.json',spec)
     write_json(job/'status.json',{'state':'created','run_id':run_id})
     return job
+
+
+def verify_nvidia_renderer(info: dict) -> None:
+    """Require actual graphics-context evidence, never infer it from nvidia-smi."""
+    renderer=str(info.get('renderer','')).lower()
+    vendor=str(info.get('vendor','')).lower()
+    if (info.get('available') is not True or info.get('software_rendering_suspected') or
+        str(info.get('device_type','')).upper()=='SOFTWARE' or
+        any(name in renderer for name in ('llvmpipe','softpipe','software')) or
+        'nvidia' not in vendor+' '+renderer):
+        raise RuntimeError('NVIDIA graphics renderer required; refusing software/unknown rendering: '+str(info))
 
 
 def check_resume(job: Path, spec: dict) -> None:
@@ -201,6 +218,8 @@ def requests(spec: dict) -> list[dict]:
         return [{'path':f'keyframes/{name}_3.5s.png','frame':round(3.5*fps)+1,'seconds':3.5,'camera':mode,'kind':'camera_check'}]
     result=[{'path':f'frames/frame_{frame:06d}.png','frame':frame,'seconds':(frame-1)/fps,
              'camera':mode,'kind':'video'} for frame in range(1,count+1)]
+    # The explicitly authorized final job renders only its 576 delivery frames.
+    if a.get('authorization',{}).get('mode')=='explicit_direct_final':return result
     times=[1,3.5,6]
     if a['stage']=='short':times+= [5.5,6.5,10,16,23]
     for seconds in sorted(set(times)):

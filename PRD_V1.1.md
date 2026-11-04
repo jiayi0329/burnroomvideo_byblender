@@ -113,6 +113,10 @@ F8-D（app/F8_room_demo.py）提供 inspect、samples、short 三档：先展示
 
 ### 2.3 A阶段：Room8动画性能测试与出片（2026-11-04）
 
+**GPU执行修正（同日，后续明确要求）**：远端能枚举4张L20，但仅有Mesa EGL配置、无NVIDIA图形库，不能把nvidia-smi成功当作EEVEE GPU执行证据。生产容器显式请求NVIDIA_VISIBLE_DEVICES=all及NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics。正式任务快照强制require_nvidia_graphics；第一帧获取实际上下文后，NVIDIA证据不符立即失败，保存renderer.json，不继续576帧软件渲染。编码前再次核对，纯续跑必须有既有NVIDIA证据。不增加独立性能基准或短片；重新创建app-server挂载驱动库后新建正式任务，旧CPU任务和帧保留，不混用旧任务。独立GPU覆盖配置只更改app-server环境，不替换生产环境文件/卷，不更动数据库或MinIO。首次远端修复仍须实际NVIDIA渲染器与监控验证，离线测试不代表已使用GPU。
+
+**当前执行决定（2026-11-04，替代本节旧短片前置要求）**：用户已验收第三轮风格及修复后的overview构图，明确直接正式出片，不再新增GPU排查、性能基准、短片复测或耗时预估。使用独立Room8资产、第三轮冻结配置及13内部点BFS，排除32/42；24秒、1280×720、24fps、576帧。通过 `--stage final --preset final --camera-mode overview --direct-final` 明确记录本次直接出片授权，不伪造旧短片审核文件；未显式选择该模式的旧审核路径继续保留。只渲染交付视频帧，保留实际计时、并发检查、版本隔离、输入保护与可验证续跑。交付fire_final.mp4、config_snapshot.json、render_manifest.json、timing_report.json、video_receipt.json及状态/日志；核对分辨率/FPS/帧数/时长并完整解码后才发布视频，人工最终检查播放效果。数据库、原始资产、历史视频和第三轮配置不改。测试追溯test_room_animation_final.py，运行步骤见docs/room_animation_final.md。
+
 **动画镜头回归修复（2026-11-04，优先于下文首轮运行步骤）**：首个4秒短片实际被记录为PERSP/30mm，而任务误标overview。原因是F8-D的camera函数修改scene.camera，动画连续调用两次后overview/closeup共享同一对象、数据及TRACK_TO目标，后一次近景覆盖前一次总览。F8-D静帧函数本身保持原用法不改，F8-E分别创建独立Room8_Overview/Room8_Closeup22及独立data/target，清除派生场景继承的marker相机绑定；渲染前后检查类型/对象，编码前再次核对实际视频帧相机，不能只看字符串标签。
 
 动画任务新增camera_mode=overview/closeup，默认overview，正式主镜头为整体正交斜视，近景仅显式选择；机位/目标沿用第三轮overview，按实际画幅投影核对房间多边形、展示墙高范围及13点峰值火焰包围，必要时只扩大正交尺度，并记录原尺度/有效尺度/覆盖范围。该检查不声称穿墙遮挡或整片烟尾均已验证。manifest记录实际对象/data/type/位置/世界旋转/TRACK_TO目标/轴向/正交尺度，每帧在渲染后回读；请求与实际不符中止，不以近景帧冒充总览性能。

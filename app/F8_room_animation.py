@@ -26,7 +26,7 @@ from F8_prepare_room_asset import below, make_mesh
 from F8_room_fire_style import configure_render, lighting, add_fire, snapshot_settings, checked
 from room_demo_plan import display_faces, room_timeline
 from room_animation_job import (read_json, write_json, digest, confined, check_guards,
-                                effect_state, requests, verified_record, png_ok, phase_name)
+                                effect_state, requests, verified_record, png_ok, phase_name, verify_nvidia_renderer)
 
 
 def independent_camera(scene: object, name: str, position: list, target: list, ortho: bool, span: float) -> object:
@@ -231,7 +231,14 @@ def run(job: Path, attempt: str, launch_monotonic: float) -> None:
             start=time.perf_counter(); started_at=datetime.now(timezone.utc).isoformat()
             bpy.ops.render.render(write_still=True)
             elapsed=time.perf_counter()-start
-            if 'renderer' not in timings:timings['renderer']=renderer_info()
+            if 'renderer' not in timings:
+                timings['renderer']=renderer_info()
+                manifest['renderer']=timings['renderer']
+                write_json(work/'renderer.json',timings['renderer'])
+                write_json(job/'render_manifest.json',manifest)
+                print('[room-animation] renderer='+str(timings['renderer']),flush=True)
+                if spec['animation'].get('require_nvidia_graphics'):
+                    verify_nvidia_renderer(timings['renderer'])
             if not png_ok(temp,spec['animation']['resolution']):raise ValueError('Invalid/incomplete PNG: '+str(temp))
             if target.exists():raise ValueError('Refusing to overwrite an existing frame')
             final_camera={'camera_mode':request['camera'],**camera_parameters(scene.camera)}
@@ -270,7 +277,9 @@ def run(job: Path, attempt: str, launch_monotonic: float) -> None:
     manifest['frames']=list(records.values()); write_json(job/'render_manifest.json',manifest)
     timings['new_rendered_outputs']=rendered; timings['reused_outputs']=reused
     if 'renderer' not in timings:
-        timings['renderer']={'available':False,'reason':'All frames reused; no rendering performed in this attempt'}
+        timings['renderer']=old.get('renderer') or {'available':False,'reason':'All frames reused; no rendering performed in this attempt'}
+        if spec['animation'].get('require_nvidia_graphics'):verify_nvidia_renderer(timings['renderer'])
+    manifest['renderer']=timings['renderer']; write_json(job/'render_manifest.json',manifest)
     write_json(work/'worker_timing.json',timings)
     print(f'[room-animation] worker_complete=true rendered={rendered} reused={reused}',flush=True)
 

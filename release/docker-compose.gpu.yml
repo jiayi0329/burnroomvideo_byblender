@@ -1,0 +1,6 @@
+# Apply with the EXISTING remote compose file; never replace its env/volumes.
+services:
+  app-server:
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility,graphics
