@@ -3,7 +3,7 @@
 inspect: 更新三视图；samples: 中近景/总览六张对比样帧。静帧审核期间禁用动画入口。
 复用 F8-B 的 UV 保留建网格/展示截断，不重做户型对齐或房间平面裁切。
 不修改基础 room.blend/glb、数据库、源模型、核验记录或历史视频。
-远端 Blender 4.2 独立执行；当前第二轮操作见 docs/room_style_round2.md。
+远端 Blender 4.2 独立执行；当前第三轮操作见 docs/room_style_round3.md。
 """
 from __future__ import annotations
 
@@ -189,11 +189,16 @@ def run(args: argparse.Namespace) -> Path:
             effects=add_fire(scene,timeline,points,floor,[display,floor_obj],config,closest_hit)
             actual['effects']=effects
             dump(output/'effective_settings.json',actual)
-            if revision==2:
+            if revision>=2:
                 report['changes']=['Preserve round-one tongue topology, color ramp, emission, exposure and surface lighting',
                     'Primary height x1.75 / radius x1.45; secondary height x1.3; four radial density layers',
                     'Replace smoke spheres with curled narrow-base plumes; independent extinction and growth',
                     'Reduce volume illumination only; fire light cutoff 5m, energy unchanged; closeup 30mm/target 1.3m']
+            if revision==3:
+                report['changes']=['Preserve round-two flame parameters, plume geometry/growth, propagation, cameras and quality',
+                    'Exposure -0.35 / world .22 with subtly lighter charcoal background',
+                    'Key 500W unchanged; fill 190W volume .35; rim 340W volume .7 aimed 1.6m above scene lighting center',
+                    'Only thin smoke scattering edge slightly brighter; dark core, density and absorption unchanged']
             report['effects']=effects
             report['timeline']=timeline
             anchor=next(p for p in effects['anchors'] if p['device']==ignition)
@@ -243,7 +248,7 @@ def main() -> None:
     p=argparse.ArgumentParser(description='Versioned paired stills only; animation paused pending review')
     p.add_argument('--asset',type=Path,required=True)
     p.add_argument('--mode',choices=('inspect','samples'),default='samples')
-    p.add_argument('--config',type=Path,default=Path(__file__).with_name('room_fire_round2.json'))
+    p.add_argument('--config',type=Path,default=Path(__file__).with_name('room_fire_round3.json'))
     p.add_argument('--wall-height',type=float,default=1.1)
     p.add_argument('--drop-component',type=int,action='append',default=[])
     p.add_argument('--points',type=Path)

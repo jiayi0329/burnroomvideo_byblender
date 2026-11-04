@@ -37,6 +37,8 @@
 
 ## 命令与执行边界
 
+2026-11-03第三轮：新增`test_room_fire_round3.py`，对应PRD2.2/architecture3.2；6项核对火焰参数/火舌网格、烟柱几何/成长、BFS/机位/质量均不变；曝光/背景及薄层颜色小幅提升；离线执行lighting函数确认逐灯体积倍率和烟柱高度目标真正应用/记录；第三轮仍走分层火体/吸收烟柱分支；实际设置回读曝光；无效倍率/目标/版本拒绝。相关回归共74项通过。命令：`python -m unittest test.test_room_fire_round3 test.test_room_fire_round2 test.test_room_fire_config test.test_room_fire_style test.test_room_demo test.test_room_demo_plan -v`。全为离线替身及合成几何，不渲染/不写数据库；六张真实图片/耗时需按docs/room_style_round3.md远端验收。
+
 2026-11-03第二轮：新增`test_room_fire_round2.py`，对应PRD2.2/architecture3.2；8项覆盖主/次火尺寸比例且风格/事件/质量不变、表面照明保持但体积照亮受控、卷曲烟柱闭合/不规则/窄底宽顶、独立成长/升高/消退及固定烟底、主体密度不耦合发光、深色非发光散射和额外吸收连线、无效参数拒绝、分轮独立目录和静帧门禁。复用原节点替身，无Blender/数据库/资产写入。命令：`python -m unittest test.test_room_fire_round2 test.test_room_fire_config test.test_room_fire_style test.test_room_demo test.test_room_demo_plan -v`。与房间资产/户型相关回归共68项离线通过；远端六张图片、API兼容和耗时仍按docs/room_style_round2.md验收，不宣称已出新图。
 
 2026-11-03第一轮：`test_room_fire_config.py`追溯PRD2.2/architecture3.2，覆盖art/events/quality分组、已确认灯光、禁止改BFS排除策略、火弱烟留、固定种子和主/次火舌数量、闭合有向网格边；`test_room_fire_style.py`覆盖设置显式赋值/回读、缺失与截断拒绝、short在任何资产I/O前拒绝。原`test_room_demo.py`增加独立发光/密度与四层色/深灰非发光烟的节点替身断言，并验证只有静帧渲染调用。命令：`python -m unittest test.test_room_fire_config test.test_room_fire_style test.test_room_demo test.test_room_demo_plan -v`。不运行Blender/数据库，不写真实数据；Blender4.2 API、六张样帧实际色彩及耗时须远端按docs/room_style_round1.md确认。

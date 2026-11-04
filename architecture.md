@@ -113,6 +113,8 @@
 ---
 
 ### 3.2 独立房间资产准备与诊断
+2026-11-03 第三轮：room_fire_round3.json只调整背景/曝光、两盏现有补光和烟薄层散射色；火焰配置、烟柱网格/曲线、事件、相机、质量保持第二轮值。revision>=2共享已认可的分层火体和烟柱实现，避免新增revision误走旧球烟。面光配置可选volume_factor/target_offset，默认兼容旧配置；纯配置层校验倍率/偏移，Blender层实际赋值并记录位置、目标、旋转和回读体积倍率，不新增渲染入口或灯对象数量。默认第三轮，显式配置仍可复现前两轮；style_round3独立保存六图、配置、有效参数及逐图耗时，基本保护与静帧门禁不变。世界节点主要改善可见背景，室内提亮由现有面光承担，不宣称新增GI。对应PRD2.2、test/test_room_fire_round3.py、docs/room_style_round3.md；真实烟可见性/过曝程度和耗时需远端审核。
+
 2026-11-03 第二轮静帧：沿用F8-D及两个辅助模块，不新增引擎入口。room_fire_round2.json通过art.revision=2选择新分支，第一轮JSON未改；输出按已校验revision隔离style_round1/2。保持accepted火舌几何算法与发光路径，放大名义尺寸并新增独立FlameDensityLayers/FlameBodyNoise径向主体密度，不把密度变化耦合到Emission。smoke_state/plume_mesh为纯stdlib：固定火源附近窄底、不规则卷曲扩散上体、独立浓度/成长和向上纹理平移；R2不调用球体烟分支。深色Principled散射叠加无发光VolumeAbsorption，面光/点光显式设置并回读Blender4.2的volume_factor，以降低烟雾被照成浅灰的风险，实际仍需看图。
 
 effective_settings包含回读材质密度层、吸收比、噪声保底、光照系数及生成尺寸；sample_manifest每图回读灯功率/体积系数、密度/发光包络、烟柱变换与世界Z包围盒，并记录耗时。请求系数与逐帧实际值分开；不声称静帧已验证运动连续性。体积对象仍每点2个、总26个，采样/分辨率不增，但覆盖范围增大会增加逐像素体积工作量，耗时须实测。13点BFS、展示几何、基础资产保护和仅静帧门禁保持。操作见docs/room_style_round2.md，新增测试test/test_room_fire_round2.py追溯PRD2.2/本节；禁止以替身节点测试冒充Blender远端验收。

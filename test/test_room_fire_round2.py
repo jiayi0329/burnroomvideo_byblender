@@ -110,7 +110,7 @@ class RoundTwo(unittest.TestCase):
     def test_round_two_uses_new_directory_and_rejects_video(self) -> None:
         text=(ROOT/'app/F8_room_demo.py').read_text(encoding='utf-8')
         self.assertIn("('style_round'+str(revision))",text)
-        self.assertIn("with_name('room_fire_round2.json')",text)
+        self.assertIn("with_name('room_fire_round3.json')",text)
         self.assertIn("choices=('inspect','samples')",text)
         tree=ast.parse(text)
         calls=[n for n in ast.walk(tree) if isinstance(n,ast.Call) and ast.unparse(n.func)=='bpy.ops.render.render']

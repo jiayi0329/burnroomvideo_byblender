@@ -68,12 +68,14 @@ def lighting(scene: bpy.types.Scene, center: list, span: float, config: dict) ->
     for spec in art['area_lights']:
         data=bpy.data.lights.new(prefix+spec['name'],'AREA')
         data.energy=spec['energy']; data.size=spec['size']; data.color=spec['color']; data.shape='SQUARE'; data.use_shadow=True
-        checked(data,'volume_factor',art.get('area_volume_factor',1.0))
+        checked(data,'volume_factor',spec.get('volume_factor',art.get('area_volume_factor',1.0)))
         obj=bpy.data.objects.new(data.name,data); scene.collection.objects.link(obj)
         obj.location=Vector(center)+Vector(spec['offset'])
-        obj.rotation_euler=(Vector(center)-obj.location).to_track_quat('-Z','Y').to_euler()
+        target=Vector(center)+Vector(spec.get('target_offset',[0,0,0]))
+        obj.rotation_euler=(target-obj.location).to_track_quat('-Z','Y').to_euler()
         values.append({'name':data.name,'energy':data.energy,'size':data.size,'shape':data.shape,
-                       'position':list(obj.location),'color':list(data.color),'use_shadow':data.use_shadow,
+                       'position':list(obj.location),'target':list(target),'rotation_euler':list(obj.rotation_euler),
+                       'color':list(data.color),'use_shadow':data.use_shadow,
                        'volume_factor':data.volume_factor})
     return {'world_color':list(background.inputs['Color'].default_value),
             'world_strength':background.inputs['Strength'].default_value,'area_lights':values}
@@ -81,7 +83,7 @@ def lighting(scene: bpy.types.Scene, center: list, span: float, config: dict) ->
 
 def volume_material(name: str, smoke: bool, config: dict, phase: float, end_frame: int) -> tuple:
     style=config['art']['smoke' if smoke else 'flame']; fps=config['quality']['fps']
-    round2=config['art'].get('revision',1)==2
+    round2=config['art'].get('revision',1)>=2
     mat=bpy.data.materials.new(name); mat.use_nodes=True
     # Curled plume is non-convex; FAST's convex shortcut is only kept for old spheres.
     mat.volume_intersection_method='FAST' if smoke and not round2 else config['quality']['flame_intersection']
@@ -249,7 +251,7 @@ def add_fire(scene: bpy.types.Scene, timeline: dict, points: list[dict], floor: 
         mesh=bpy.data.meshes.new('TongueCluster_'+str(device)); mesh.from_pydata(vertices,[],faces); mesh.update()
         flame=bpy.data.objects.new(mesh.name,mesh); scene.collection.objects.link(flame); flame.location=(p['x'],p['y'],base)
         mat,fc=volume_material('FlameStyle_'+str(device),False,config,phase,end_frame); mesh.materials.append(mat)
-        if art.get('revision',1)==2:
+        if art.get('revision',1)>=2:
             sv,sf=plume_mesh(config,phase+2)
             smoke_mesh=bpy.data.meshes.new('SmokePlume_'+str(device)); smoke_mesh.from_pydata(sv,[],sf); smoke_mesh.update()
             smoke=bpy.data.objects.new(smoke_mesh.name,smoke_mesh); scene.collection.objects.link(smoke)
@@ -274,7 +276,7 @@ def add_fire(scene: bpy.types.Scene, timeline: dict, points: list[dict], floor: 
             flame.scale=(.35+.65*a,.35+.65*a,(.04+.96*a)*(1+(flicker-1)*.5))
             flame.rotation_euler=(f['sway_radians']*math.sin(age*5+phase),f['sway_radians']*math.cos(age*4+phase),0)
             flame.keyframe_insert('scale',frame=frame); flame.keyframe_insert('rotation_euler',frame=frame)
-            if art.get('revision',1)==2:
+            if art.get('revision',1)>=2:
                 state=smoke_state(config,age,primary)
                 smoke.scale=(state['radius'],state['radius'],state['height'])
                 smoke.location.z=base+state['emitter_offset']
@@ -290,7 +292,7 @@ def add_fire(scene: bpy.types.Scene, timeline: dict, points: list[dict], floor: 
             'flame_material':material_settings(mat),'smoke_material':material_settings(sm),
             'smoke_shape':s.get('shape','uv_sphere'),
             'smoke_samples':[{'seconds':seconds,'age':seconds-start,**smoke_state(config,seconds-start,primary)}
-                for seconds in q['sample_times']] if art.get('revision',1)==2 else [],
+                for seconds in q['sample_times']] if art.get('revision',1)>=2 else [],
             'light_effective':{'radius':light.shadow_soft_size,'use_shadow':light.use_shadow,
                 'custom_distance':light.use_custom_distance,'cutoff_distance':light.cutoff_distance,'volume_factor':light.volume_factor}})
     return {'anchors':anchors,'clusters':all_specs,'animation_keyframe_end':end_frame,

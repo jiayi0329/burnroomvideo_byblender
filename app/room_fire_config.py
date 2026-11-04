@@ -29,8 +29,8 @@ def validate(c: dict) -> None:
     finite(c)
     art,events,q=c['art'],c['events'],c['quality']; f=art['flame']; s=art['smoke']
     revision=art.get('revision',1)
-    if type(revision) is not int or revision not in (1,2):raise ValueError('Unsupported style revision')
-    if revision==2:
+    if type(revision) is not int or revision not in (1,2,3):raise ValueError('Unsupported style revision')
+    if revision>=2:
         if f['primary_tongues']!=4 or f['secondary_tongues']!=2:raise ValueError('Round two keeps 4/2 tongues')
         profile=f['density_layers']
         if len(profile)!=4 or [p[0] for p in profile]!=[0,.28,.68,1]:raise ValueError('Invalid density layer positions')
@@ -89,6 +89,12 @@ def validate(c: dict) -> None:
         raise ValueError('Expected four linear RGBA flame colors and valid RGBA values')
     if len(art['area_lights'])!=3 or any(light['energy']<0 or light['size']<=0 or len(light['offset'])!=3 for light in art['area_lights']):
         raise ValueError('Expected three valid area lights')
+    for light in art['area_lights']:
+        if not 0<=light.get('volume_factor',art.get('area_volume_factor',1))<=1:
+            raise ValueError('Invalid per-light volume factor')
+        target=light.get('target_offset',[0,0,0])
+        if len(target)!=3 or any(not isinstance(v,(int,float)) or abs(v)>10 for v in target):
+            raise ValueError('Invalid light target offset')
     if not -5<=art['exposure']<=3 or not 0<=art['world_strength']<=2:
         raise ValueError('Invalid exposure/world strength')
     if not 0<f['light_distance']<=20 or f['light_energy']<0 or f['light_radius']<=0:
