@@ -1,5 +1,7 @@
 # A阶段：冻结第三轮风格的Room8短片与性能验收
 
+首轮短片发现相机对象复用错误，已修复。当前先按[动画相机单帧核对](room_animation_camera_fix.md)操作；本页原短片步骤暂停，构图通过后再用short。默认stage现为camera_check，任务显式记录camera_mode。
+
 2026-11-04；PRD2.3 / architecture3.3。当前仅执行short，不执行final。原F8-D静帧入口和room_fire_round3.json不变；新F8-E经普通Python启动器调用Blender，不访问数据库或旧API。
 
 ## 输出与时间契约

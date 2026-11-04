@@ -142,6 +142,10 @@ app/diagnose_room_sections.py 绑定通过的导入报告与本地检查 SHA256�
 
 ### 3.3 A阶段独立动画任务（2026-11-04）
 
+相机回归修复：F8-D camera()为当前相机修改器，F8-E不能把它两次返回值当成两个相机。现在通过independent_camera先清空scene.camera再调用原helper，创建独立对象、data、TRACK_TO target；派生场景marker camera解绑，原资产不保存。activate_camera在每次绝对时间seek后选机位并检查独立性/类型，渲染后记录实际相机，编码前核对有效帧相机；camera_mode显式进入快照、manifest、审批绑定。总览位置/目标沿用R3，fit_overview利用实际view_frame画幅/投影检查房间及峰值火焰覆盖，只增大尺度不动模型/位置/目标；两机位不再相互覆盖。
+
+新增camera_check stage，CLI默认该档：一张3.5秒动画总览，不进入编码或短片审批模板。camera_reference绑定原R3样帧/配置/基础资产SHA，源文件纳入只读guards，比较图和并排HTML在独立新任务输出，位姿/类型偏离原参考报错；正交尺度若为覆盖检查放大则明确记录并等待人工构图验收。旧错误任务的video/timing_manifest保留，不续跑旧错误帧；historical_summary和--report-job只读提取，标出标签overview/实际PERSP不符，不把旧CPU近景耗时视为总览或L20性能。用户报告显示llvmpipe/SOFTWARE，本轮不更改GPU后端。新增test_room_animation_camera.py追溯PRD2.3，含真实旧camera helper的别名复现与修复回归、投影余量、参考指纹、一帧无编码流程及报告只读；离线测试不代表远端新构图已通过。当前操作以docs/room_animation_camera_fix.md为准。
+
 run_room_animation.py（普通Python，无bpy/DB）→Linux内核排他锁/已有进程检查→F8_room_animation.py（Blender专用F8-E）→PNG→独立FFmpeg编码/ffprobe核验→等待人工审核。room_animation_job.py为纯stdlib文件契约、冻结指纹、绝对时间状态、输出约束/统计/推算与审批门禁；不引入后端任务队列或数据库。复用F8-D的mesh_faces/camera/closest_hit与F8-B的below/make_mesh，当前展示截断不变；复用现有F8_room_fire_style的configure_render/lighting/add_fire，只给既有流动节点增加稳定名称EffectFlow，无艺术参数改动。F8-D静帧执行分支不改。
 
 任务根为基础资产版本的上一级Room8/render_jobs，独立UTC_UUID。配置快照及输入/脚本哈希绑定工作；检查原资产/历史视频/原timeline不变。Blender逐帧scene.frame_set后，用绝对时间公式重新赋值火焰包络/闪烁/变换、烟成长/密度、点光及4D噪声W/坐标，避免依赖前一帧/模拟缓存。沿用第三轮总览和近景机位，短片固定总览，近景仅用于验收；不实现Hybrid或火烟墙面遮罩。GPU粒度保守为所有可见卡串行，锁描述符继承到worker；旧API与外部非协作任务不能被此锁控制，启动前探测并要求本阶段不同时手动开任务。监控可用时85/90°C告警/终止，数据不可用保留原因。

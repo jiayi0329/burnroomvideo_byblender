@@ -164,7 +164,9 @@ class AnimationJobs(unittest.TestCase):
         image=png(960,540); records=[]
         for request in jobs.requests(self.spec):
             path=job/request['path']; path.write_bytes(image)
-            records.append({**request,'sha256':jobs.digest(path),'render_seconds':1,'copied':'copy_from' in request})
+            records.append({**request,'sha256':jobs.digest(path),'render_seconds':1,'copied':'copy_from' in request,
+                            'effective':{'camera':{'object':'fixture_'+request['camera'],'camera_mode':request['camera'],
+                                                   'type':'ORTHO' if request['camera']=='overview' else 'PERSP'}}})
         jobs.write_json(job/'render_manifest.json',{'frames':records})
 
     def test_encoder_isolated_success_and_failure_preserve_pngs(self) -> None:

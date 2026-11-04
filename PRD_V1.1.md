@@ -113,6 +113,14 @@ F8-D（app/F8_room_demo.py）提供 inspect、samples、short 三档：先展示
 
 ### 2.3 A阶段：Room8动画性能测试与出片（2026-11-04）
 
+**动画镜头回归修复（2026-11-04，优先于下文首轮运行步骤）**：首个4秒短片实际被记录为PERSP/30mm，而任务误标overview。原因是F8-D的camera函数修改scene.camera，动画连续调用两次后overview/closeup共享同一对象、数据及TRACK_TO目标，后一次近景覆盖前一次总览。F8-D静帧函数本身保持原用法不改，F8-E分别创建独立Room8_Overview/Room8_Closeup22及独立data/target，清除派生场景继承的marker相机绑定；渲染前后检查类型/对象，编码前再次核对实际视频帧相机，不能只看字符串标签。
+
+动画任务新增camera_mode=overview/closeup，默认overview，正式主镜头为整体正交斜视，近景仅显式选择；机位/目标沿用第三轮overview，按实际画幅投影核对房间多边形、展示墙高范围及13点峰值火焰包围，必要时只扩大正交尺度，并记录原尺度/有效尺度/覆盖范围。该检查不声称穿墙遮挡或整片烟尾均已验证。manifest记录实际对象/data/type/位置/世界旋转/TRACK_TO目标/轴向/正交尺度，每帧在渲染后回读；请求与实际不符中止，不以近景帧冒充总览性能。
+
+当前CLI默认camera_check：经同一动画入口只出3.5秒一张图，不编码、不启动短片/完整视频。自动读取同一基础资产对应第三轮sample_manifest、requested_config、repair_report和overview_3.5s.png，验证指纹/配置与基础房间SHA，复制参考图到新任务并输出camera_comparison.json/HTML并排对照；找不到可验证原图时出图前报错，可显式指定reference-samples。构图须用户人工确认后再运行short，原样式JSON/火烟/灯光/基础模型/视频和历史任务不改；旧错误镜头任务不能用新代码续跑。
+
+旧短片耗时已从用户提供报告只读提取保留：48帧纯渲染991.66秒，均值20.66/中位19.02/P90 29.26/最大33.60秒，9次额外检查355.50秒，编码0.73秒，总1352.36秒。该次实际renderer=llvmpipe、device_type=SOFTWARE、GPU利用率0%，所以是近景软件渲染的历史实测，不能当作总览/L20基准或据此承诺新全片耗时。本轮只记录软件渲染瓶颈，不调整GPU后端。read-only report-job模式可提取旧任务，不需要GPU锁或Blender。测试test/test_room_animation_camera.py与操作docs/room_animation_camera_fix.md追溯本次修复。
+
 第三轮六张样帧已由用户人工通过，冻结room_fire_round3.json的艺术/传播/质量基线，以规范化JSON指纹拒绝未审核修改；动画只通过job preset改变FPS/分辨率。F8-D静帧入口继续仅inspect/samples，新F8-E独立Python启动器经子进程调用Blender4.2，复用F8-D的展示几何/相机和现有火烟模块，不接旧全屋API/白色方块实现，不改数据库或原裁切算法。每帧按绝对秒数设置火体、烟、光和4D噪声，不能积累前一帧状态；视觉状态应可任意跳帧复现，不承诺不同GPU的PNG字节完全一致。
 
 当前只准备4秒48帧/12fps/960×540固定总览短片。帧1对应0秒、帧48对应47/12秒，视频编码时长4秒；额外输出原1/3.5/6秒六张近景/总览对比图，以及5.5/6.5/10/16/23秒总览后期检查。复用视频中的1/3.5秒总览，实际新增9次静帧渲染，合计57次出图、59份PNG（含2份复制）；额外验证开销与48帧性能基准分开统计，不自动编码成第二段短片。

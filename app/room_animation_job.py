@@ -65,7 +65,8 @@ def full_duration(config: dict, timeline: dict) -> int:
     return math.ceil(last+end)+1  # One second after all effect envelopes reach zero.
 
 
-def preflight(asset: Path, points: Path, config: Path, code_root: Path) -> dict:
+def preflight(asset: Path, points: Path, config: Path, code_root: Path,
+              reference_manifest: Path | None=None, require_reference: bool=False) -> dict:
     asset=asset.resolve(); points=points.resolve(); config=config.resolve()
     style=load_config(config)
     if style['art'].get('revision')!=3:raise ValueError('Animation baseline must be round three')
@@ -100,8 +101,38 @@ def preflight(asset: Path, points: Path, config: Path, code_root: Path) -> dict:
         raise ValueError('Reviewed Room8 activation schedule changed; review duration/stage model first')
     codes={name:digest(code_root/name) for name in CODE_FILES}
     guards.update({str((code_root/name).resolve()):h for name,h in codes.items()})
-    return {'asset':str(asset),'points':str(points),'config':str(config),'style':style,
+    result={'asset':str(asset),'points':str(points),'config':str(config),'style':style,
             'guards':guards,'timeline':timeline,'codes':codes}
+    result['camera_reference']=load_camera_reference(asset,reference_manifest,require_reference)
+    if result['camera_reference']:
+        guards.update(result['camera_reference']['guards'])
+    return result
+
+
+def load_camera_reference(asset: Path, manifest_path: Path | None, required: bool) -> dict | None:
+    """Read verified round-three overview evidence; never edit source samples."""
+    choices=([manifest_path.resolve()] if manifest_path is not None else
+             sorted((asset.parent/'style_round3').glob('*/sample_manifest.json'),key=lambda p:p.stat().st_mtime,reverse=True))
+    errors=[]
+    for path in choices:
+        try:
+            requested=path.parent/'requested_config.json'
+            if fingerprint(read_json(requested))!=APPROVED_STYLE_FINGERPRINT:raise ValueError('Reference style differs')
+            samples=read_json(path)['samples']
+            sample=next(s for s in samples if s['image']=='overview_3.5s.png')
+            image=confined(path.parent,sample['image'])
+            if digest(image)!=sample['sha256'] or sample['effective']['camera']['type']!='ORTHO' or not png_ok(image,[960,540]):
+                raise ValueError('Reference image fingerprint or camera differs')
+            repair=path.parent/'repair_report.json'; guards={str(p):digest(p) for p in (path,requested,image)}
+            if not repair.exists() or read_json(repair).get('base_room_sha256')!=digest(asset/'room.blend'):
+                raise ValueError('Reference must bind the same base room asset')
+            guards[str(repair)]=digest(repair)
+            return {'manifest':str(path),'image':str(image),'sha256':sample['sha256'],
+                    'camera':sample['effective']['camera'],'guards':guards}
+        except (OSError,ValueError,KeyError,StopIteration) as exc:errors.append(str(exc))
+    if required or manifest_path is not None:
+        raise ValueError('Verified round-three overview reference required; use --reference-samples. '+str(errors))
+    return None
 
 
 def check_guards(inputs: dict) -> None:
@@ -110,14 +141,16 @@ def check_guards(inputs: dict) -> None:
 
 
 def build_spec(inputs: dict, stage: str, preset: str='test', wall_height: float=1.1,
-               drops: list[int] | None=None) -> dict:
-    if stage not in ('short','final') or preset not in ('test','final'):raise ValueError('Invalid stage/preset')
-    if stage=='short' and preset!='test':raise ValueError('Short baseline is 960x540 / 12fps')
+               drops: list[int] | None=None, camera_mode: str='overview') -> dict:
+    if stage not in ('camera_check','short','final') or preset not in ('test','final'):raise ValueError('Invalid stage/preset')
+    if camera_mode not in ('overview','closeup'):raise ValueError('Invalid camera mode')
+    if stage in ('camera_check','short') and preset!='test':raise ValueError('Camera/short baseline is 960x540 / 12fps')
     if not math.isfinite(wall_height) or not .3<=wall_height<=2.4:raise ValueError('Invalid display wall height')
     fps,resolution=(12,[960,540]) if preset=='test' else (24,[1280,720])
-    duration=4 if stage=='short' else full_duration(inputs['style'],inputs['timeline'])
+    duration=0 if stage=='camera_check' else 4 if stage=='short' else full_duration(inputs['style'],inputs['timeline'])
     animation={'stage':stage,'preset':preset,'fps':fps,'resolution':resolution,'duration_seconds':duration,
-               'frame_count':duration*fps,'camera':'overview','wall_height':wall_height,'drop_components':sorted(set(drops or []))}
+               'frame_count':1 if stage=='camera_check' else duration*fps,'camera_mode':camera_mode,
+               'wall_height':wall_height,'drop_components':sorted(set(drops or []))}
     spec={'schema_version':1,'inputs':inputs,'animation':animation}
     spec['signature']=fingerprint(spec)
     return spec
@@ -162,15 +195,20 @@ def phase_name(seconds: float) -> str:
 
 def requests(spec: dict) -> list[dict]:
     a=spec['animation']; fps=a['fps']; count=a['frame_count']
+    mode=a['camera_mode']
+    if a['stage']=='camera_check':
+        name='overview' if mode=='overview' else 'closeup_22'
+        return [{'path':f'keyframes/{name}_3.5s.png','frame':round(3.5*fps)+1,'seconds':3.5,'camera':mode,'kind':'camera_check'}]
     result=[{'path':f'frames/frame_{frame:06d}.png','frame':frame,'seconds':(frame-1)/fps,
-             'camera':'overview','kind':'video'} for frame in range(1,count+1)]
+             'camera':mode,'kind':'video'} for frame in range(1,count+1)]
     times=[1,3.5,6]
     if a['stage']=='short':times+= [5.5,6.5,10,16,23]
     for seconds in sorted(set(times)):
-        for camera in ('overview','closeup_22') if seconds in (1,3.5,6) else ('overview',):
+        for camera in ('overview','closeup') if seconds in (1,3.5,6) else ('overview',):
             frame=round(seconds*fps)+1
-            item={'path':f'keyframes/{camera}_{seconds:g}s.png','frame':frame,'seconds':seconds,'camera':camera,'kind':'keyframe'}
-            if camera=='overview' and frame<=count:item['copy_from']=f'frames/frame_{frame:06d}.png'
+            label='closeup_22' if camera=='closeup' else 'overview'
+            item={'path':f'keyframes/{label}_{seconds:g}s.png','frame':frame,'seconds':seconds,'camera':camera,'kind':'keyframe'}
+            if camera==mode and frame<=count:item['copy_from']=f'frames/frame_{frame:06d}.png'
             result.append(item)
     return result
 
@@ -204,12 +242,23 @@ def summarize(records: list[dict], spec: dict) -> dict:
     main=[r for r in records if r['kind']=='video']; groups=defaultdict(list)
     for record in records:
         if record['camera']=='overview' and not record.get('copied'):groups[phase_name(record['seconds'])].append(record)
-    return {'video_frames':frame_stats(main),'extra_keyframes':frame_stats([r for r in records if r['kind']=='keyframe']),
+    return {'video_frames':frame_stats(main),'extra_keyframes':frame_stats([r for r in records if r['kind']!='video']),
             'overview_stages':{name:frame_stats(items) for name,items in groups.items()},
-            'video_frame_count':spec['animation']['frame_count']}
+            'video_frame_count':0 if spec['animation']['stage']=='camera_check' else spec['animation']['frame_count']}
+
+
+def verify_effective_cameras(records: list[dict], spec: dict) -> None:
+    for record in records:
+        if record['kind'] not in ('video','camera_check'):continue
+        actual=(record.get('effective') or {}).get('camera') or {}
+        mode=spec['animation'].get('camera_mode',spec['animation'].get('camera','overview'))
+        if (record['camera']!=mode or actual.get('camera_mode')!=mode or not actual.get('object') or
+            actual.get('type')!=('ORTHO' if mode=='overview' else 'PERSP')):
+            raise ValueError('Effective rendered camera does not match task camera_mode')
 
 
 def estimate_full(stats: dict, spec: dict, prep_seconds: float, encode_seconds: float) -> dict:
+    if spec['animation']['camera_mode']!='overview':return {'status':'not_applicable_to_overview','reason':'Closeup timings cannot estimate overview performance'}
     mean=stats['video_frames'].get('mean_seconds')
     if mean is None:return {'status':'not_measured'}
     # Empirical phase means where available; absent phases use observed P90 conservatively.
@@ -250,7 +299,31 @@ def verify_video(probe: dict, spec: dict) -> dict:
 
 
 def review_binding(spec: dict) -> str:
-    return fingerprint({'inputs':spec['inputs'],'display':{key:spec['animation'][key] for key in ('camera','wall_height','drop_components')}})
+    a=spec['animation']
+    display={key:a[key] for key in ('wall_height','drop_components')}
+    display['camera_mode']=a.get('camera_mode',a.get('camera','overview'))
+    return fingerprint({'inputs':spec['inputs'],'display':display})
+
+
+def historical_summary(job: Path) -> dict:
+    """Read-only extraction, including legacy incorrectly labelled overview frames."""
+    manifest=read_json(job/'render_manifest.json')
+    timing=read_json(job/'timing_report.json') if (job/'timing_report.json').is_file() else {}
+    video=manifest.get('video') or {}
+    frames=[r for r in manifest.get('frames',[]) if r.get('kind')=='video']
+    cameras=[r.get('effective',{}).get('camera',{}) for r in frames]
+    types=sorted({c.get('type','unrecorded') for c in cameras})
+    labelled=sorted({r.get('camera','unrecorded') for r in frames})
+    mismatch='overview' in labelled and any(c.get('type')!='ORTHO' for c in cameras)
+    return {'source':str(job.resolve()),'read_only':True,'measured_video_frames':len(frames),
+            'video_frames':timing.get('frames',{}).get('video_frames',frame_stats(frames)),
+            'extra_keyframes':timing.get('frames',{}).get('extra_keyframes'),
+            'encoding_seconds':timing.get('encoding_seconds_original',video.get('encoding_seconds')),
+            'total_seconds':timing.get('total_seconds_this_attempt'),'blender':timing.get('blender'),
+            'gpu':timing.get('gpu'),'video':{k:v for k,v in video.items() if k!='encoding_command'},
+            'labelled_camera_modes':labelled,'actual_camera_types':types,'actual_first_camera':cameras[0] if cameras else None,
+            'camera_mismatch':mismatch,'usable_as_overview_performance_baseline':not mismatch and bool(cameras) and types==['ORTHO'],
+            'note':'Preserve original timings. A mislabelled perspective/software run is not an overview/L20 performance measurement. No new overview estimate is inferred.'}
 
 
 def approval_template(job: Path, spec: dict) -> dict:
@@ -271,6 +344,7 @@ def verify_approval(path: Path, root: Path, spec: dict) -> dict:
     previous=read_json(source/'config_snapshot.json'); manifest=read_json(source/'render_manifest.json')
     if previous['animation']['stage']!='short' or read_json(source/'status.json')['state']!='awaiting_visual_review' or manifest.get('technical_complete') is not True:
         raise ValueError('Successful short job evidence required')
+    verify_effective_cameras(manifest['frames'],previous)
     if approval['binding']!=review_binding(spec) or review_binding(previous)!=review_binding(spec):raise ValueError('Approved baseline, inputs, code or camera differs')
     for name in ('config_snapshot.json','render_manifest.json','timing_report.json','fire_short.mp4'):
         if digest(source/name)!=approval.get('evidence',{}).get(name):raise ValueError('Review evidence changed: '+name)

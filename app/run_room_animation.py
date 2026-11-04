@@ -21,11 +21,11 @@ import uuid
 if __package__:
     from .room_animation_job import (preflight, build_spec, create_job, check_resume, check_guards,
         read_json, write_json, digest, confined, requests, verified_record, summarize, estimate_full,
-        encoding_command, verify_video, approval_template, verify_approval)
+        encoding_command, verify_video, approval_template, verify_approval, historical_summary, verify_effective_cameras)
 else:
     from room_animation_job import (preflight, build_spec, create_job, check_resume, check_guards,
         read_json, write_json, digest, confined, requests, verified_record, summarize, estimate_full,
-        encoding_command, verify_video, approval_template, verify_approval)
+        encoding_command, verify_video, approval_template, verify_approval, historical_summary, verify_effective_cameras)
 
 
 @contextmanager
@@ -113,6 +113,7 @@ def encode(job: Path, attempt_dir: Path, spec: dict) -> tuple[dict,float,float]:
         if not receipt.exists() or read_json(receipt)['sha256']!=digest(final):raise ValueError('Unverified existing video retained; start new job')
         return read_json(receipt),0.0,0.0
     records={r['path']:r for r in read_json(job/'render_manifest.json')['frames']}
+    verify_effective_cameras(list(records.values()),spec)
     for request in requests(spec):
         if not verified_record(job,request,records,spec['animation']['resolution']):raise ValueError('Missing frame: '+request['path'])
     temporary=attempt_dir/name; command=encoding_command(job,temporary,spec)
@@ -134,10 +135,13 @@ def encode(job: Path, attempt_dir: Path, spec: dict) -> tuple[dict,float,float]:
 
 def execute(args: argparse.Namespace) -> Path:
     started=time.perf_counter(); code_root=Path(__file__).resolve().parent
-    for tool in ('blender','ffmpeg','ffprobe'):
+    for tool in ('blender',) if args.stage=='camera_check' else ('blender','ffmpeg','ffprobe'):
         if not shutil.which(tool):raise RuntimeError('Required executable missing: '+tool)
-    inputs=preflight(args.asset,args.points,args.config,code_root)
-    spec=build_spec(inputs,args.stage,args.preset,args.wall_height,args.drop_component)
+    mode=getattr(args,'camera_mode','overview')
+    inputs=preflight(args.asset,args.points,args.config,code_root,
+                     reference_manifest=getattr(args,'reference_samples',None),require_reference=args.stage=='camera_check' and mode=='overview')
+    spec=build_spec(inputs,args.stage,args.preset,args.wall_height,args.drop_component,
+                    camera_mode=mode)
     root=args.asset.resolve().parent.parent/'render_jobs'; data_root=args.points.resolve().parent.parent
     # Approval checked before creating a final directory or starting Blender.
     approval=None
@@ -176,16 +180,21 @@ def execute(args: argparse.Namespace) -> Path:
             if code:raise RuntimeError(f'Blender exited {code}; see {attempt_dir}/blender.log')
             manifest=read_json(job/'render_manifest.json')
             if manifest.get('worker_complete') is not True:raise RuntimeError('Worker did not finish all requested outputs')
-            write_json(job/'status.json',{'state':'encoding','attempt':attempt})
-            video,encoding_seconds,probe_seconds=encode(job,attempt_dir,spec)
+            verify_effective_cameras(manifest['frames'],spec)
+            if args.stage=='camera_check':
+                video=None; encoding_seconds=probe_seconds=0.0
+            else:
+                write_json(job/'status.json',{'state':'encoding','attempt':attempt})
+                video,encoding_seconds,probe_seconds=encode(job,attempt_dir,spec)
             check_guards(inputs)
             worker=read_json(attempt_dir/'worker_timing.json')
             stats=summarize(manifest['frames'],spec)
             prep=preparation+worker['blender_startup_and_import_seconds']+worker['worker_prepare_seconds']
-            estimate=estimate_full(stats,spec,prep,video['encoding_seconds'])
+            original_encoding=video['encoding_seconds'] if video else 0.0
+            estimate=estimate_full(stats,spec,prep,original_encoding)
             gpu_rows=[g for s in samples for g in s.get('gpus',[])]
             costs={'preparation':prep,'png_rendering':stats['video_frames'].get('sum_seconds',0)+stats['extra_keyframes'].get('sum_seconds',0),
-                   'encoding':video['encoding_seconds']}
+                   'encoding':original_encoding}
             current_records=[r for r in manifest['frames'] if r.get('attempt')==attempt]
             current_render=sum(r['render_seconds'] for r in current_records)
             report={'measurement_status':'measured_remote_run','attempt':attempt,
@@ -193,7 +202,7 @@ def execute(args: argparse.Namespace) -> Path:
                 'frames':stats,'encoding_seconds_this_attempt':encoding_seconds,'ffprobe_seconds_this_attempt':probe_seconds,
                 'state_update_seconds_this_attempt':sum(r.get('state_update_seconds',0) for r in current_records),
                 'worker_non_render_overhead_seconds':max(0,process_seconds-worker['blender_startup_and_import_seconds']-worker['worker_prepare_seconds']-current_render),
-                'encoding_seconds_original':video['encoding_seconds'],'video':video,
+                'encoding_seconds_original':original_encoding,'video':video,'camera_mode':spec['animation']['camera_mode'],
                 'total_seconds_this_attempt':time.perf_counter()-started,
                 'frame_timing_scope':'Frame records retain original timings when resumed; this-attempt total excludes historical attempts',
                 'gpu':{'available':bool(gpu_rows),'sample_count':len(samples),'renderer':worker.get('renderer',{'available':False}),
@@ -207,7 +216,10 @@ def execute(args: argparse.Namespace) -> Path:
             write_json(job/'render_manifest.json',manifest)
             write_json(job/'status.json',{'state':'awaiting_visual_review','attempt':attempt,'automatic_final_render':False})
             if args.stage=='short':write_json(job/'approval_template.json',approval_template(job,spec))
-            print(f'[room-animation] done video={job/video["file"]} frames={video["frames"]} total_seconds={report["total_seconds_this_attempt"]:.3f} status=awaiting_visual_review',flush=True)
+            if video:
+                print(f'[room-animation] done video={job/video["file"]} frames={video["frames"]} total_seconds={report["total_seconds_this_attempt"]:.3f} status=awaiting_visual_review',flush=True)
+            else:
+                print(f'[room-animation] camera_check={job/manifest["frames"][0]["path"]} total_seconds={report["total_seconds_this_attempt"]:.3f} status=awaiting_visual_review',flush=True)
             return job
         except BaseException as exc:
             if process is not None:stop_child(process)
@@ -224,14 +236,22 @@ def execute(args: argparse.Namespace) -> Path:
 
 def main() -> None:
     parser=argparse.ArgumentParser(description='A-stage isolated Room8 animation, no legacy API')
-    parser.add_argument('--asset',type=Path,required=True); parser.add_argument('--points',type=Path,required=True)
+    parser.add_argument('--asset',type=Path); parser.add_argument('--points',type=Path)
     parser.add_argument('--config',type=Path,default=Path(__file__).with_name('room_fire_round3.json'))
-    parser.add_argument('--stage',choices=('short','final'),default='short')
+    parser.add_argument('--stage',choices=('camera_check','short','final'),default='camera_check')
+    parser.add_argument('--camera-mode',choices=('overview','closeup'),default='overview')
+    parser.add_argument('--reference-samples',type=Path)
+    parser.add_argument('--report-job',type=Path,help='Read historical timing/camera evidence only; no GPU lock or render')
     parser.add_argument('--preset',choices=('test','final'),default='test')
     parser.add_argument('--approval',type=Path); parser.add_argument('--resume',type=Path)
     parser.add_argument('--wall-height',type=float,default=1.1)
     parser.add_argument('--drop-component',type=int,action='append',default=[])
-    execute(parser.parse_args())
+    args=parser.parse_args()
+    if args.report_job:
+        print(json.dumps(historical_summary(args.report_job),ensure_ascii=False,indent=2),flush=True)
+        return
+    if args.asset is None or args.points is None:parser.error('--asset and --points are required for rendering')
+    execute(args)
 
 
 if __name__=='__main__':main()
