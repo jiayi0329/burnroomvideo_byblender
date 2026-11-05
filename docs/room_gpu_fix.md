@@ -1,5 +1,7 @@
 # Room8 NVIDIA EEVEE 修复（2026-11-04）
 
+2026-11-05补充：宿主机已安装580.178.04图形库，但容器依然无库。只读检查显示Docker已注册nvidia运行时、默认及app-server实际运行时为runc，Toolkit/CLI均为1.20.0。因此生产模板与GPU覆盖文件均增加app-server.runtime: nvidia，显式走NVIDIA runtime；不修改Docker全局默认运行时、不重启Docker守护进程、不改其他容器。gpus: all及compute,utility,graphics保留。此次是有依据的下一步修复，仍须重建后检查实际Runtime=nvidia、库可加载及NVIDIA EGL JSON；不能仅凭运行时名称宣布EEVEE已使用GPU。
+
 现有远端证据：4张L20可枚举，但NVIDIA_DRIVER_CAPABILITIES未设置，EGL vendor只有50_mesa.json，无libEGL_nvidia/libGLX_nvidia。NVIDIA Toolkit默认utility/compute不足以提供EEVEE所需graphics能力。配置修复不保证宿主机图形驱动本身完整，必须观察实际上下文。
 
 只将release/docker-compose.gpu.yml上传为远端部署目录的docker-compose.gpu.yml，叠加现有compose。不要用本地生产模板整体替换远端compose或凭证。先确认旧Blender任务已停止；保留旧任务目录。不要使用docker compose down或删除卷。

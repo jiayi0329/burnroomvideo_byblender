@@ -113,6 +113,8 @@ F8-D（app/F8_room_demo.py）提供 inspect、samples、short 三档：先展示
 
 ### 2.3 A阶段：Room8动画性能测试与出片（2026-11-04）
 
+2026-11-05运行时修正：宿主机580.178.04图形库已补齐，Docker注册nvidia、Toolkit1.20.0，但应用实际Runtime=runc且容器仍无NVIDIA EGL/GLX库。仅对app-server显式设置runtime: nvidia，保留gpus: all和graphics能力，不改共享服务器Docker默认配置。重建后先验证驱动库，再以正式首帧实际NVIDIA上下文作准；不增加短片或性能基准。对应test_room_gpu_rendering.py运行时范围测试。
+
 **GPU执行修正（同日，后续明确要求）**：远端能枚举4张L20，但仅有Mesa EGL配置、无NVIDIA图形库，不能把nvidia-smi成功当作EEVEE GPU执行证据。生产容器显式请求NVIDIA_VISIBLE_DEVICES=all及NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics。正式任务快照强制require_nvidia_graphics；第一帧获取实际上下文后，NVIDIA证据不符立即失败，保存renderer.json，不继续576帧软件渲染。编码前再次核对，纯续跑必须有既有NVIDIA证据。不增加独立性能基准或短片；重新创建app-server挂载驱动库后新建正式任务，旧CPU任务和帧保留，不混用旧任务。独立GPU覆盖配置只更改app-server环境，不替换生产环境文件/卷，不更动数据库或MinIO。首次远端修复仍须实际NVIDIA渲染器与监控验证，离线测试不代表已使用GPU。
 
 **当前执行决定（2026-11-04，替代本节旧短片前置要求）**：用户已验收第三轮风格及修复后的overview构图，明确直接正式出片，不再新增GPU排查、性能基准、短片复测或耗时预估。使用独立Room8资产、第三轮冻结配置及13内部点BFS，排除32/42；24秒、1280×720、24fps、576帧。通过 `--stage final --preset final --camera-mode overview --direct-final` 明确记录本次直接出片授权，不伪造旧短片审核文件；未显式选择该模式的旧审核路径继续保留。只渲染交付视频帧，保留实际计时、并发检查、版本隔离、输入保护与可验证续跑。交付fire_final.mp4、config_snapshot.json、render_manifest.json、timing_report.json、video_receipt.json及状态/日志；核对分辨率/FPS/帧数/时长并完整解码后才发布视频，人工最终检查播放效果。数据库、原始资产、历史视频和第三轮配置不改。测试追溯test_room_animation_final.py，运行步骤见docs/room_animation_final.md。

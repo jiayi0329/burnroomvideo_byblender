@@ -75,6 +75,8 @@ docker compose exec -T -e ROOM_DB_INTEGRATION=1 app-server python3 -m unittest t
 
 ## 每次交付记录
 
+2026-11-05：test_room_gpu_rendering.py新增1项，检查生产模板/覆盖文件都显式设置runtime: nvidia且仅作用app-server，保留gpus: all。只读配置检查，不运行Docker。宿主机缺库已由管理员补齐，当前调整对应容器实际Runtime=runc的远端证据；真实图形库注入仍待服务器验证。
+
 GPU修复后相关回归共120项通过（前次114项加6项GPU守卫测试）；未运行真实Blender/GPU或远端任务，实际L20上下文须在正式任务首帧后确认。
 
 GPU修复新增 `test_room_gpu_rendering.py`（6项），追溯PRD2.3/architecture3.3：NVIDIA上下文通过，软件/未知/非NVIDIA拒绝；执行真实worker AST守卫并验证失败前留证、发布帧前阻断；final强制GPU且旧CPU契约无法续跑；生产与覆盖配置仅请求所需图形能力。正式流程进程替身补充合成NVIDIA证据，避免测试默许CPU。命令：`python -m unittest test.test_room_gpu_rendering test.test_room_animation_final test.test_room_animation_camera test.test_room_animation -v`。未在本地运行Docker/Blender/GPU，不安装驱动。

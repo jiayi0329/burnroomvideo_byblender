@@ -3,6 +3,7 @@ services:
     image: burnroom-app:latest  # 直接使用打包好的镜像，不再现场 build
     restart: always
     gpus: all                   # 使用宿主机 NVIDIA GPU (需已装 nvidia-container-toolkit)
+    runtime: nvidia             # 显式经过 NVIDIA runtime，处理图形驱动库挂载
     ports:
       - "8000:8000"
     env_file:

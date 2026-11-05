@@ -84,5 +84,13 @@ class GraphicsGuard(unittest.TestCase):
         for key in ('volumes:','ports:','image:','env_file:','minio-oss:','postgres:'):
             self.assertNotIn(key,overlay)
 
+    def test_nvidia_runtime_is_explicit_and_scoped_to_app_server(self) -> None:
+        for filename in ('docker-compose.prod.yml','docker-compose.gpu.yml'):
+            source=(ROOT/'release'/filename).read_text(encoding='utf-8')
+            self.assertEqual(source.count('runtime: nvidia'),1)
+            app=source.split('  app-server:',1)[1].split('\n  minio-oss:',1)[0]
+            self.assertIn('    runtime: nvidia',app)
+        self.assertIn('    gpus: all',(ROOT/'release/docker-compose.prod.yml').read_text(encoding='utf-8'))
+
 
 if __name__=='__main__':unittest.main()
