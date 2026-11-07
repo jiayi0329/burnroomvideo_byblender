@@ -1,3 +1,6 @@
+> 当前有效需求已整理至 [docs/PRD.md](docs/PRD.md)，完成度见 [项目状态](docs/PROJECT_STATUS.md)。
+> 下文保留历史累积正文，含已被替代的步骤，不作为本轮任务指令。整理前原始字节已保存至 [历史快照](docs/archive/20261107_pre_baseline/PRD_V1.1.md)。
+
 # 产品需求文档 (PRD)：火灾场景时序演变视频生成系统
 
 > 版本：V2.3（房间数据管理与 PostgreSQL 接入）

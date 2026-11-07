@@ -1,0 +1,31 @@
+{
+  "purpose": "Byte-identical documentation snapshot before baseline documentation organization; not a rendering asset manifest",
+  "created_utc": "2026-11-07T09:19:00.786049+00:00",
+  "source_commit": "6725223dd6a1502bfe144411b6c94575be0ac210",
+  "files": [
+    {
+      "source": "PRD_V1.1.md",
+      "archive": "PRD_V1.1.md",
+      "bytes": 39503,
+      "sha256": "7d9cb72f2195891e55ad001ceeb5457f723ca6be742fbdb0fd95e231b860001d"
+    },
+    {
+      "source": "architecture.md",
+      "archive": "architecture.md",
+      "bytes": 26705,
+      "sha256": "554c062ef87ccbc1efa5626225f92f7260842c2b4636482fb213cae6a42425ee"
+    },
+    {
+      "source": "README.md",
+      "archive": "README.md",
+      "bytes": 5551,
+      "sha256": "a12989f7b97753c2c0faeb23f2820813b5cd6c597621742917e13834f6497498"
+    },
+    {
+      "source": "CLAUDE.md",
+      "archive": "CLAUDE.md",
+      "bytes": 3409,
+      "sha256": "63016d53dec4031cd76bc8505d68ecd64d765a756ffd3a427629cd024b18e0cd"
+    }
+  ]
+}

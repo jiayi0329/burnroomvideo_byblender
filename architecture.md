@@ -1,3 +1,6 @@
+> 当前有效架构已整理至 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，目录与数据规范见 [文档入口](docs/README.md)。
+> 下文保留历史正文，旧GPU中间方案及“待执行”状态不代表当前实现。整理前原始字节见 [历史快照](docs/archive/20261107_pre_baseline/architecture.md)。
+
 # 系统架构文档：火灾场景时序演变视频生成系统
 
 > 版本：V2.0（现状架构如实化 + 版本路线图映射）

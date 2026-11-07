@@ -1,3 +1,7 @@
+> **当前入口：[docs/README.md](docs/README.md)。** Room8 V1 已完成阶段性出片，当前进行工程整理，不重新渲染。
+> 下文冷启动、Docker与 `/api/render` 示例是保留的 Legacy 操作资料；旧接口会处理场景根视频，不能用来启动新版Room8任务。
+> 当前需求见 [PRD](docs/PRD.md)，架构见 [ARCHITECTURE](docs/ARCHITECTURE.md)，基线与性能见 [RELEASES](docs/RELEASES.md)。原README已按字节 [归档](docs/archive/20261107_pre_baseline/README.md)。
+
 # 写在最前面：冷启动步骤
 第 1 步：唤醒服务器
 ssh -p 7777 zhaojy@172.25.76.201 "docker ps"
