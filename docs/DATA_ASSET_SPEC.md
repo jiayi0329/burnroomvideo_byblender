@@ -16,7 +16,11 @@
 
 房间关系身份为 `(scene_id, layout_version, room_id)`；资产身份还包含 asset_version；任务可定位为 `(scene_id, room_id, render_job_id)`，其配置必须绑定相应户型和资产版本。新户型不能复用同一目录覆盖旧版 Room8。
 
+同一 `(scene_id, room_id)` 路径下，asset_version 跨户型版本也不得重复使用；render_job_id 也不得复用覆盖。同一文件多份相同SHA只是内容相同，不自动合并其业务来源。时间戳/UUID后缀是现有命名方式，不是全系统唯一性证明；当前create_job只保证本目录不重名，未来查询必须带场景/房间上下文或有可验证的唯一索引。
+
 现有 CLI/JSON 仍使用 scene_code/room_id，现有 catalog API 路径仍接收整数 room_id。后续适配器显式转换，不能全局替换字段，也不能让浏览器把 `Room8` 传给已有整数路由。
+
+业务编号保留原大小写及连字符/下划线，不因命名规范重命名既有版本。新接口只接受登记值，不把用户提供的字符串直接拼接成路径；解析到允许的数据根后须检查路径越界及符号链接，不接受绝对路径、`..` 或伪造目录分隔符。
 
 ## 2. 各存储位置的职责
 
@@ -61,6 +65,12 @@
 
 数据库持久化 `/data/zhaojy/burnroom-data/postgres/` 与 MinIO 持久化 `/data/zhaojy/burnroom-data/minio/` 各自独立。MinIO 数据目录由服务管理，业务代码不得直接操作其底层文件；必须走 SDK。真实环境变量不进入数据包或文档。
 
+### 可变运行文件与不可变交付
+
+任务运行时的 status、render_manifest、timing_report、GPU指标及日志会更新；它们是运行记录，不要求每次写入都新建业务任务。基础资产、冻结配置和已发布视频则按版本保护。
+
+MinIO不可变key用于已定稿的交付或明确时间点的快照，不能持续覆盖同一个key以同步运行中的状态。成功任务定稿后发布视频/回执/必要报告；失败或续跑批次的报告快照放在任务前缀下的 `attempts/<attempt_id>/`，与根目录最新运行视图分开。快照记录采集时间和对应SHA；后续更正另建快照，不重写已发布证据。本轮不添加快照实现。
+
 ## 4. MinIO key：现状兼容与目标命名
 
 | 类型 | 当前实现 | 后续版本化约定（未实现上传器） |
@@ -76,6 +86,16 @@
 新增对象的关系元数据必须绑定已核验的户型依据；数据库导入完成前用对齐报告/review SHA 引用，不填造一个 layout_versions.id。后续导入时解析到实际 layout fingerprint。当前旧下载器会跳过含子目录的 key，不会自动将版本资产拉入场景根；新版需专用下载/登记适配器。
 
 数据库永久保存 bucket、object_key、sha256、size_bytes 和关联；临时预签名 URL 按需生成，不作为主键、不写入长期 manifest。浏览器可达端点与签名主机必须一致，不能换签名 URL 的主机/端口；预签名不提供网络穿透。
+
+### 上传与登记顺序（目标约定）
+
+1. 本地清单先确认场景/房间/版本、来源指纹与技术产物，保持 `upload_status=not_uploaded`、`registration_status=not_registered`；基础资产已生成不表示已允许公开外发。
+2. 上传版本化对象；相同key已存在时先核对内容，不能直接覆盖。首次登记前回读对象并计算SHA，核对字节数和媒体类型，成功后才标记对象verified；仅metadata中的自报SHA或ETag不足以证明回读内容一致。
+3. 在独立数据库事务中登记对象与关系，成功后才标记registered。MinIO与PostgreSQL没有共享事务：上传成功但事务失败可能留下未登记对象，应保留并单独重试登记，不重新渲染、不自动删除原文件或回退其他任务。
+
+上传可用性、目录登记和人工审核是不同维度。未来API分别表达upload_status、registration_status、runtime_state与human_acceptance；现有表/接口没有实现完整状态组合，不把这些名称当成已落地字段。
+
+原始config_snapshot、完整日志和私有模型默认不作为可公开分享附件。当前代码支持可选桶级公开策略，但本轮未查询远端实际桶策略；新增上传器必须先确认访问范围。若旧产物桶存在全桶匿名读取，不将原始运行报告直接上传到该公开范围；私有报告的隔离方式另行设计，不在本轮改变旧视频访问权限。
 
 ## 5. PostgreSQL：已有八表与缺口
 
@@ -95,6 +115,8 @@
 现有 SQL 的任务状态只允许 unknown/running/done/failed；文件还含 created、preparing、rendering、encoding、awaiting_visual_review、interrupted。目标同步规则：活动阶段→running，技术验证通过且待审核→done，failed/interrupted→failed，缺失/无法核验→unknown。**这是待实现映射**，done 只表示技术完成，必须在 API 中另保留原始 runtime_state 与人工审核信息；现有表没有独立审核列，不冒称已能保存全部审核状态。
 
 后续增加任务外部标识、资产版本索引/关联及审核元数据时，新增迁移文件，评审唯一性和跨场景约束；不得修改已应用的 001_rooms.sql。可以先设计登记清单，不在本轮写库。
+
+现有points按场景/device唯一保存坐标，import_rooms.py:111–115会拒绝同场景既有点位的坐标变更。新layout_version只解决户型/归属版本，不能自动解决扫描点位空间变化；如以后重新扫描，须另行设计scene revision及兼容关系，不静默覆盖points。
 
 真实导入验收目标：6 条房间记录（含无效 Room11）、22 个点位；22 属 Room8，32 为门口关联，42 在户型外。Room8 13 个内部传播点、另有 1 个边界锚点，两类数量分开。当前仍未完成真实导入，以上是预期，不是查询实测。
 
@@ -129,13 +151,34 @@ fire_final.mp4  c339c91d12709797b43989c680474286e5b2641a64de160d3fde7902267404dd
     "alignment_report_sha256": "95bdfd18aa233a718b6f21114fd84f3bd102dee68ea07561e46860c6c0114b8b",
     "review_sha256": "883de043a2a8106b8daac1299fe99a7f598ddfc200eeb4c91fbaffdb8c95bfdc"
   },
+  "upload_status": "not_uploaded",
   "registration_status": "not_registered",
   "runtime_state": "awaiting_visual_review",
-  "human_acceptance": "provisional_demo_with_known_limits"
+  "human_acceptance": "provisional_demo_with_known_limits",
+  "objects": [
+    {
+      "kind": "room_blend",
+      "source_relative_path": "rooms/Room8/20261102T025550Z-7f677509/asset/room.blend",
+      "sha256": "3123e1373296c866602f683a22c80d80d4ac1507cf4a86243ee44a4852f3bce1",
+      "size_bytes": 2262936,
+      "bucket": null,
+      "object_key": null
+    },
+    {
+      "kind": "video_final",
+      "source_relative_path": "rooms/Room8/render_jobs/20261105T040552Z_91f5fb7d/fire_final.mp4",
+      "sha256": "c339c91d12709797b43989c680474286e5b2641a64de160d3fde7902267404dd",
+      "size_bytes": 1062049,
+      "bucket": null,
+      "object_key": null
+    }
+  ]
 }
 ```
 
 所有文件描述条目须记录 kind、业务关联、source_relative_path、sha256、size_bytes；上传后才填实际 bucket/object_key。发布文件和运行缓存分别列出，不凭本示例自动创建上传记录或填充 SQL ID。
+
+这里的source_relative_path以场景数据根为基准，实际位置可以是服务器场景根或归档incoming中的同场景根，由可信适配器映射；不将开发者Windows路径永久写入跨环境业务标识。表中MinIO key是计划位置，示例bucket/key为null，表示没有冒充远端上传验收。
 
 ## 7. 新版网页 API 的文件适配边界（待实现）
 
@@ -143,12 +186,20 @@ fire_final.mp4  c339c91d12709797b43989c680474286e5b2641a64de160d3fde7902267404dd
 
 拟议 `POST /api/room-jobs` 只接收可信业务字段，例如 scene_id、room_id、asset_version、preset、camera_mode、受控 style preset 引用。后端查清单并检查版本，再构建当前引擎所需的真实 CLI/JSON；不允许客户端指定工作目录、Python路径、任意命令或未经审核的 direct-final 绕过参数。
 
-`GET /api/room-jobs/<render_job_id>` 返回原始任务阶段、技术完成、人工审核、有效帧数、日志摘要与可用产物引用；仅凭 MP4 文件存在不能标记成功。视频通过后端可信路径或经登记对象按需签名交付，浏览器不能自行遍历服务器路径。这些路由尚未实现。
+拟议查询为 `GET /api/room-jobs/<render_job_id>?scene_id=<scene_id>&room_id=<room_id>`，按三元组定位；不凭一个UUID后缀全盘扫描或挑最新任务。如未来另建全局唯一索引，可在另一版接口中简化上下文。返回原始任务阶段、技术完成、人工审核、有效帧数、日志摘要与可用产物引用；仅凭 MP4 文件存在不能标记成功。视频通过后端可信路径或经登记对象按需签名交付，浏览器不能自行遍历服务器路径。这些路由尚未实现。
 
 ## 8. 一致性与恢复规则
 
 源数据/核验→candidate→基础资产→任务快照→帧清单→视频回执形成单向指纹链。文件 SHA 按实际字节计算，不在 WinSCP 传输时做文本换行转换；规范化 JSON 指纹仅用于定义了 canonical 规则的配置契约，两者不能混用。
 
+现有schema_version=1任务快照还包含asset/points/config/guards的绝对路径，check_resume要求新预检结果与整个快照一致。因此“同内容换了位置”不保证能续跑原任务；跨目录恢复可以只读核验/播放已有产物，如需重新生成则创建新任务并记录来源。不能手改旧快照路径、signature或帧指纹来绕过续跑检查。跨环境可移植的新版运行契约应另行版本化，不在本轮改写历史任务。
+
 只读核验结论追加保存；不得为“修复通过”改旧 manifest 的 SHA 或人工结论。关系目录/对象存储可重试登记，但不能因登记失败重新启动 Blender。备份不反向覆盖当前工作目录；恢复到新目录，核对版本后显式切换。
 
 Room8 V1 当前缺少本地原帧和四份 R3 原始参考附件，历史远端 Git checkout 号也未记录；已有关键文件归档不宣称完整灾难恢复。详细证据与范围见发布记录。
+
+## 9. 本次工程审阅结论
+
+2026-11-07：保留现有业务编号映射和版本key方向；补齐唯一性范围、路径约束、可变状态/不可变交付、两阶段上传登记及跨路径续跑边界。示例已列出真实文件大小和SHA，bucket/key维持null。
+
+本规范可以指导下一步纯函数解耦；尚未具备直接实施数据库迁移、批量上传或改名既有资产的条件。后续登记功能须新增隔离测试，覆盖对象已存在但SHA不同、上传成功登记失败、状态/审批分离、同任务号跨房间歧义以及路径变化后拒绝续跑。测试与实际接入分别验收，不用文档状态代替运行结果。
