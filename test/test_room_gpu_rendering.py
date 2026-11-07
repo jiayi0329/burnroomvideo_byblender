@@ -90,7 +90,16 @@ class GraphicsGuard(unittest.TestCase):
             self.assertEqual(source.count('runtime: nvidia'),1)
             app=source.split('  app-server:',1)[1].split('\n  minio-oss:',1)[0]
             self.assertIn('    runtime: nvidia',app)
-        self.assertIn('    gpus: all',(ROOT/'release/docker-compose.prod.yml').read_text(encoding='utf-8'))
+
+    def test_gpu_requests_are_cleared_while_runtime_environment_keeps_devices(self) -> None:
+        prod=(ROOT/'release/docker-compose.prod.yml').read_text(encoding='utf-8')
+        overlay=(ROOT/'release/docker-compose.gpu.yml').read_text(encoding='utf-8')
+        active_prod=[line.strip() for line in prod.splitlines() if line.strip() and not line.lstrip().startswith('#')]
+        self.assertFalse(any(line.startswith('gpus:') for line in active_prod))
+        self.assertIn('    gpus: !reset []',overlay)
+        self.assertIn('    runtime: nvidia',overlay)
+        self.assertIn('NVIDIA_VISIBLE_DEVICES: all',overlay)
+        self.assertIn('NVIDIA_DRIVER_CAPABILITIES: compute,utility,graphics',overlay)
 
 
 if __name__=='__main__':unittest.main()

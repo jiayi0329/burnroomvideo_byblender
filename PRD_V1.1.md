@@ -113,6 +113,8 @@ F8-D（app/F8_room_demo.py）提供 inspect、samples、short 三档：先展示
 
 ### 2.3 A阶段：Room8动画性能测试与出片（2026-11-04）
 
+2026-11-05后续实测决定（替代本节先前保留gpus: all的修正）：同一镜像通过runtime=nvidia+NVIDIA_VISIBLE_DEVICES=all+graphics能力、不传--gpus时，临时容器EGL/GLX库加载成功。生产模板删除gpus，远端GPU覆盖文件以gpus: !reset []清除基础配置的DeviceRequests，保留runtime及环境变量；不推断为已证实的Toolkit缺陷。远端须验证配置解析、Runtime=nvidia、DeviceRequests为空及库可加载，再由正式首帧确认实际L20渲染。
+
 2026-11-05运行时修正：宿主机580.178.04图形库已补齐，Docker注册nvidia、Toolkit1.20.0，但应用实际Runtime=runc且容器仍无NVIDIA EGL/GLX库。仅对app-server显式设置runtime: nvidia，保留gpus: all和graphics能力，不改共享服务器Docker默认配置。重建后先验证驱动库，再以正式首帧实际NVIDIA上下文作准；不增加短片或性能基准。对应test_room_gpu_rendering.py运行时范围测试。
 
 **GPU执行修正（同日，后续明确要求）**：远端能枚举4张L20，但仅有Mesa EGL配置、无NVIDIA图形库，不能把nvidia-smi成功当作EEVEE GPU执行证据。生产容器显式请求NVIDIA_VISIBLE_DEVICES=all及NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics。正式任务快照强制require_nvidia_graphics；第一帧获取实际上下文后，NVIDIA证据不符立即失败，保存renderer.json，不继续576帧软件渲染。编码前再次核对，纯续跑必须有既有NVIDIA证据。不增加独立性能基准或短片；重新创建app-server挂载驱动库后新建正式任务，旧CPU任务和帧保留，不混用旧任务。独立GPU覆盖配置只更改app-server环境，不替换生产环境文件/卷，不更动数据库或MinIO。首次远端修复仍须实际NVIDIA渲染器与监控验证，离线测试不代表已使用GPU。

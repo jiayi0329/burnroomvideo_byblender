@@ -75,6 +75,8 @@ docker compose exec -T -e ROOM_DB_INTEGRATION=1 app-server python3 -m unittest t
 
 ## 每次交付记录
 
+2026-11-05后续GPU路径修正：test_room_gpu_rendering.py新增1项（本模块共8项），生产模板删除gpus，覆盖文件!reset清除旧gpus请求，同时保留NVIDIA runtime与设备/graphics环境变量。替代上一轮测试要求保留gpus: all的中间策略；依据远端同镜像不带--gpus时图形库加载成功。仅作配置文本回归，Compose的!reset支持和实际合并必须在远端config --quiet及inspect验证。
+
 2026-11-05：test_room_gpu_rendering.py新增1项，检查生产模板/覆盖文件都显式设置runtime: nvidia且仅作用app-server，保留gpus: all。只读配置检查，不运行Docker。宿主机缺库已由管理员补齐，当前调整对应容器实际Runtime=runc的远端证据；真实图形库注入仍待服务器验证。
 
 GPU修复后相关回归共120项通过（前次114项加6项GPU守卫测试）；未运行真实Blender/GPU或远端任务，实际L20上下文须在正式任务首帧后确认。

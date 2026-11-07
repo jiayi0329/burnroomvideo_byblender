@@ -142,6 +142,8 @@ app/diagnose_room_sections.py 绑定通过的导入报告与本地检查 SHA256�
 
 ### 3.3 A阶段独立动画任务（2026-11-04）
 
+2026-11-05最新对比验证：同一镜像通过显式NVIDIA runtime及环境变量、不传--gpus时能加载图形库。采用该路径，生产模板不再声明gpus；GPU覆盖文件声明gpus: !reset []，避免旧生产基础文件的gpus: all经Compose合并继续生效。保留NVIDIA_VISIBLE_DEVICES=all及graphics能力；DeviceRequests应为空。配置合并语法由远端config --quiet检查，不以文本测试代替实际Compose校验。无需更新镜像、驱动或Docker daemon；真实EEVEE上下文仍由正式帧守卫确认。
+
 2026-11-05：宿主机图形库就绪后仍未注入，检查发现app-server实际Runtime=runc，已注册nvidia运行时及Toolkit1.20.0。生产/覆盖compose显式指定app-server.runtime: nvidia，保持graphics能力及gpus请求，避免依赖全局默认运行时；不修改Docker daemon或其他容器。容器重建后核验Runtime、EGL/GLX可加载和vendor JSON，真实GPU仍由正式首帧守卫判断。
 
 **NVIDIA图形能力修正**：release/docker-compose.prod.yml显式请求compute,utility,graphics；临时远端修复使用release/docker-compose.gpu.yml叠加现有生产compose，只重建app-server容器、不重建镜像，保留所有既有生产env/卷。NVIDIA驱动库由容器运行时从宿主机挂载，不在容器内另装显卡驱动。require_nvidia_graphics写入所有final任务契约；第一帧后、发布PNG前校验gpu.platform实际renderer/vendor/device_type，拒绝软件/未知/非NVIDIA；保存attempts/<attempt>/renderer.json及manifest.renderer供失败排查。正式编码前再次核验worker_timing中的实际渲染器；全部帧复用的续跑读取同任务既有renderer证据，无证据则拒绝。旧CPU任务与新GPU任务分目录，不续跑代码/契约不同的旧任务；火烟/灯光/机位参数不变。test_room_gpu_rendering.py验证驱动配置、真实worker守卫分支与软件拒绝，不等于实机GPU验证。
