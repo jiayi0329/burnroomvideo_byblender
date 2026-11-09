@@ -20,41 +20,25 @@
 
 effective_settings.json回读背景、色彩管理、逐灯能量/体积倍率/位置/目标/旋转以及火烟材质。sample_manifest.json继续记录六图实际帧号、机位、灯能量、体积控制、烟对象包围盒和耗时。没有加入Hybrid、顶棚积烟或动画渲染。
 
-## ① 本地 PowerShell：上传七个文件
+## ① 本地 PowerShell：准备完整代码包
 
-2026-11-09兼容更新：新增`F8_room_helpers.py`须一同上传到脚本目录；第三轮配置内容未改。本页保留复现步骤，本轮目录整理不重渲染。
+2026-11-09第4批：先按[完整代码包说明](room_engine_migration.md)上传/解压并设置`engine_root`，不能再上传平铺脚本。第三轮配置内容未改，本轮目录整理不重渲染。
 
-在项目目录完整复制下面一块执行。文件数组用于避免长命令被手工换行破坏：
+未来明确授权重新运行时，在项目目录打包，再通过WinSCP上传并解压到独立目录：
 
 ```powershell
 cd D:\burnroomvideo_byblender
-$styleFiles = @(
-    '.\app\F8_room_demo.py'
-    '.\app\F8_room_fire_style.py'
-    '.\app\room_fire_config.py'
-    '.\app\room_fire_round3.json'
-    '.\app\F8_prepare_room_asset.py'
-    '.\app\F8_room_helpers.py'
-    '.\app\room_demo_plan.py'
-)
-scp -P 7777 $styleFiles zhaojy@172.25.76.201:/tmp/
+.\release\scripts\build.ps1
 ```
 
 无需重建镜像、重新打包或重做资产。不在本地运行Docker/Blender。
 
 ## ② 远程 SSH：复制文件
 
-逐行执行，任意命令报错先停止：
+先完成迁移说明中的独立解压，保持同一个SSH会话和`engine_root`变量。不要再复制单个app脚本。任意命令报错先停止：
 
 ```bash
 cd ~/burnroom-prod/burnroom-deploy-package
-docker compose cp /tmp/F8_room_demo.py app-server:/tmp/F8_room_demo.py
-docker compose cp /tmp/F8_room_fire_style.py app-server:/tmp/F8_room_fire_style.py
-docker compose cp /tmp/room_fire_config.py app-server:/tmp/room_fire_config.py
-docker compose cp /tmp/room_fire_round3.json app-server:/tmp/room_fire_round3.json
-docker compose cp /tmp/F8_prepare_room_asset.py app-server:/tmp/F8_prepare_room_asset.py
-docker compose cp /tmp/F8_room_helpers.py app-server:/tmp/F8_room_helpers.py
-docker compose cp /tmp/room_demo_plan.py app-server:/tmp/room_demo_plan.py
 ```
 
 ## ③ 同一个远程 SSH 会话：确认基础资产
@@ -86,11 +70,11 @@ docker compose exec -T app-server blender \
   --background \
   --factory-startup \
   --python-exit-code 1 \
-  --python /tmp/F8_room_demo.py \
+  --python "$engine_root/render_engine/blender/F8_room_demo.py" \
   -- \
   --asset "$asset" \
   --mode samples \
-  --config /tmp/room_fire_round3.json \
+  --config "$engine_root/configs/render/room_fire_round3.json" \
   --points /app/data/KK-EEz16cmU14/points.json
 ```
 

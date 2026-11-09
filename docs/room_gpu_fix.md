@@ -1,5 +1,7 @@
 # Room8 NVIDIA EEVEE 修复（2026-11-04）
 
+> 第4批后下文9/10文件平铺上传步骤已失效，当前须用[完整代码包](room_engine_migration.md)。本页保留GPU修复依据，本轮不重建容器或修改GPU环境。
+
 **2026-11-05当前生效策略（替代下文保留gpus: all的中间方案）**：远端临时容器使用同一burnroom-app:latest镜像、runtime=nvidia、NVIDIA_VISIBLE_DEVICES=all及compute,utility,graphics，但不传--gpus时，EGL/GLX均加载成功且有10_nvidia.json；原应用Runtime=nvidia但带gpus: all仍未挂载图形库。应用改用已验证的runtime+环境变量路径：生产模板删除gpus，覆盖文件用gpus: !reset []清除远端基础compose继承的GPU DeviceRequests。只删除覆盖文件中的gpus行无法清除基础文件的值。先远端config --quiet验证Compose支持该合并语法，失败时不要重建；重建后必须Runtime=nvidia、DeviceRequests为null或空列表，且ctypes加载两个库为OK。容器重建后恢复/tmp/room8_gpu_code；正式首帧继续核验实际NVIDIA renderer，不因库加载成功就宣称EEVEE已使用GPU。不修改宿主机Docker全局配置或其他容器。
 
 2026-11-05补充：宿主机已安装580.178.04图形库，但容器依然无库。只读检查显示Docker已注册nvidia运行时、默认及app-server实际运行时为runc，Toolkit/CLI均为1.20.0。因此生产模板与GPU覆盖文件均增加app-server.runtime: nvidia，显式走NVIDIA runtime；不修改Docker全局默认运行时、不重启Docker守护进程、不改其他容器。gpus: all及compute,utility,graphics保留。此次是有依据的下一步修复，仍须重建后检查实际Runtime=nvidia、库可加载及NVIDIA EGL JSON；不能仅凭运行时名称宣布EEVEE已使用GPU。

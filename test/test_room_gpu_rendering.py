@@ -33,7 +33,7 @@ class GraphicsGuard(unittest.TestCase):
                 jobs.verify_nvidia_renderer(info)
 
     def worker_guard(self,root: Path,info: dict) -> dict:
-        tree=ast.parse((ROOT/'app/F8_room_animation.py').read_text(encoding='utf-8'))
+        tree=ast.parse((ROOT/'render_engine/blender/F8_room_animation.py').read_text(encoding='utf-8'))
         run=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='run')
         guard=next(n for n in ast.walk(run) if isinstance(n,ast.If) and
             any(isinstance(call,ast.Call) and isinstance(call.func,ast.Name) and call.func.id=='renderer_info'
@@ -54,7 +54,7 @@ class GraphicsGuard(unittest.TestCase):
                 self.worker_guard(root,info)
             self.assertEqual(jobs.read_json(root/'renderer.json'),info)
             self.assertEqual(jobs.read_json(root/'render_manifest.json')['renderer'],info)
-        source=(ROOT/'app/F8_room_animation.py').read_text(encoding='utf-8')
+        source=(ROOT/'render_engine/blender/F8_room_animation.py').read_text(encoding='utf-8')
         self.assertLess(source.index("verify_nvidia_renderer(timings['renderer'])"),source.index('temp.replace(target)'))
 
     def test_worker_records_actual_nvidia_evidence(self) -> None:

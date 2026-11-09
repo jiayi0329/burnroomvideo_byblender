@@ -108,7 +108,7 @@ class CandidatePreparation(unittest.TestCase):
             self.prepare()
 
     def test_blender_script_save_reopen_precedes_preview_and_no_video_operator(self) -> None:
-        path = Path(__file__).resolve().parents[1]/'app/F8_prepare_room_asset.py'
+        path = Path(__file__).resolve().parents[1]/'render_engine/blender/F8_prepare_room_asset.py'
         tree = ast.parse(path.read_text(encoding='utf-8'))
         run = next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='run')
         calls = sorted((n.lineno,ast.unparse(n.func)) for n in ast.walk(run) if isinstance(n,ast.Call))

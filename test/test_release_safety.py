@@ -10,6 +10,7 @@ import subprocess
 import tarfile
 import tempfile
 import unittest
+from render_engine.paths import CODE_FILES
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -26,7 +27,7 @@ class ReleaseSafety(unittest.TestCase):
             shutil.copyfile(ROOT / 'release/scripts' / name, scripts / name)
         for name, content in {
             'app/source.py': 'print("synthetic")', 'app/db/001.sql': 'SELECT 1;',
-            'app/F8_room_helpers.py': '# synthetic Blender shared helper',
+            'render_engine/blender/F8_room_helpers.py': '# synthetic Blender shared helper',
             'Dockerfile': 'COPY . .', 'requirements.txt': '', 'docs/database.md': 'synthetic',
             'test/__init__.py': '', 'test/test_synthetic.py': '',
             'tools/__init__.py': '', 'tools/diagnostics/__init__.py': '',
@@ -38,6 +39,11 @@ class ReleaseSafety(unittest.TestCase):
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding='utf-8')
+        for relative in CODE_FILES:
+            path = self.root / relative
+            if not path.exists():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text('# synthetic engine fixture', encoding='utf-8')
         shutil.copyfile(ROOT / '.dockerignore', self.root / '.dockerignore')
 
     def run_ps(self, command: str) -> subprocess.CompletedProcess:

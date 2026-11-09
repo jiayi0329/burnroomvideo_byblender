@@ -1,5 +1,7 @@
 # A阶段：冻结第三轮风格的Room8短片与性能验收
 
+> 第4批后下文平铺SCP/CP及/tmp脚本路径仅适用于归档版本，不能拿当前app兼容文件直接执行。新版必须按[完整代码包说明](room_engine_migration.md)安装；本轮不复跑短片。
+
 2026-11-09兼容更新：下方上传/复制清单已包含`F8_room_helpers.py`，须与worker同目录。历史短片步骤不作为当前清理任务指令；本轮不运行渲染，也不以新源码续跑旧任务。
 
 首轮短片发现相机对象复用错误，已修复。当前先按[动画相机单帧核对](room_animation_camera_fix.md)操作；本页原短片步骤暂停，构图通过后再用short。默认stage现为camera_check，任务显式记录camera_mode。

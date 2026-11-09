@@ -147,6 +147,9 @@ class DiagnosticsPackage(unittest.TestCase):
 
     def setUp(self) -> None:
         self.setUp_base()
+        # The existing app imports now resolve to the installed geometry package.
+        shutil.copytree(ROOT / 'render_engine', self.root / 'render_engine', dirs_exist_ok=True,
+                        ignore=shutil.ignore_patterns('__pycache__'))
         for source in (ROOT / 'tools').rglob('*.py'):
             relative = source.relative_to(ROOT)
             if relative.parts[:2] != ('tools', 'diagnostics') and relative.as_posix() != 'tools/__init__.py':

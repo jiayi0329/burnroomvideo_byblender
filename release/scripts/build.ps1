@@ -24,6 +24,37 @@ New-Item -ItemType Directory -Path "$StagingDir/scripts" | Out-Null
 Write-Host "===> [2/4] 组装核心代码与依赖..." -ForegroundColor Cyan
 # 拷贝纯净代码，自动剔除本地缓存
 Copy-Item -Path "$ProjectRoot\app" -Destination $StagingDir -Recurse
+# Room8 engine is an installed package; never ship only the app shims.
+$EngineModules = @{
+    blender = @('F8_prepare_room_asset', 'F8_room_demo', 'F8_room_animation', 'F8_room_fire_style', 'F8_room_helpers')
+    jobs = @('run_room_animation', 'room_animation_job')
+    effects = @('room_fire_config')
+    propagation = @('room_demo_plan')
+    geometry = @('room_source_io', 'room_source_inputs', 'room_clip_geometry', 'prepare_room_candidate')
+}
+$EngineFiles = @('render_engine/__init__.py', 'render_engine/paths.py')
+foreach ($Group in $EngineModules.Keys) {
+    $EngineFiles += "render_engine/$Group/__init__.py"
+    foreach ($Module in $EngineModules[$Group]) { $EngineFiles += "render_engine/$Group/$Module.py" }
+}
+foreach ($Relative in $EngineFiles) {
+    $Source = Join-Path $ProjectRoot $Relative
+    if (-not (Test-Path -LiteralPath $Source -PathType Leaf)) { throw "Required engine source missing: $Relative" }
+    $Destination = Join-Path $StagingDir $Relative
+    New-Item -ItemType Directory -Path (Split-Path -Parent $Destination) -Force | Out-Null
+    Copy-Item -LiteralPath $Source -Destination $Destination
+}
+foreach ($Revision in 1, 2, 3) {
+    $Relative = "configs/render/room_fire_round$Revision.json"
+    $Source = Join-Path $ProjectRoot $Relative
+    if (-not (Test-Path -LiteralPath $Source -PathType Leaf)) { throw "Required render preset missing: $Relative" }
+    if ((Get-FileHash -LiteralPath $Source -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath (Join-Path $ProjectRoot "app/room_fire_round$Revision.json") -Algorithm SHA256).Hash) {
+        throw "Compatibility preset differs: $Relative"
+    }
+    $Destination = Join-Path $StagingDir $Relative
+    New-Item -ItemType Directory -Path (Split-Path -Parent $Destination) -Force | Out-Null
+    Copy-Item -LiteralPath $Source -Destination $Destination
+}
 # Include only the diagnostics package Python sources, never other tool data.
 New-Item -ItemType Directory -Path "$StagingDir/tools/diagnostics" | Out-Null
 Copy-Item -LiteralPath "$ProjectRoot/tools/__init__.py" -Destination "$StagingDir/tools/__init__.py"

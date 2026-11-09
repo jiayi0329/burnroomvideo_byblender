@@ -1,6 +1,6 @@
 # 项目职责目录与渐进迁移规范
 
-更新：2026-11-09。**第1批公共输入、第2批断面工具、第3批Blender公共辅助已完成本地整理；其余为目标目录和处置计划。** app旧入口、test、release继续保留，不创建前后端骨架或批量删除源码。架构依据见 [ARCHITECTURE](ARCHITECTURE.md)。
+更新：2026-11-09。**第1–4批已完成本地整理；Backend和其余工具/测试部署目录仍为计划。** app旧入口、test、release继续保留，不创建前后端骨架或删除Legacy源码。架构依据见[ARCHITECTURE](ARCHITECTURE.md)。
 
 ## 1. 两个分类维度
 
@@ -64,17 +64,12 @@ release/                       # 当前发布入口，暂不改成 deploy/
 | app/observability.py | Legacy 文件状态与GPU监控 | 先保留；未来按旧编排与引擎监控边界提取公共部分 |
 | app/F6_detect.py | 烧损图像与起火点分析；旧 main 及测试调用 | render_engine/analysis/；保持评分语义，不顺便修改起火点选择 |
 | app/F7_spread.py | 旧传播；旧 main 及测试调用 | render_engine/propagation/；保留旧 BFS 语义，不与房间 BFS 混写 |
-| app/run_room_animation.py | 新版普通 Python 启动、锁、编码、报告 | render_engine/jobs/；CLI、worker路径、九文件指纹清单同步迁移 |
-| app/room_animation_job.py | 冻结契约/状态/续跑/审核/统计 | render_engine/jobs/；无 bpy，保持文件边界 |
-| app/F8_room_animation.py（F8-E） | Blender 动画 worker | render_engine/blender/；第3批已改为直接导入共用helper，不再导入D/B入口 |
-| app/F8_room_demo.py（F8-D） | 展示/静帧入口，旧辅助名继续导出 | render_engine/blender/；**不是可删除的旧预览实验** |
-| app/F8_room_helpers.py | 第3批提取的Blender网格/UV、展示截断、相机与射线辅助 | render_engine/blender/；无独立入口，不能被普通Python业务模块导入 |
-| app/F8_room_fire_style.py | D/E 共用的 bpy 材质/灯光辅助 | render_engine/blender/；不是单独任务入口 |
-| app/room_fire_config.py | 纯配置校验、火舌/烟柱几何 | render_engine/effects/；R3 指纹和测试保持 |
-| app/room_demo_plan.py | 展示分量与房间 BFS 的纯函数 | 先保持单文件；后按 geometry/propagation 提取，避免顺便改算法 |
-| app/prepare_room_candidate.py、app/room_clip_geometry.py | 候选裁切入口与纯几何 | render_engine/geometry/；第1批已改为直接依赖公共输入模块，不再导入diagnose |
-| app/room_source_io.py、app/room_source_inputs.py | 第1批提取的纯读取、坐标和来源校验 | render_engine/geometry/；当前先保留app路径，诊断兼容导出不变 |
-| app/F8_prepare_room_asset.py（F8-B） | 资产导出、重载，旧辅助名继续导出 | render_engine/blender/；第3批已提取公共函数，原资产流程不变 |
+| app/run_room_animation.py、app/room_animation_job.py | 兼容入口；启动/锁/编码/状态/续跑实现 | 已迁入render_engine/jobs；安装根寻址及完整源码指纹已适配 |
+| app/F8_room_animation.py（E）、F8_room_demo.py（D）、F8_prepare_room_asset.py（B） | Blender兼容入口 | 实现已迁入render_engine/blender；保留原函数接口与CLI |
+| app/F8_room_helpers.py、F8_room_fire_style.py | Blender公共辅助兼容模块 | 实现已迁入render_engine/blender；不被普通Python业务端导入 |
+| app/room_fire_config.py | 配置校验、火舌/烟柱几何兼容模块 | 实现已迁入render_engine/effects；算法不变 |
+| app/room_demo_plan.py | 展示分量/BFS兼容模块 | 整体迁入render_engine/propagation，暂不继续拆算法 |
+| app/prepare_room_candidate.py、room_clip_geometry.py、room_source_io.py、room_source_inputs.py | 候选/几何/输入兼容模块 | 实现已迁入render_engine/geometry，不反向导入app/Backend/tools |
 | app/analyze_floorplan.py | 对齐分析，也被导入/候选/诊断复用 | 纯解析与变换进入 render_engine/geometry/；报告CLI再放 tools/diagnostics/ |
 | app/inspect_room_asset.py | 历史坐标/高度检查，保留公共读取函数名导出 | 解析已在app内提取；后续诊断外壳迁入tools，仍须核对build_plan等依赖 |
 | app/diagnose_room_sections.py | 旧CLI/导入兼容，保留load_inputs/REQUIRED_CHECKS接口 | 已迁至tools/diagnostics/diagnose_room_sections.py；app指向同一模块 |
@@ -82,7 +77,7 @@ release/                       # 当前发布入口，暂不改成 deploy/
 | app/F8_inspect_room_import.py（F8-A） | 已完成的 Blender 导入检查依据 | tools/diagnostics/blender/；保留追溯脚本与两个测试的静态检查 |
 | app/probe_floorplan.py | 上游 API 探测，相关测试仍在 | tools/diagnostics/；仅移动代码，不提交真实返回包或 appkey |
 | app/F8_blender_render.py（F8-C） | 旧 main 绑定的 Legacy worker | 保留原入口；之后可迁至独立 legacy 区并保留兼容启动路径 |
-| app/room_fire_round1/2/3.json | 公共预设；旧轮次用于回归 | configs/render/；迁移要改默认寻址和打包，不改 R3 内容 |
+| configs/render/room_fire_round1/2/3.json、旧app副本 | 默认预设与兼容副本 | 第4批原样复制，默认寻址已迁移；打包拒绝新旧副本不一致 |
 | test/*.py、test/__init__.py | 当前单元/替身/部分集成测试 | 后续逐组迁至 tests/，保留现有模块命令直至引用更新 |
 | test_4dkankan.py | 根目录手工 API 检查脚本 | tools/integration/ 候选；先核对网络副作用/凭证来源，不直接纳入离线发现 |
 | release/scripts/*、release/*.yml、release/prod.env.example、Dockerfile、docker-compose.yml | 当前部署与开发配置 | deploy/ 目录本身最后迁移；代码每次跨目录移动时，原位置打包规则必须同步适配，不能留到最后 |
@@ -103,10 +98,10 @@ release/                       # 当前发布入口，暂不改成 deploy/
 
 | 现有约束与证据 | 迁移必须满足的条件 |
 | --- | --- |
-| build.ps1与.dockerignore现已增加tools包初始化文件及diagnostics的Python源码，其他tools目录/数据默认排除 | 后续新增目标源码/配置目录仍须同批更新暂存复制和镜像白名单，用安装包内容/解压导入测试验证，不能只验证本地import |
+| build.ps1/.dockerignore已包含tools诊断源码及新版引擎/命名预设 | 打包只复制20份命名引擎Python及3份预设；缺失或配置分叉即失败，安装包/解压导入需测试 |
 | Dockerfile:36 启动 app.main:app，reload路径仍为 /app/app | 保留兼容入口，直到部署启动命令与相关路径一起通过验证；不提前移走 main |
-| F8_room_animation.py:23–29 将脚本目录加入 sys.path，按同目录文件名导入；启动器还支持包导入/直接脚本两种方式 | 明确安装后的包根目录与worker路径，验证普通Python和Blender内两种导入；不依赖启动时恰好位于项目目录 |
-| room_animation_job.CODE_FILES从同一code_root计算源码SHA；第3批在原八文件基础上加入helper，共九份 | 静帧和动画均校验新helper；缺失/改动必须拒绝，不能改签名强行续跑旧任务 |
+| 新Blender入口和兼容脚本从自身位置加入安装根，使用包导入 | 普通Python/Blender的导入与帮助替身均检查；不能再单文件上传/tmp |
+| render_engine.paths统一列出39份源码/预设，静帧和动画共用 | 覆盖包初始化、路径模块、兼容脚本及新旧配置；缺失/改动拒绝，不给旧任务改签名 |
 | run_room_animation.py:151 由 points 路径推导共享锁根，worker会核对同一锁 | 目录整理不得把点位移到另一层缓存而造成多个锁根；本阶段保持数据路径不变，未来改动须显式设计共享锁位置 |
 
 以上是迁移约束；已落地范围按下表标明。新增目录的产物仍只写入私有data/，不能混入源码安装包。
@@ -118,7 +113,7 @@ release/                       # 当前发布入口，暂不改成 deploy/
 | 1 | app内提取OBJ/MTL、坐标与指纹公共函数 | 已完成；输入保护及旧接口 |
 | 2 | 三个断面工具迁入tools/diagnostics | 已完成；兼容入口、CLI与安装包 |
 | 3 | app内提取B/D/E共用Blender辅助 | 本地实现；UV/材质/坐标、相机、源码指纹、旧接口与打包；未远端渲染 |
-| 4 | 新版Room8引擎及配置逐组迁入render_engine/configs | 待执行；同批适配路径、打包、配置寻址和源码清单 |
+| 4 | 新版Room8引擎及配置迁入render_engine/configs | 本地实现；13个app兼容模块、默认R3、worker、打包/镜像上下文与完整指纹已适配；未远端部署/渲染 |
 | 5 | Backend API、数据库工具和MinIO适配分组整理 | 待执行；保留Legacy，不导入真实数据 |
 | 6 | 其余诊断/集成工具逐组迁移 | 待执行；核对引用与历史依据，不直接删除Z轴工具 |
 | 7 | 测试/部署目录收尾及稳定性审阅 | 待执行；旧发布入口兼容，全量相关回归后审阅main合并 |
@@ -138,3 +133,5 @@ release/                       # 当前发布入口，暂不改成 deploy/
 2026-11-07：目录职责划分可作为目标规范；修正了 F6 分类和“部署最后迁移”的歧义，补齐打包、双执行环境、源码指纹与共享锁约束。**目标结构可保留，当前尚不具备直接批量移动文件的条件。**
 
 第1批已在app内提取room_source_io与room_source_inputs，保留旧函数名，新增两份测试。2026-11-09第2批将diagnose_room_sections、room_section_geometry、room_section_plots实现迁至tools/diagnostics；app保留共享模块对象的兼容入口，打包和镜像上下文只增加这组Python源码。既有高度、裁切与F8动画算法不动；安装包内容/解压导入、旧CLI和相关离线回归分别检查。服务器尚未部署本次迁移。
+
+第4批已按用户授权迁移13个新版实现，保留全部app兼容入口；旧F8-C和Backend未移动。默认预设及完整源码清单按安装根寻址，打包/镜像上下文同批适配。205项相关离线回归中204通过、1项可选绘图库测试跳过；实际GPU未重渲染。剩余第5–7批仍逐批实施，不因本批完成而批量移动其他代码。

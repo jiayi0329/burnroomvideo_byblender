@@ -12,13 +12,14 @@ import math
 from pathlib import Path
 from types import SimpleNamespace
 import unittest
+from test.engine_paths import source_path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def helpers() -> dict:
-    trees = [ast.parse((ROOT/'app'/name).read_text(encoding='utf-8'))
+    trees = [ast.parse((source_path(name)).read_text(encoding='utf-8'))
              for name in ('F8_prepare_room_asset.py', 'F8_room_helpers.py')]
     selected = {'verify_point_mapping','verify_saved_point_anchors','below','contains','interior_camera'}
     module = ast.Module(body=[n for tree in trees for n in tree.body
@@ -110,9 +111,9 @@ class AssetHelpers(unittest.TestCase):
     def test_three_f8_headers_identify_current_entry(self) -> None:
         for name,label in (('F8_inspect_room_import.py','F8-A'),
                            ('F8_prepare_room_asset.py','F8-B'),('F8_blender_render.py','F8-C')):
-            doc = ast.get_docstring(ast.parse((ROOT/'app'/name).read_text(encoding='utf-8')))
+            doc = ast.get_docstring(ast.parse((source_path(name)).read_text(encoding='utf-8')))
             self.assertIn(label,doc)
-        tree = ast.parse((ROOT/'app/F8_prepare_room_asset.py').read_text(encoding='utf-8'))
+        tree = ast.parse((ROOT/'render_engine/blender/F8_prepare_room_asset.py').read_text(encoding='utf-8'))
         for node in ast.walk(tree):
             if isinstance(node,ast.Call) and isinstance(node.func,ast.Name) and node.func.id=='print':
                 self.assertTrue(any(k.arg=='flush' and isinstance(k.value,ast.Constant) and k.value.value is True

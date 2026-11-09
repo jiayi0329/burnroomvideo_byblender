@@ -43,14 +43,14 @@ catalog 的真实数据导入尚未完成；图中的连接表示代码已有，
 
 ### 2.2 原始数据到独立房间
 
-2026-11-09目录整理：只读断面入口、断面几何和绘图实现位于tools/diagnostics，app保留兼容路径；公共来源读取/校验仍在app/room_source_io和room_source_inputs，候选裁切及F8动画不导入诊断工具。此迁移不改变高度判断或裁切策略，不表示服务器已部署新目录。
+2026-11-09目录整理：只读断面实现位于tools/diagnostics；第4批将公共来源读取、坐标、指纹和候选裁切迁入render_engine/geometry，app保留同一模块对象的兼容路径。候选及F8动画不导入诊断或Backend；不改变高度判断或裁切策略，不表示服务器已部署新目录。
 
 | 阶段 | 当前模块 | 输入与边界 |
 | --- | --- | --- |
 | 户型探测/对齐 | probe_floorplan、analyze_floorplan | 私有探测数据；算法归属与人工 review 分开，绑定指纹 |
-| 裁切准备 | prepare_room_candidate、room_clip_geometry | 已核验多边形；三角面裁切插值保留 UV、XYZ、材质归属 |
-| 独立资产 | F8_prepare_room_asset（F8-B） | 复用通过验证的 OBJ 导入轴向，保存 blend 后重开核验，再导出 GLB |
-| 展示/静帧 | F8_room_demo（F8-D）、room_demo_plan | 在基础资产上派生低墙/去顶展示副本，基础墙顶保持原样 |
+| 裁切准备 | render_engine/geometry | 已核验多边形；三角面裁切插值保留 UV、XYZ、材质归属 |
+| 独立资产 | render_engine/blender/F8_prepare_room_asset（F8-B） | 复用通过验证的OBJ导入轴向，保存blend后重开核验，再导出GLB |
+| 展示/静帧 | render_engine/blender/F8_room_demo（F8-D）、propagation/room_demo_plan | 在基础资产上派生低墙/去顶展示副本，基础墙顶保持原样 |
 
 Room8 原始 OBJ 与 Blender 世界坐标一致，不额外移动原 Z。基础 blend 为原始 XYZ，GLB 的 glTF Y-up 导出映射为 `(x,y,z) → (x,z,-y)`，由 manifest 记录，前端不得再无条件重复转换。
 
@@ -58,15 +58,17 @@ Room8 使用 11 顶点多边形、零外扩，源房间 6,835 个三角形，独
 
 ### 2.3 Room8 动画与可复现任务
 
-2026-11-09第3批：B/D/E共用函数已在app内提取到`F8_room_helpers.py`，旧函数名继续导出；E不再导入D/B入口。函数实现及R3风格不变。静帧与动画源码指纹均包含新helper；动画保留原八份并加helper共九份。缺失或变动会拒绝预检/续跑；旧V1只能用归档代码复现，不能重签旧任务。当前只完成离线验证，未执行新的Blender渲染。
+第3批提取B/D/E辅助后，第4批将实现迁入`render_engine/{geometry,propagation,effects,blender,jobs}`，旧app函数名/CLI继续兼容；E不导入D/B入口，普通Python不导入bpy。默认配置按安装位置读取`configs/render/room_fire_round3.json`，与工作目录无关，旧app JSON保留原样兼容副本。
+
+`render_engine.paths.CODE_FILES`统一覆盖20份引擎Python、13份兼容入口与6份预设/兼容副本，共39份文件；静帧和动画均使用。预检接受安装根或旧app目录。源码/配置缺失时拒绝新任务；变动后拒绝旧任务续跑。R3、火烟算法及历史任务不改，复现V1使用归档代码。完整包操作见[迁移说明](room_engine_migration.md)，不能再平铺上传几个脚本。
 
 ```mermaid
 flowchart LR
-    A[run_room_animation.py] --> B[预检与文件指纹]
+    A[jobs/run_room_animation.py] --> B[paths清单与预检]
     B --> C[Linux GPU 排他锁与冲突检查]
-    C --> D[F8_room_animation.py]
-    D --> E[F8_room_helpers 网格/UV/截断/相机/射线]
-    D --> G[F8_room_fire_style 与纯配置模块]
+    C --> D[blender/F8_room_animation.py]
+    D --> E[blender/F8_room_helpers]
+    D --> G[blender样式 / effects配置 / propagation时序]
     D --> H[frames 与 render_manifest]
     H --> I[FFmpeg / ffprobe / 完整解码]
     I --> J[视频回执与待人工审核状态]

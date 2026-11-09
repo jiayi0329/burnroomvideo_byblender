@@ -1,10 +1,24 @@
-# Default deny: application/diagnostic Python source, synthetic tests and dependencies only.
+# Default deny: application/engine/diagnostic source, named presets and synthetic tests.
 **
 !Dockerfile
 !.dockerignore
 !requirements.txt
 !app/
 !app/**
+!render_engine/
+!render_engine/**/
+!render_engine/**/*.py
+!configs/
+!configs/render/
+!configs/render/room_fire_round1.json
+!configs/render/room_fire_round2.json
+!configs/render/room_fire_round3.json
+render_engine/**/*.json
+render_engine/**/*.blend
+render_engine/**/*.glb
+render_engine/**/*.png
+render_engine/**/*.jpg
+render_engine/**/*.mp4
 !test/
 !test/**
 !tools/

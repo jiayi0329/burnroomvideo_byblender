@@ -13,10 +13,12 @@ import json
 import math
 from pathlib import Path
 import runpy
+import shutil
 import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
+from test.engine_paths import source_path
 from unittest.mock import patch
 
 from app import room_animation_job as jobs
@@ -96,6 +98,9 @@ def loaded():
             patch.object(sys, 'path', [str(ROOT/'app'), *sys.path]):
         for name in names:
             sys.modules.pop(name, None)
+            sys.modules.pop('app.'+name, None)
+            sys.modules.pop('render_engine.blender.'+name, None)
+        sys.modules.pop('render_engine.blender.F8_room_fire_style', None)
         helper = importlib.import_module('F8_room_helpers')
         yield helper, scene
 
@@ -177,35 +182,38 @@ class SharedHelpers(unittest.TestCase):
                 module = importlib.import_module(name)
                 for function in functions:
                     self.assertIs(getattr(module,function), getattr(h,function), (name,function))
-                tree = ast.parse((ROOT/'app'/f'{name}.py').read_text(encoding='utf-8'))
+                tree = ast.parse((source_path(name)).read_text(encoding='utf-8'))
                 imports = {node.module for node in ast.walk(tree) if isinstance(node,ast.ImportFrom)}
-                self.assertIn('F8_room_helpers',imports)
-                self.assertFalse(imports & (set(exports)-{name}))
+                self.assertIn('render_engine.blender.F8_room_helpers',imports)
+                self.assertFalse(imports & {'render_engine.blender.'+n for n in set(exports)-{name}})
             self.assertIsNone(scene.camera)  # Imports create no camera or asset.
 
     def test_launchers_and_backend_do_not_import_blender_helper(self):
         for name in ('run_room_animation.py','room_animation_job.py','room_api.py','main.py'):
-            tree = ast.parse((ROOT/'app'/name).read_text(encoding='utf-8'))
+            tree = ast.parse((source_path(name)).read_text(encoding='utf-8'))
             imports = [node.module for node in ast.walk(tree) if isinstance(node,ast.ImportFrom)]
             imports += [alias.name for node in ast.walk(tree) if isinstance(node,ast.Import) for alias in node.names]
             self.assertFalse({'bpy','F8_room_helpers','app.F8_room_helpers'} & set(imports), name)
 
-    def test_renamed_asset_script_imports_sibling_helper_from_unrelated_directory(self):
+    def test_renamed_asset_shim_imports_installed_helper_from_unrelated_directory(self):
         with loaded(), tempfile.TemporaryDirectory() as directory:
             folder = Path(directory)
-            script = folder/'burnroom_prepare_room_asset.py'
+            (folder/'app').mkdir()
+            script = folder/'app/burnroom_prepare_room_asset.py'
             script.write_bytes((ROOT/'app/F8_prepare_room_asset.py').read_bytes())
-            (folder/'F8_room_helpers.py').write_bytes((ROOT/'app/F8_room_helpers.py').read_bytes())
+            shutil.copytree(ROOT/'render_engine',folder/'render_engine',ignore=shutil.ignore_patterns('__pycache__'))
             working = folder/'elsewhere'; working.mkdir()
-            sys.modules.pop('F8_room_helpers')
-            # Match Blender --python with only the uploaded files and no app package.
+            # The compatibility script now needs an installed package, not flat uploads.
             paths = [p for p in sys.path if Path(p).resolve() not in (ROOT, ROOT/'app')]
-            with patch.object(sys, 'path', paths), chdir(working):
+            with patch.dict(sys.modules), patch.object(sys, 'path', paths), chdir(working):
+                for key in list(sys.modules):
+                    if key=='render_engine' or key.startswith('render_engine.'):
+                        sys.modules.pop(key)
                 scope = runpy.run_path(str(script), run_name='uploaded_asset_check')
-                helper = sys.modules['F8_room_helpers']
-                self.assertEqual(Path(helper.__file__), folder/'F8_room_helpers.py')
-                self.assertIs(scope['make_mesh'], helper.make_mesh)
-                self.assertIs(scope['below'], helper.below)
+                helper = sys.modules['render_engine.blender.F8_room_helpers']
+                self.assertEqual(Path(helper.__file__), folder/'render_engine/blender/F8_room_helpers.py')
+                self.assertIs(scope['_implementation'].make_mesh, helper.make_mesh)
+                self.assertIs(scope['_implementation'].below, helper.below)
 
 
 class HelperFingerprints(unittest.TestCase):
@@ -214,20 +222,20 @@ class HelperFingerprints(unittest.TestCase):
         self.addCleanup(value.doCleanups); return value
 
     def test_samples_and_animation_include_shared_helper_in_code_guards(self):
-        self.assertIn('F8_room_helpers.py', jobs.CODE_FILES)
-        tree = ast.parse((ROOT/'app/F8_room_demo.py').read_text(encoding='utf-8'))
+        key = 'render_engine/blender/F8_room_helpers.py'
+        self.assertIn(key, jobs.CODE_FILES)
+        tree = ast.parse((ROOT/'render_engine/blender/F8_room_demo.py').read_text(encoding='utf-8'))
         run = next(node for node in tree.body if isinstance(node,ast.FunctionDef) and node.name=='run')
-        code_files = next(node.value for node in ast.walk(run) if isinstance(node,ast.Assign)
-                          and any(isinstance(t,ast.Name) and t.id=='code_files' for t in node.targets))
-        self.assertIn('F8_room_helpers.py', ast.literal_eval(code_files))
-        f = self.fixture(); path = f.codes/'F8_room_helpers.py'
+        self.assertTrue(any(isinstance(n,ast.Call) and isinstance(n.func,ast.Name)
+                            and n.func.id=='source_paths' for n in ast.walk(run)))
+        f = self.fixture(); path = f.codes/key
         self.assertEqual(f.inputs['guards'][str(path.resolve())], jobs.digest(path))
-        self.assertIn(path.name, f.inputs['codes'])
+        self.assertIn(key, f.inputs['codes'])
 
     def test_changed_helper_rejected_by_guard_and_old_job_resume(self):
         f = self.fixture(); job = f.new_job()
         snapshot = (job/'config_snapshot.json').read_bytes()
-        (f.codes/'F8_room_helpers.py').write_text('# new helper version',encoding='utf-8')
+        (f.codes/'render_engine/blender/F8_room_helpers.py').write_text('# new helper version',encoding='utf-8')
         with self.assertRaisesRegex(ValueError,'Protected input'): jobs.check_guards(f.inputs)
         inputs = jobs.preflight(f.asset,f.points,f.config,f.codes)
         spec = jobs.build_spec(inputs,'short')
@@ -236,6 +244,6 @@ class HelperFingerprints(unittest.TestCase):
         self.assertEqual((job/'config_snapshot.json').read_bytes(), snapshot)
 
     def test_missing_helper_fails_before_job_creation(self):
-        f = self.fixture(); (f.codes/'F8_room_helpers.py').unlink()
+        f = self.fixture(); (f.codes/'render_engine/blender/F8_room_helpers.py').unlink()
         with self.assertRaises(FileNotFoundError): jobs.preflight(f.asset,f.points,f.config,f.codes)
         self.assertFalse(f.job_root.exists())

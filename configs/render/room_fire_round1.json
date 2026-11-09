@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "art": {
+    "seed": 731,
+    "exposure": -0.5,
+    "world_color": [0.02, 0.025, 0.03, 1.0],
+    "world_strength": 0.15,
+    "area_lights": [
+      {"name": "Key", "offset": [0, 0, 5], "energy": 500, "size": 3.0, "color": [1, 1, 1]},
+      {"name": "Fill", "offset": [-3, -2, 3], "energy": 150, "size": 4.0, "color": [1, 1, 1]},
+      {"name": "Rim", "offset": [3, 2, 4], "energy": 300, "size": 2.5, "color": [1, 1, 1]}
+    ],
+    "flame": {
+      "primary_tongues": 4, "secondary_tongues": 2,
+      "primary_height": 1.7, "secondary_height": 1.25,
+      "primary_radius": 0.18, "secondary_radius": 0.13,
+      "lean_degrees": 12.0, "flow_speed": 0.9, "morph_speed": 0.65,
+      "noise_scale": 4.0, "noise_detail": 3.0,
+      "noise_roughness": 0.65, "noise_distortion": 0.35, "stretch_z": 0.55,
+      "noise_low": 0.43, "noise_high": 0.61,
+      "density": 0.45, "emission": 11.0,
+      "emission_mask_power": 1.6, "sway_radians": 0.04,
+      "scatter_color": [0.08, 0.025, 0.004, 1], "anisotropy": 0.05,
+      "flicker_hz": 3.2, "flicker_amplitude": 0.14,
+      "colors": [[0.25, 0.008, 0.001, 1], [1, 0.12, 0.004, 1], [1, 0.38, 0.02, 1], [1, 0.68, 0.13, 1]],
+      "light_energy": 80.0, "light_radius": 0.25, "light_distance": 4.0, "light_color": [1, 0.18, 0.02]
+    },
+    "smoke": {
+      "density": 7.0, "radius": 0.62, "height": 2.7,
+      "rise_speed": 0.35, "flow_speed": 0.3, "morph_speed": 0.22,
+      "noise_scale": 2.4, "noise_detail": 3.0,
+      "noise_roughness": 0.65, "noise_distortion": 0.35, "stretch_z": 0.8,
+      "noise_low": 0.28, "noise_high": 0.64,
+      "anisotropy": 0.1,
+      "dark_color": [0.025, 0.03, 0.035, 1], "edge_color": [0.075, 0.08, 0.09, 1],
+      "density_curve": [[0, 0], [1.5, 0.3], [3, 0.75], [5, 1], [8, 1], [12, 0.6], [18, 0]],
+      "growth_curve": [[0, 0.15], [2, 0.65], [5, 1], [10, 1.25], [18, 1.5]]
+    },
+    "closeup": {"lens": 35.0, "offset": [2.6, -3.6, 3.0], "target_height": 0.9}
+  },
+  "events": {
+    "layer_seconds": 1.5,
+    "excluded_devices": [32, 42],
+    "fire_curve": [[0, 0], [0.9, 0.25], [1.9, 0.6], [3, 1], [4.5, 0.6], [6, 0.2], [8, 0]]
+  },
+  "quality": {
+    "resolution": [960, 540], "fps": 12, "sample_times": [1, 3.5, 6],
+    "display_device": "sRGB", "view_transform": "AgX", "look": "AgX - Medium High Contrast", "gamma": 1.0,
+    "render_samples": 32, "volume_tile_size": "4", "volume_steps": 48,
+    "volume_shadow_steps": 8, "volume_shadows": true,
+    "flame_intersection": "ACCURATE", "volume_ray_depth": 16,
+    "volume_start": 0.1, "volume_end": 30.0,
+    "shadow_rays": 1, "shadow_steps": 6,
+    "tongue_rings": 9, "tongue_sides": 12, "bloom": false
+  }
+}

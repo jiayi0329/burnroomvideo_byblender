@@ -52,7 +52,7 @@ class RoundThree(unittest.TestCase):
         self.assertEqual([s['energy'] for s in a['area_lights']],[500,190,340])
 
     def test_per_light_volume_and_high_rim_target_are_applied_and_recorded(self) -> None:
-        tree=ast.parse((ROOT/'app/F8_room_fire_style.py').read_text(encoding='utf-8'))
+        tree=ast.parse((ROOT/'render_engine/blender/F8_room_fire_style.py').read_text(encoding='utf-8'))
         functions=[n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name in ('checked','lighting')]
         future=ast.ImportFrom(module='__future__',names=[ast.alias(name='annotations')],level=0)
         sockets={key:SimpleNamespace(default_value=None) for key in ('Color','Strength')}

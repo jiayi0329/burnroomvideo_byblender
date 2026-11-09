@@ -21,7 +21,7 @@ class Owner:
 
 class RuntimeConfiguration(unittest.TestCase):
     def functions(self) -> dict:
-        tree=ast.parse((ROOT/'app/F8_room_fire_style.py').read_text(encoding='utf-8'))
+        tree=ast.parse((ROOT/'render_engine/blender/F8_room_fire_style.py').read_text(encoding='utf-8'))
         selected=[n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name in ('checked','configure_render')]
         future=ast.ImportFrom(module='__future__',names=[ast.alias(name='annotations')],level=0)
         module=ast.fix_missing_locations(ast.Module(body=[future]+selected,type_ignores=[]))
@@ -52,7 +52,7 @@ class RuntimeConfiguration(unittest.TestCase):
         with self.assertRaises(RuntimeError):checked(Clamp(),'value',.5)
 
     def test_short_mode_is_rejected_without_accessing_assets(self) -> None:
-        tree=ast.parse((ROOT/'app/F8_room_demo.py').read_text(encoding='utf-8'))
+        tree=ast.parse((ROOT/'render_engine/blender/F8_room_demo.py').read_text(encoding='utf-8'))
         function=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='run')
         scope={'argparse':argparse,'Path':Path,'time':SimpleNamespace(perf_counter=lambda:0)}
         exec(compile(ast.Module(body=[function],type_ignores=[]),'offline mode guard','exec'),scope)

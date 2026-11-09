@@ -10,7 +10,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import unittest
 
-PATH=Path(__file__).resolve().parents[1]/'app/F8_room_demo.py'
+PATH=Path(__file__).resolve().parents[1]/'render_engine/blender/F8_room_demo.py'
 STYLE=PATH.with_name('F8_room_fire_style.py')
 
 
@@ -54,7 +54,7 @@ class DemoTests(unittest.TestCase):
         function=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='volume_material')
         scope={'bpy':bpy}
         exec(compile(ast.Module(body=[function],type_ignores=[]),str(PATH),'exec'),scope)
-        if config is None:config=__import__('json').loads(STYLE.with_name('room_fire_round1.json').read_text(encoding='utf-8'))
+        if config is None:config=__import__('json').loads((Path(__file__).resolve().parents[1]/'configs/render/room_fire_round1.json').read_text(encoding='utf-8'))
         scope['volume_material']('synthetic',smoke,config,.5,253)
         return nodes,links
 

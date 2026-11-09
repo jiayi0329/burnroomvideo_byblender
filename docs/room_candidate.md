@@ -1,5 +1,7 @@
 # 单房间候选资产：当前演示近似策略
 
+2026-11-09第4批：B实现已迁入render_engine/blender，旧app入口需完整引擎包。以后重新生成资产时，先按[迁移说明](room_engine_migration.md)安装并设置`engine_root`；不能再单独上传B/helper。本轮不执行资产生成。
+
 **本次只运行 F8-B：app/F8_prepare_room_asset.py。** F8-A（F8_inspect_room_import.py）是已完成的原模型导入检查；F8-C（F8_blender_render.py）是旧完整视频入口，本轮不运行。各脚本头部已有标记，完整索引见 [app/README.md](../app/README.md)。
 
 2026-11-02 用户确认：Room8 采用平层地板近似，参考地板 -1.35m（主导下包络候选）。不再等待地板、平台、吊顶、墙厚的真实建筑语义确认。旧诊断及 review.json 不改，历史 ready_for_cut=false 不作回填；新 candidate 单独记录工程放行依据，physical_semantics_verified=false。该策略优先于 room_asset_checks.md / room_section_diagnostics.md 的旧物理确认门槛。
@@ -19,11 +21,9 @@
 
 控制台会给出独立版本路径。不同房间可复用该工具，需换相应 inspection、导入证据和参考高度；不会自动将 Room8 的高度应用到其他房间。
 
-接着上传三个文件（把 <版本目录> 换成此次输出的 UTC_UUID；不要原样粘贴占位符）。2026-11-09起，B入口依赖同目录的`F8_room_helpers.py`；本页保留资产生成步骤，当前迁移不重新裁切或出图：
+完整代码包已独立安装后，只另行上传候选数据（把<版本目录>换成此次输出的UTC_UUID，不原样粘贴占位符）。代码使用`engine_root`中的完整引擎，不单独传兼容脚本：
 
 ```powershell
-scp -P 7777 .\app\F8_prepare_room_asset.py zhaojy@172.25.76.201:/tmp/burnroom_prepare_room_asset.py
-scp -P 7777 .\app\F8_room_helpers.py zhaojy@172.25.76.201:/tmp/F8_room_helpers.py
 scp -P 7777 .\data\KK-EEz16cmU14\rooms\Room8\<版本目录>\candidate.json zhaojy@172.25.76.201:/tmp/burnroom_room_candidate.json
 ```
 
@@ -38,10 +38,8 @@ cd ~/burnroom-prod/burnroom-deploy-package
 run_id=$(date -u +%Y%m%dT%H%M%SZ)-$(python3 -c 'import uuid; print(uuid.uuid4().hex[:8])')
 room_run="/app/data/KK-EEz16cmU14/rooms/Room8/$run_id"
 docker compose exec -T app-server mkdir -p "$room_run"
-docker compose cp /tmp/burnroom_prepare_room_asset.py app-server:/tmp/burnroom_prepare_room_asset.py
-docker compose cp /tmp/F8_room_helpers.py app-server:/tmp/F8_room_helpers.py
 docker compose cp /tmp/burnroom_room_candidate.json "app-server:$room_run/candidate.json"
-docker compose exec -T app-server blender --background --factory-startup --python-exit-code 1 --python /tmp/burnroom_prepare_room_asset.py -- --candidate "$room_run/candidate.json" --data-root /app/data --display-height 2.4
+docker compose exec -T app-server blender --background --factory-startup --python-exit-code 1 --python "$engine_root/render_engine/blender/F8_prepare_room_asset.py" -- --candidate "$room_run/candidate.json" --data-root /app/data --display-height 2.4
 printf 'Result directory: %s/asset\n' "$room_run"
 ```
 

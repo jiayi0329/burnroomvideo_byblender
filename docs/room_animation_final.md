@@ -1,6 +1,6 @@
 # Room8 直接正式出片（2026-11-04）
 
-2026-11-09兼容更新：上传清单现为9份Python源码和R3配置，共10份文件，包含新增的`F8_room_helpers.py`。仅供以后显式启动新任务；V1已出片，本轮整理不重渲染。新源码不能用于旧任务续跑；复现V1应恢复归档代码。
+2026-11-09第4批：必须先按[完整代码包说明](room_engine_migration.md)安装并在当前SSH会话设置`engine_root`。不再上传平铺脚本；下方路径已适配包结构。V1已出片，本轮不执行渲染，新源码不能续跑旧任务；复现V1应恢复归档代码。
 
 **GPU修正优先**：生产容器原先只有Mesa图形库，必须先按room_gpu_fix.md应用NVIDIA graphics能力并重新创建app-server。下文旧步骤中的“无需重启”仅适用于驱动挂载已修复的容器。新版final会强制校验实际NVIDIA上下文；首次修复须使用新任务，不续跑旧CPU任务。
 
@@ -10,29 +10,15 @@
 
 ```powershell
 cd D:\burnroomvideo_byblender
-$files = @(
-  '.\app\run_room_animation.py'
-  '.\app\room_animation_job.py'
-  '.\app\F8_room_animation.py'
-  '.\app\F8_room_demo.py'
-  '.\app\F8_room_fire_style.py'
-  '.\app\room_fire_config.py'
-  '.\app\room_demo_plan.py'
-  '.\app\F8_prepare_room_asset.py'
-  '.\app\F8_room_helpers.py'
-  '.\app\room_fire_round3.json'
-)
-ssh -p 7777 zhaojy@172.25.76.201 'mkdir -p /tmp/room8_final_code'
-scp -P 7777 $files zhaojy@172.25.76.201:/tmp/room8_final_code/
+.\release\scripts\build.ps1
 ```
 
-两条传输命令都成功后进入SSH，不使用本地Docker。
+将生成的包通过WinSCP上传并按迁移说明解压到独立目录，获得`engine_root`；不要直接覆盖现有部署，不使用本地Docker。本轮仅维护说明，不执行这些步骤。
 
 ## 2. 远程 SSH：装入运行脚本并选取已有资产
 
 ```bash
 cd ~/burnroom-prod/burnroom-deploy-package
-docker compose cp /tmp/room8_final_code app-server:/tmp/
 asset=$(
 docker compose exec -T app-server python3 - <<'PY'
 from pathlib import Path
@@ -52,10 +38,10 @@ asset应指向既有`Room8/<版本>/asset`；入口会再次核对资产/候选�
 ```bash
 launch_log="$HOME/burnroom-prod/room8-final-$(date -u +%Y%m%dT%H%M%SZ)-$$.log"
 nohup docker compose exec -T app-server python3 -u \
-  /tmp/room8_final_code/run_room_animation.py \
+  "$engine_root/app/run_room_animation.py" \
   --asset "$asset" \
   --points /app/data/KK-EEz16cmU14/points.json \
-  --config /tmp/room8_final_code/room_fire_round3.json \
+  --config "$engine_root/configs/render/room_fire_round3.json" \
   --stage final --preset final --camera-mode overview --direct-final \
   > "$launch_log" 2>&1 < /dev/null &
 printf 'Launch log: %s\n' "$launch_log"
@@ -87,9 +73,9 @@ asset='/app/data/KK-EEz16cmU14/rooms/Room8/实际资产版本/asset'
 job='/app/data/KK-EEz16cmU14/rooms/Room8/render_jobs/实际run_id'
 launch_log="$HOME/burnroom-prod/room8-final-resume-$(date -u +%Y%m%dT%H%M%SZ)-$$.log"
 nohup docker compose exec -T app-server python3 -u \
-  /tmp/room8_final_code/run_room_animation.py \
+  "$engine_root/app/run_room_animation.py" \
   --asset "$asset" --points /app/data/KK-EEz16cmU14/points.json \
-  --config /tmp/room8_final_code/room_fire_round3.json \
+  --config "$engine_root/configs/render/room_fire_round3.json" \
   --stage final --preset final --camera-mode overview --direct-final \
   --resume "$job" > "$launch_log" 2>&1 < /dev/null &
 printf 'Resume log: %s\n' "$launch_log"

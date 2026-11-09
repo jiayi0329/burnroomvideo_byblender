@@ -16,6 +16,7 @@ import subprocess
 import tempfile
 from types import SimpleNamespace
 import unittest
+from test.engine_paths import source_path
 from unittest.mock import patch
 import zlib
 
@@ -41,7 +42,9 @@ class AnimationJobs(unittest.TestCase):
         self.root=Path(self.temp.name); self.scene=self.root/'scene'; self.scene.mkdir()
         self.asset=self.scene/'rooms/Room8/version/asset'; self.asset.mkdir(parents=True)
         self.codes=self.root/'code'; self.codes.mkdir()
-        for name in jobs.CODE_FILES:(self.codes/name).write_text('# fixture '+name,encoding='utf-8')
+        for name in jobs.CODE_FILES:
+            path=self.codes/name; path.parent.mkdir(parents=True,exist_ok=True)
+            path.write_text('# fixture '+name,encoding='utf-8')
         self.config=self.root/'room_fire_round3.json'
         self.config.write_bytes((ROOT/'app/room_fire_round3.json').read_bytes())
         devices=[0,2,4,6,8,10,12,14,16,18,20,22,40]
@@ -89,7 +92,7 @@ class AnimationJobs(unittest.TestCase):
         jobs.check_guards(self.inputs)
         self.assertIn(str(self.scene/'output.mp4'),self.inputs['guards'])
         self.assertIn(str(self.scene/'timeline.json'),self.inputs['guards'])
-        self.assertIn(str(self.codes/'F8_room_animation.py'),self.inputs['guards'])
+        self.assertIn(str(self.codes/'render_engine/blender/F8_room_animation.py'),self.inputs['guards'])
         (self.scene/'output.mp4').write_bytes(b'changed externally')
         with self.assertRaisesRegex(ValueError,'Protected input'):jobs.check_guards(self.inputs)
 
@@ -215,7 +218,7 @@ class AnimationJobs(unittest.TestCase):
         path,_=self.reviewed_job(); final=jobs.build_spec(self.inputs,'final','test')
         final['animation']['wall_height']=1.2
         with self.assertRaisesRegex(ValueError,'differs'):jobs.verify_approval(path,self.job_root,final)
-        final=jobs.build_spec(self.inputs,'final','test'); final['inputs']['codes']['F8_room_animation.py']='changed'
+        final=jobs.build_spec(self.inputs,'final','test'); final['inputs']['codes']['render_engine/blender/F8_room_animation.py']='changed'
         with self.assertRaisesRegex(ValueError,'differs'):jobs.verify_approval(path,self.job_root,final)
 
     def test_review_gate_rechecks_actual_keyframe_bytes(self) -> None:
@@ -314,7 +317,7 @@ class AnimationJobs(unittest.TestCase):
         nodes,_=demo.DemoTests().volume(True,self.inputs['style'])
         flow=next(n for n in nodes if getattr(n,'name','')=='EffectFlow')
         self.assertEqual(len(flow.inputs[1].keys),2)
-        tree=ast.parse((ROOT/'app/F8_room_animation.py').read_text(encoding='utf-8'))
+        tree=ast.parse((ROOT/'render_engine/blender/F8_room_animation.py').read_text(encoding='utf-8'))
         function=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='apply_absolute')
         def material() -> object:
             nodes={name:demo.Node('fixture') for name in ('DensityEnvelope','EmissionEnvelope','EffectNoise','EffectFlow')}
@@ -346,7 +349,7 @@ class AnimationJobs(unittest.TestCase):
         self.assertEqual(late['emission'],0); self.assertGreater(late['smoke']['density'],0)
 
     def test_optional_gpu_renderer_evidence_identifies_software(self) -> None:
-        tree=ast.parse((ROOT/'app/F8_room_animation.py').read_text(encoding='utf-8'))
+        tree=ast.parse((ROOT/'render_engine/blender/F8_room_animation.py').read_text(encoding='utf-8'))
         function=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='renderer_info')
         scope={}; exec(compile(ast.Module(body=[function],type_ignores=[]),'renderer evidence stand-in','exec'),scope)
         platform=SimpleNamespace(renderer_get=lambda:'llvmpipe',vendor_get=lambda:'Mesa',version_get=lambda:'fixture',
@@ -358,7 +361,7 @@ class AnimationJobs(unittest.TestCase):
 
     def test_animation_code_never_imports_legacy_or_database_and_prints_flush(self) -> None:
         for name in ('run_room_animation.py','room_animation_job.py','F8_room_animation.py'):
-            source=(ROOT/'app'/name).read_text(encoding='utf-8'); tree=ast.parse(source)
+            source=(source_path(name)).read_text(encoding='utf-8'); tree=ast.parse(source)
             self.assertNotIn('F8_blender_render',source); self.assertNotIn('psycopg',source)
             if name!='F8_room_animation.py':self.assertNotIn('import bpy',source)
             for node in ast.walk(tree):

@@ -65,9 +65,9 @@ class CameraFix(unittest.TestCase):
             cameras=SimpleNamespace(new=CameraData)),context=SimpleNamespace(view_layer=SimpleNamespace(update=lambda:None)))
         scene=SimpleNamespace(camera=None,collection=SimpleNamespace(objects=SimpleNamespace(link=objects.append)),
                               render=SimpleNamespace(resolution_x=960,resolution_y=540))
-        old=ast.parse((ROOT/'app/F8_room_helpers.py').read_text(encoding='utf-8'))
+        old=ast.parse((ROOT/'render_engine/blender/F8_room_helpers.py').read_text(encoding='utf-8'))
         legacy=next(n for n in old.body if isinstance(n,ast.FunctionDef) and n.name=='camera')
-        new=ast.parse((ROOT/'app/F8_room_animation.py').read_text(encoding='utf-8'))
+        new=ast.parse((ROOT/'render_engine/blender/F8_room_animation.py').read_text(encoding='utf-8'))
         selected=[n for n in new.body if isinstance(n,ast.FunctionDef) and n.name in
                   ('independent_camera','camera_parameters','activate_camera','fit_overview')]
         future=ast.ImportFrom(module='__future__',names=[ast.alias(name='annotations')],level=0)

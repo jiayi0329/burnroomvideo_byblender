@@ -1,5 +1,13 @@
 # 测试规范与需求追溯
 
+## 2026-11-09 第4批：引擎/配置目录落位
+
+新增`test_engine_migration.py`（15项）及AST源码定位辅助`engine_paths.py`，对应[PRD工程要求](../docs/PRD.md)、[架构2.2–2.3](../docs/ARCHITECTURE.md)和[目录规范第4批](../docs/PROJECT_ORGANIZATION.md)。检查13份兼容模块与实际实现同一性、旧接口替换、普通Python/Blender帮助替身、跨工作目录寻址、R3及新旧配置副本、引擎不导入Backend/tools、39文件指纹、旧app根参数兼容、源码变动/缺失及旧任务拒绝、worker/锁/输出路径，以及真实临时安装包、解压后导入、私有文件排除和打包失败保护。
+
+命令：`python -B -m unittest test.test_engine_migration test.test_diagnostics_migration test.test_release_safety -v`。原资产/火烟/相机/时序测试改读render_engine实际源码，保留原回归断言；原函数导入继续走app兼容路径。发布测试使用临时合成代码，不在真实部署目录执行脚本。
+
+最终相关回归205项：204通过、1项因缺少可选Matplotlib跳过；15项新增迁移测试全部通过。94个未涉及寻址/源码登记改动的原函数AST一致，R1/R2/R3预设字节不变，24份V1备份SHA一致。未运行Blender、GPU、Docker、SSH、数据库或真实视频；模拟出片日志不能当作新成片。当前是本地迁移完成，远端包安装和渲染尚未复验。旧归档版本的源码清单/运行说明保留历史含义，当前以[完整包说明](../docs/room_engine_migration.md)为准。
+
 ## 2026-11-09 第3批：Blender公共辅助
 
 新增`test_blender_room_helpers.py`，对应[PRD当前MVP](../docs/PRD.md)、[架构2.2–2.3](../docs/ARCHITECTURE.md)与[目录规范第3批](../docs/PROJECT_ORGANIZATION.md)。12项离线测试验证实际helper的逐角UV/材质/原始Z、世界坐标、展示截断、凹房间机位、最近射线命中、旧接口同一性、业务导入隔离、改名脚本同目录加载，以及静帧/动画源码指纹、缺失/变动拒绝与旧任务快照不变。B资产及相机原AST测试改为读取实际公共函数，原断言保留；安装包测试增加helper包含检查。

@@ -1,5 +1,7 @@
 # app 脚本索引
 
+**2026-11-09第4批更新：** 下表保留旧名称与职责。B/D/E、火烟辅助、普通动画启动器/契约、配置校验、BFS及四个几何/候选模块共13份文件，现均为兼容入口；实际实现见[引擎目录](../render_engine/README.md)。默认预设改读configs/render，app JSON保留字节一致的兼容副本。Legacy main/F6/F7/旧F8-C及数据库/MinIO模块仍在app，未迁移。必须使用完整安装包，不能再只上传几个app脚本到/tmp；操作见[迁移说明](../docs/room_engine_migration.md)。
+
 保留现有API和app兼容路径；已迁移工具的实际位置见下表。F8文件必须在远端Blender内执行，不能用普通Python直接运行，也不能由后端import。
 
 | 标记 | 文件 | 职责及输入输出 | 当前是否运行 |
