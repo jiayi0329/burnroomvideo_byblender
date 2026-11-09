@@ -71,11 +71,12 @@ release/                       # 当前发布入口，暂不改成 deploy/
 | app/F8_room_fire_style.py | D/E 共用的 bpy 材质/灯光辅助 | render_engine/blender/；不是单独任务入口 |
 | app/room_fire_config.py | 纯配置校验、火舌/烟柱几何 | render_engine/effects/；R3 指纹和测试保持 |
 | app/room_demo_plan.py | 展示分量与房间 BFS 的纯函数 | 先保持单文件；后按 geometry/propagation 提取，避免顺便改算法 |
-| app/prepare_room_candidate.py、app/room_clip_geometry.py | 候选裁切入口与纯几何 | render_engine/geometry/；候选入口依赖 diagnose.load_inputs，不能先移走该模块 |
+| app/prepare_room_candidate.py、app/room_clip_geometry.py | 候选裁切入口与纯几何 | render_engine/geometry/；第1批已改为直接依赖公共输入模块，不再导入diagnose |
+| app/room_source_io.py、app/room_source_inputs.py | 第1批提取的纯读取、坐标和来源校验 | render_engine/geometry/；当前先保留app路径，诊断兼容导出不变 |
 | app/F8_prepare_room_asset.py（F8-B） | 资产导出、重载、展示截断辅助 | render_engine/blender/；D/E 依赖其 below/make_mesh 等函数，须先提取公共辅助 |
 | app/analyze_floorplan.py | 对齐分析，也被导入/候选/诊断复用 | 纯解析与变换进入 render_engine/geometry/；报告CLI再放 tools/diagnostics/ |
-| app/inspect_room_asset.py | 历史坐标/高度检查，含被复用的 OBJ/MTL 读取 | 先将只读解析工具提取到 geometry/，诊断外壳才移 tools/diagnostics/ |
-| app/diagnose_room_sections.py | 历史断面入口；load_inputs 仍被候选使用 | 先拆输入指纹校验与诊断绘图职责，再迁移外壳 |
+| app/inspect_room_asset.py | 历史坐标/高度检查，保留公共读取函数名导出 | 解析已在app内提取；后续诊断外壳迁入tools，仍须核对build_plan等依赖 |
+| app/diagnose_room_sections.py | 历史断面入口；load_inputs/REQUIRED_CHECKS兼容导出 | 校验已提取到公共模块，后续与断面计算/绘图成组迁移 |
 | app/room_section_geometry.py、app/room_section_plots.py | 断面计算/可选 Matplotlib 绘图 | tools/diagnostics/；一起检查 diagnose 与 test_room_sections 的引用 |
 | app/F8_inspect_room_import.py（F8-A） | 已完成的 Blender 导入检查依据 | tools/diagnostics/blender/；保留追溯脚本与两个测试的静态检查 |
 | app/probe_floorplan.py | 上游 API 探测，相关测试仍在 | tools/diagnostics/；仅移动代码，不提交真实返回包或 appkey |
@@ -91,7 +92,7 @@ release/                       # 当前发布入口，暂不改成 deploy/
 
 ## 4. 必须先拆的依赖
 
-实际链条：`prepare_room_candidate → diagnose_room_sections.load_inputs → inspect_room_asset → import_rooms → analyze_floorplan`；其中数据库连接是延迟执行，不能据此说引擎已经必须连库。但这条文件依赖链让“先移动全部诊断工具”不安全。
+整理前链条：`prepare_room_candidate → diagnose_room_sections.load_inputs → inspect_room_asset → import_rooms → analyze_floorplan`；其中数据库连接是延迟执行，并非引擎必须连库。2026-11-07第1批已将候选入口改为 `prepare_room_candidate → room_source_inputs → room_source_io`，不再导入诊断或后端工具；原 inspect/diagnose 函数名继续兼容导出。高度诊断自身仍复用 analyze_floorplan/import_rooms，不能据此批量移动所有上游工具。
 
 动画链条：`F8_room_animation → F8_room_demo / F8_prepare_room_asset / F8_room_fire_style`。D/B 的复用函数先提取为 Blender 内部辅助，保持旧入口包装；普通 Python 业务端不能为了复用而导入这些 bpy 模块。
 
@@ -127,4 +128,4 @@ release/                       # 当前发布入口，暂不改成 deploy/
 
 2026-11-07：目录职责划分可作为目标规范；修正了 F6 分类和“部署最后迁移”的歧义，补齐打包、双执行环境、源码指纹与共享锁约束。**目标结构可保留，当前尚不具备直接批量移动文件的条件。**
 
-建议下一批只做第1批：在 app 内提取只读解析及输入核验，保留现有函数入口，并为提取模块新建测试。测试必须证明凹多边形/UV/材质解析不变、源文件指纹变更仍被拒绝、旧诊断入口和候选入口仍可调用；沿用合成数据与临时目录，不需要重渲染 Room8。该批的具体文件清单与实现另行展开。
+第1批已在 app 内提取 room_source_io（OBJ/MTL/XY/字节SHA）与 room_source_inputs（来源/人工review/Blender证据校验），保留旧函数名，新增两份测试。既有高度、裁切与F8动画算法不动。下一批可评估将 diagnose_room_sections、room_section_geometry、room_section_plots 作为断面诊断工具组迁移；仍须保留旧路径兼容、更新测试/打包/操作入口后再执行，本轮尚未移动。

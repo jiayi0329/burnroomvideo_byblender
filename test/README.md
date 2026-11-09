@@ -1,5 +1,11 @@
 # 测试规范与需求追溯
 
+## 2026-11-07 公共读取与输入校验解耦
+
+新增 `test_room_source_io.py`、`test_room_source_inputs.py`，追溯当前 [架构的几何/文件边界](../docs/ARCHITECTURE.md) 与 [目录规范第1批](../docs/PROJECT_ORGANIZATION.md)，兼容原 PRD 2.2 / architecture 3.2。22项离线单元测试覆盖数值/索引、原始Z/逐角UV/材质、XY逆变换、路径越界、读取不改源文件、字节SHA、人工review/导入证据/材质指纹拒绝，以及 inspect/diagnose旧接口和候选独立导入。只用临时合成资产，不运行数据库、网络或Blender。
+
+本地 PowerShell：`python -B -m unittest test.test_room_source_io test.test_room_source_inputs -v`。断面PNG测试仍需可选Matplotlib；缺少时如实记录跳过。F8八份冻结源码保持原样，动画回归使用替身，不代表新的GPU或视觉验收。
+
 ## 每次修改的要求
 
 每次修改 `app/` 脚本以新增功能、改变行为或修复缺陷，都必须在 `test/` 新增至少一个对应测试用例；独立功能新建 `test_<功能名>.py`，已有功能可以在对应测试文件中新增用例。缺陷修复应增加能复现原问题的回归测试，不能只修改原断言让测试通过。

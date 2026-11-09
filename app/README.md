@@ -12,6 +12,8 @@
 
 | 相关普通 Python 工具 | 职责 | 当前关系 |
 |---|---|---|
+| room_source_io.py | 只读 OBJ/MTL、数值/索引、路径约束、XY逆变换和字节SHA256 | stdlib公共模块；inspect_room_asset保留原函数名导出 |
+| room_source_inputs.py | 输入/贴图指纹、人工XY结论、Blender导入证据绑定 | 候选和断面共用；diagnose_room_sections保留load_inputs/REQUIRED_CHECKS导出 |
 | probe_floorplan.py | 探测并留存户型 API 结果 | 上游数据来源 |
 | analyze_floorplan.py | 户型/点位 XY 对齐与归属候选，生成 overlay | 上游核验 |
 | inspect_room_asset.py | 材质/UV/坐标和高度采样核验 | 上游 inspection |
@@ -26,5 +28,7 @@
 | room_animation_job.py | 冻结配置、版本任务、绝对时间状态、PNG/MP4契约、耗时统计和审核绑定 | stdlib，无bpy或数据库 |
 
 本次链路：已核验户型 → prepare_room_candidate.py → candidate.json → **F8-B** → room.blend / room.glb / 三视图 → 人工验收 → 后续火灾效果阶段。
+
+2026-11-07 第一批解耦：候选入口直接读取 room_source_inputs，不再通过断面/高度诊断入口加载输入。公共函数保持既有解析/校验行为；未修改高度计算、裁切算法或F8动画/样式。当前出片完成度见 [PROJECT_STATUS](../docs/PROJECT_STATUS.md)。
 
 完整操作：[候选资产与检查图](../docs/room_candidate.md)。F8-B 保存的基础房间与 section_preview.blend 分开；三视图使用展示去顶副本。地板参考高度是演示工程近似，扫描平台/家具未自动重建。

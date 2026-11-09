@@ -12,8 +12,8 @@ import math
 from pathlib import Path
 import uuid
 
-from app.analyze_floorplan import sha256
-from app.diagnose_room_sections import load_inputs
+from app.room_source_io import sha256
+from app.room_source_inputs import load_inputs
 from app.room_clip_geometry import clip_mesh
 
 
