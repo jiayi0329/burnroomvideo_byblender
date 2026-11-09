@@ -1,5 +1,7 @@
 # A阶段：冻结第三轮风格的Room8短片与性能验收
 
+2026-11-09兼容更新：下方上传/复制清单已包含`F8_room_helpers.py`，须与worker同目录。历史短片步骤不作为当前清理任务指令；本轮不运行渲染，也不以新源码续跑旧任务。
+
 首轮短片发现相机对象复用错误，已修复。当前先按[动画相机单帧核对](room_animation_camera_fix.md)操作；本页原短片步骤暂停，构图通过后再用short。默认stage现为camera_check，任务显式记录camera_mode。
 
 2026-11-04；PRD2.3 / architecture3.3。当前仅执行short，不执行final。原F8-D静帧入口和room_fire_round3.json不变；新F8-E经普通Python启动器调用Blender，不访问数据库或旧API。
@@ -50,6 +52,7 @@ $animationFiles = @(
     '.\app\room_fire_config.py'
     '.\app\room_demo_plan.py'
     '.\app\F8_prepare_room_asset.py'
+    '.\app\F8_room_helpers.py'
     '.\app\room_fire_round3.json'
 )
 scp -P 7777 $animationFiles zhaojy@172.25.76.201:/tmp/
@@ -72,6 +75,7 @@ docker compose cp /tmp/F8_room_fire_style.py app-server:/tmp/room_animation_A/F8
 docker compose cp /tmp/room_fire_config.py app-server:/tmp/room_animation_A/room_fire_config.py
 docker compose cp /tmp/room_demo_plan.py app-server:/tmp/room_animation_A/room_demo_plan.py
 docker compose cp /tmp/F8_prepare_room_asset.py app-server:/tmp/room_animation_A/F8_prepare_room_asset.py
+docker compose cp /tmp/F8_room_helpers.py app-server:/tmp/room_animation_A/F8_room_helpers.py
 docker compose cp /tmp/room_fire_round3.json app-server:/tmp/room_animation_A/room_fire_round3.json
 docker compose exec -T app-server python3 /tmp/room_animation_A/run_room_animation.py --help
 ```

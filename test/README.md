@@ -1,5 +1,13 @@
 # 测试规范与需求追溯
 
+## 2026-11-09 第3批：Blender公共辅助
+
+新增`test_blender_room_helpers.py`，对应[PRD当前MVP](../docs/PRD.md)、[架构2.2–2.3](../docs/ARCHITECTURE.md)与[目录规范第3批](../docs/PROJECT_ORGANIZATION.md)。12项离线测试验证实际helper的逐角UV/材质/原始Z、世界坐标、展示截断、凹房间机位、最近射线命中、旧接口同一性、业务导入隔离、改名脚本同目录加载，以及静帧/动画源码指纹、缺失/变动拒绝与旧任务快照不变。B资产及相机原AST测试改为读取实际公共函数，原断言保留；安装包测试增加helper包含检查。
+
+命令：`python -B -m unittest test.test_blender_room_helpers test.test_prepare_room_asset test.test_room_animation_camera test.test_room_animation test.test_release_safety -v`。仅使用合成Blender对象、临时资产和模拟进程；打包在临时合成目录执行PowerShell/tar。不运行Blender、GPU、Docker、真实SSH或数据库。新helper函数与迁移前AST对照一致，R3/样式/传播/裁切实现及24份V1资产备份SHA未改；普通后端不得导入此bpy模块。远端Blender导入与画面尚未复测。
+
+本批相关回归共190项：189通过，1项因缺少可选Matplotlib跳过；其中12项新增公共辅助测试全部通过。覆盖前两批、资产、静帧、R1/R2/R3、动画/相机/final/GPU守卫及临时安装包；模拟日志中的出片信息不代表实际重新渲染。
+
 ## 2026-11-09 断面诊断工具迁移
 
 新增 `test_diagnostics_migration.py`，对应 [目录规范](../docs/PROJECT_ORGANIZATION.md) 的工具组迁移和 [架构](../docs/ARCHITECTURE.md) 的诊断/运行边界，兼容原PRD2.2、architecture3.2。12项离线测试覆盖新旧模块同一性、旧函数替换兼容、两条CLI帮助/缺参、延迟绘图依赖、候选导入隔离、HTML索引、诊断成功/失败保留，以及临时安装包内容与解压后导入、工具缺失时打包中止、镜像上下文白名单与BOM。

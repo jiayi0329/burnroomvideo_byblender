@@ -19,10 +19,11 @@
 
 控制台会给出独立版本路径。不同房间可复用该工具，需换相应 inspection、导入证据和参考高度；不会自动将 Room8 的高度应用到其他房间。
 
-接着上传两个文件（把 <版本目录> 换成此次输出的 UTC_UUID；不要原样粘贴占位符）：
+接着上传三个文件（把 <版本目录> 换成此次输出的 UTC_UUID；不要原样粘贴占位符）。2026-11-09起，B入口依赖同目录的`F8_room_helpers.py`；本页保留资产生成步骤，当前迁移不重新裁切或出图：
 
 ```powershell
 scp -P 7777 .\app\F8_prepare_room_asset.py zhaojy@172.25.76.201:/tmp/burnroom_prepare_room_asset.py
+scp -P 7777 .\app\F8_room_helpers.py zhaojy@172.25.76.201:/tmp/F8_room_helpers.py
 scp -P 7777 .\data\KK-EEz16cmU14\rooms\Room8\<版本目录>\candidate.json zhaojy@172.25.76.201:/tmp/burnroom_room_candidate.json
 ```
 
@@ -38,6 +39,7 @@ run_id=$(date -u +%Y%m%dT%H%M%SZ)-$(python3 -c 'import uuid; print(uuid.uuid4().
 room_run="/app/data/KK-EEz16cmU14/rooms/Room8/$run_id"
 docker compose exec -T app-server mkdir -p "$room_run"
 docker compose cp /tmp/burnroom_prepare_room_asset.py app-server:/tmp/burnroom_prepare_room_asset.py
+docker compose cp /tmp/F8_room_helpers.py app-server:/tmp/F8_room_helpers.py
 docker compose cp /tmp/burnroom_room_candidate.json "app-server:$room_run/candidate.json"
 docker compose exec -T app-server blender --background --factory-startup --python-exit-code 1 --python /tmp/burnroom_prepare_room_asset.py -- --candidate "$room_run/candidate.json" --data-root /app/data --display-height 2.4
 printf 'Result directory: %s/asset\n' "$room_run"

@@ -20,7 +20,9 @@
 
 effective_settings.json回读背景、色彩管理、逐灯能量/体积倍率/位置/目标/旋转以及火烟材质。sample_manifest.json继续记录六图实际帧号、机位、灯能量、体积控制、烟对象包围盒和耗时。没有加入Hybrid、顶棚积烟或动画渲染。
 
-## ① 本地 PowerShell：上传六个文件
+## ① 本地 PowerShell：上传七个文件
+
+2026-11-09兼容更新：新增`F8_room_helpers.py`须一同上传到脚本目录；第三轮配置内容未改。本页保留复现步骤，本轮目录整理不重渲染。
 
 在项目目录完整复制下面一块执行。文件数组用于避免长命令被手工换行破坏：
 
@@ -32,6 +34,7 @@ $styleFiles = @(
     '.\app\room_fire_config.py'
     '.\app\room_fire_round3.json'
     '.\app\F8_prepare_room_asset.py'
+    '.\app\F8_room_helpers.py'
     '.\app\room_demo_plan.py'
 )
 scp -P 7777 $styleFiles zhaojy@172.25.76.201:/tmp/
@@ -50,6 +53,7 @@ docker compose cp /tmp/F8_room_fire_style.py app-server:/tmp/F8_room_fire_style.
 docker compose cp /tmp/room_fire_config.py app-server:/tmp/room_fire_config.py
 docker compose cp /tmp/room_fire_round3.json app-server:/tmp/room_fire_round3.json
 docker compose cp /tmp/F8_prepare_room_asset.py app-server:/tmp/F8_prepare_room_asset.py
+docker compose cp /tmp/F8_room_helpers.py app-server:/tmp/F8_room_helpers.py
 docker compose cp /tmp/room_demo_plan.py app-server:/tmp/room_demo_plan.py
 ```
 

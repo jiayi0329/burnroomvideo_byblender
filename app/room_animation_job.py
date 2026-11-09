@@ -28,7 +28,7 @@ REVIEW_CHECKS=('visual_matches_round3','ignition_and_bfs','flame_smoke_continuit
                'performance_budget_accepted')
 CODE_FILES=('run_room_animation.py','room_animation_job.py','F8_room_animation.py',
             'F8_room_demo.py','F8_room_fire_style.py','room_fire_config.py',
-            'room_demo_plan.py','F8_prepare_room_asset.py')
+            'room_demo_plan.py','F8_prepare_room_asset.py','F8_room_helpers.py')
 APPROVED_STYLE_FINGERPRINT='599020bd89f3f8a961ee039ca664feb1598961c162949238153e8beb5857a6ae'
 
 

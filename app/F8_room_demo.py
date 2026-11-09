@@ -1,7 +1,7 @@
 """【F8-D｜当前展示修正/火灾预览】只加载已生成的 room.blend，另存派生版。
 
 inspect: 更新三视图；samples: 中近景/总览六张对比样帧。静帧审核期间禁用动画入口。
-复用 F8-B 的 UV 保留建网格/展示截断，不重做户型对齐或房间平面裁切。
+复用 F8_room_helpers 的 UV 保留建网格/展示截断，不重做户型对齐或房间平面裁切。
 不修改基础 room.blend/glb、数据库、源模型、核验记录或历史视频。
 远端 Blender 4.2 独立执行；当前第三轮操作见 docs/room_style_round3.md。
 """
@@ -20,19 +20,11 @@ import bpy
 from mathutils import Vector
 
 sys.path.insert(0,str(Path(__file__).resolve().parent))
-from F8_prepare_room_asset import below, digest, dump, make_mesh, interior_camera
+from F8_room_helpers import (below, digest, dump, make_mesh, interior_camera,
+                             mesh_faces, camera, closest_hit)
 from room_demo_plan import display_faces, room_timeline
 from room_fire_config import load_config
 from F8_room_fire_style import configure_render, lighting, add_fire, snapshot_settings
-
-
-def mesh_faces(obj: bpy.types.Object) -> list[dict]:
-    mesh = obj.data
-    if not mesh.uv_layers.active or any(len(p.vertices)!=3 for p in mesh.polygons):
-        raise ValueError('Triangular room mesh and UVs required')
-    return [{'material':mesh.materials[p.material_index].name,'corners':
-        [list(obj.matrix_world @ mesh.vertices[mesh.loops[i].vertex_index].co)+list(mesh.uv_layers.active.data[i].uv)
-         for i in p.loop_indices]} for p in mesh.polygons]
 
 
 def material_audit(obj: bpy.types.Object) -> list[dict]:
@@ -55,36 +47,6 @@ def material_audit(obj: bpy.types.Object) -> list[dict]:
             'uv_present':obj.data.uv_layers.active is not None,
             'note':'Image presence does not prove shader linkage or appearance; no automatic material replacement'})
     return result
-
-
-def camera(scene: bpy.types.Scene, position: list, aim: list, ortho: bool=False, span: float=10) -> bpy.types.Object:
-    obj = scene.camera
-    if obj is None:
-        obj = bpy.data.objects.new('DemoCamera',bpy.data.cameras.new('DemoCamera'))
-        scene.collection.objects.link(obj)
-        scene.camera = obj
-        target = bpy.data.objects.new('DemoTarget',None)
-        scene.collection.objects.link(target)
-        c = obj.constraints.new('TRACK_TO')
-        c.track_axis,c.up_axis,c.target = 'TRACK_NEGATIVE_Z','UP_Y',target
-    obj.location = position
-    obj.constraints[0].target.location = aim
-    obj.data.type = 'ORTHO' if ortho else 'PERSP'
-    obj.data.lens,obj.data.clip_start,obj.data.ortho_scale = 18,.03,span*1.3
-    bpy.context.view_layer.update()
-    return obj
-
-
-def closest_hit(origin: Vector, direction: Vector, objects: list) -> tuple | None:
-    hits = []
-    for obj in objects:
-        inverse = obj.matrix_world.inverted()
-        hit,local,normal,index = obj.ray_cast(inverse @ origin,(inverse.to_3x3() @ direction).normalized())
-        if hit:
-            world = obj.matrix_world @ local
-            world_normal = (inverse.transposed().to_3x3() @ normal).normalized()
-            hits.append(((world-origin).length,world,world_normal,index,obj))
-    return min(hits,key=lambda value:value[0]) if hits else None
 
 
 def ray_probe(scene: bpy.types.Scene, objects: list) -> dict:
@@ -126,7 +88,7 @@ def run(args: argparse.Namespace) -> Path:
         path=(asset/name).resolve()
         if not path.is_relative_to(asset) or digest(path)!=h:raise ValueError('Base artifact fingerprint differs: '+name)
     guards[args.config.resolve()]=digest(args.config)
-    code_files=('F8_room_demo.py','F8_room_fire_style.py','room_fire_config.py','room_demo_plan.py','F8_prepare_room_asset.py')
+    code_files=('F8_room_demo.py','F8_room_fire_style.py','room_fire_config.py','room_demo_plan.py','F8_prepare_room_asset.py','F8_room_helpers.py')
     code_hashes={name:digest(Path(__file__).resolve().parent/name) for name in code_files}
     points=None; ignition=None
     if args.mode=='samples':

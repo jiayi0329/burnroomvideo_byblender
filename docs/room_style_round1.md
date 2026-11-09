@@ -1,5 +1,7 @@
 # Room8 第一轮：只做火焰、烟雾、光照对比静帧
 
+2026-11-09兼容更新：上传清单补入`F8_room_helpers.py`。本文为历史轮次复现依据，本轮不重新渲染。
+
 当前默认入口已进入[第二轮静帧优化](room_style_round2.md)。本文及room_fire_round1.json保留作为第一轮记录/显式对比配置；不是当前第二轮参数说明。
 
 2026-11-03 用户确认实施。当前 F8-D 仅允许 inspect/samples，short 已禁用，不执行4秒短片或313帧视频。Hybrid没有实现；仍使用原13个内部点的BFS，32/42排除，层间1.5秒。基础资产、扫描模型、人工核验、旧图和视频、数据库均不写。
@@ -27,7 +29,7 @@ JSON中的颜色是线性节点RGBA，不是最终显示像素值。`room_fire_c
 
 ```powershell
 & 'C:\Users\86182\AppData\Local\Programs\Python\Python313\python.exe' -m unittest test.test_room_fire_config test.test_room_fire_style test.test_room_demo test.test_room_demo_plan -v
-scp -P 7777 .\app\F8_room_demo.py .\app\F8_room_fire_style.py .\app\room_fire_config.py .\app\room_fire_round1.json .\app\F8_prepare_room_asset.py .\app\room_demo_plan.py zhaojy@172.25.76.201:/tmp/
+scp -P 7777 .\app\F8_room_demo.py .\app\F8_room_fire_style.py .\app\room_fire_config.py .\app\room_fire_round1.json .\app\F8_prepare_room_asset.py .\app\F8_room_helpers.py .\app\room_demo_plan.py zhaojy@172.25.76.201:/tmp/
 ```
 
 无需重新打包、重建镜像或上传模型。不要只上传F8-D主脚本，辅助文件和JSON必须同目录、同版本。
@@ -43,6 +45,7 @@ docker compose cp /tmp/F8_room_fire_style.py app-server:/tmp/F8_room_fire_style.
 docker compose cp /tmp/room_fire_config.py app-server:/tmp/room_fire_config.py
 docker compose cp /tmp/room_fire_round1.json app-server:/tmp/room_fire_round1.json
 docker compose cp /tmp/F8_prepare_room_asset.py app-server:/tmp/F8_prepare_room_asset.py
+docker compose cp /tmp/F8_room_helpers.py app-server:/tmp/F8_room_helpers.py
 docker compose cp /tmp/room_demo_plan.py app-server:/tmp/room_demo_plan.py
 asset=$(docker compose exec -T app-server python3 -c 'from pathlib import Path; items=list(Path("/app/data/KK-EEz16cmU14/rooms/Room8").glob("*/asset/manifest.json")); assert items,"No completed base asset found"; print(max(items,key=lambda p:p.stat().st_mtime).parent)')
 printf 'Base asset: %s\n' "$asset"

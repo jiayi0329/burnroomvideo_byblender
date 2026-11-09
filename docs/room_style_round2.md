@@ -1,5 +1,7 @@
 # Room8 第二轮：更大、更厚的火焰与深灰黑上升烟柱
 
+2026-11-09兼容更新：上传清单补入`F8_room_helpers.py`。本文为历史轮次复现依据，本轮不重新渲染。
+
 第三轮现已针对背景与烟雾可读性微调，当前操作见[room_style_round3.md](room_style_round3.md)。本文及第二轮JSON保留供复现对比。
 
 对应PRD 2.2 / architecture 3.2，2026-11-03。只生成六张静帧，先审核；不进入短片或完整视频。
@@ -35,7 +37,7 @@
 ```powershell
 cd D:\burnroomvideo_byblender
 & 'C:\Users\86182\AppData\Local\Programs\Python\Python313\python.exe' -m unittest test.test_room_fire_round2 test.test_room_fire_config test.test_room_fire_style test.test_room_demo test.test_room_demo_plan -v
-scp -P 7777 .\app\F8_room_demo.py .\app\F8_room_fire_style.py .\app\room_fire_config.py .\app\room_fire_round2.json .\app\F8_prepare_room_asset.py .\app\room_demo_plan.py zhaojy@172.25.76.201:/tmp/
+scp -P 7777 .\app\F8_room_demo.py .\app\F8_room_fire_style.py .\app\room_fire_config.py .\app\room_fire_round2.json .\app\F8_prepare_room_asset.py .\app\F8_room_helpers.py .\app\room_demo_plan.py zhaojy@172.25.76.201:/tmp/
 ```
 
 只上传代码/配置，不重建镜像，不重新裁切或上传基础模型。六个文件保持同目录同版本。
@@ -51,6 +53,7 @@ docker compose cp /tmp/F8_room_fire_style.py app-server:/tmp/F8_room_fire_style.
 docker compose cp /tmp/room_fire_config.py app-server:/tmp/room_fire_config.py
 docker compose cp /tmp/room_fire_round2.json app-server:/tmp/room_fire_round2.json
 docker compose cp /tmp/F8_prepare_room_asset.py app-server:/tmp/F8_prepare_room_asset.py
+docker compose cp /tmp/F8_room_helpers.py app-server:/tmp/F8_room_helpers.py
 docker compose cp /tmp/room_demo_plan.py app-server:/tmp/room_demo_plan.py
 asset=$(docker compose exec -T app-server python3 -c 'from pathlib import Path; items=list(Path("/app/data/KK-EEz16cmU14/rooms/Room8").glob("*/asset/manifest.json")); assert items,"No completed base asset found"; print(max(items,key=lambda p:p.stat().st_mtime).parent)')
 printf 'Base asset: %s\n' "$asset"

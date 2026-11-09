@@ -8,7 +8,7 @@
 
 只将release/docker-compose.gpu.yml上传为远端部署目录的docker-compose.gpu.yml，叠加现有compose。不要用本地生产模板整体替换远端compose或凭证。先确认旧Blender任务已停止；保留旧任务目录。不要使用docker compose down或删除卷。
 
-在本地上传新版9个动画运行文件到独立宿主机目录/tmp/room8_gpu_code，保留原/tmp/room8_final_code。容器重新创建会清除容器/tmp，必须之后再复制脚本进去。
+在本地上传动画运行文件到独立宿主机目录/tmp/room8_gpu_code，保留原/tmp/room8_final_code。2026-11-09起清单为9份Python源码加R3配置，共10个文件，包含`F8_room_helpers.py`，见[正式清单](room_animation_final.md)。容器重新创建会清除容器/tmp，必须之后再复制脚本进去。本文保留GPU修复依据，当前基线整理不执行重建或新渲染；新源码不能续跑旧版本任务。
 
 远程SSH，部署目录：
 

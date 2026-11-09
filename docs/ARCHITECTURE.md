@@ -58,13 +58,14 @@ Room8 使用 11 顶点多边形、零外扩，源房间 6,835 个三角形，独
 
 ### 2.3 Room8 动画与可复现任务
 
+2026-11-09第3批：B/D/E共用函数已在app内提取到`F8_room_helpers.py`，旧函数名继续导出；E不再导入D/B入口。函数实现及R3风格不变。静帧与动画源码指纹均包含新helper；动画保留原八份并加helper共九份。缺失或变动会拒绝预检/续跑；旧V1只能用归档代码复现，不能重签旧任务。当前只完成离线验证，未执行新的Blender渲染。
+
 ```mermaid
 flowchart LR
     A[run_room_animation.py] --> B[预检与文件指纹]
     B --> C[Linux GPU 排他锁与冲突检查]
     C --> D[F8_room_animation.py]
-    D --> E[F8-D 几何与相机辅助]
-    D --> F[F8-B 网格与高度截断辅助]
+    D --> E[F8_room_helpers 网格/UV/截断/相机/射线]
     D --> G[F8_room_fire_style 与纯配置模块]
     D --> H[frames 与 render_manifest]
     H --> I[FFmpeg / ffprobe / 完整解码]
@@ -134,7 +135,7 @@ flowchart TD
 
 ## 5. 演进与验证边界
 
-先审阅目录/数据约定，再分批提取被诊断入口与裁切共同使用的纯函数，之后才移动文件。旧 API、Blender 同目录导入、测试 AST 提取、打包脚本及远端 /tmp 上传清单必须一起回归；不得按文件名删除“旧 F8”或“诊断”。详见目录规范中的三批迁移。
+先审阅目录/数据约定，再分批提取被诊断入口与裁切共同使用的纯函数，之后才移动文件。旧API、Blender同目录导入、测试AST提取、打包脚本及远端/tmp上传清单必须一起回归；不得按文件名删除“旧F8”或“诊断”。详见目录规范中的七批迁移。
 
 后续源码变更按 [测试约定](../test/README.md) 新建追溯测试。离线单元/API 替身、远端 PostgreSQL/MinIO 集成、Blender/GPU 与人工画面验收分别记录。单次 Room8 已出片不代表其他房间、网页、数据库导入或公网交付完成。
 

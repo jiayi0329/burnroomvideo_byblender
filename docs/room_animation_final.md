@@ -1,5 +1,7 @@
 # Room8 直接正式出片（2026-11-04）
 
+2026-11-09兼容更新：上传清单现为9份Python源码和R3配置，共10份文件，包含新增的`F8_room_helpers.py`。仅供以后显式启动新任务；V1已出片，本轮整理不重渲染。新源码不能用于旧任务续跑；复现V1应恢复归档代码。
+
 **GPU修正优先**：生产容器原先只有Mesa图形库，必须先按room_gpu_fix.md应用NVIDIA graphics能力并重新创建app-server。下文旧步骤中的“无需重启”仅适用于驱动挂载已修复的容器。新版final会强制校验实际NVIDIA上下文；首次修复须使用新任务，不续跑旧CPU任务。
 
 本次用户明确授权替代旧短片前置门禁。只运行一次24秒、1280×720、24fps、576帧总览正式任务；不追加短片或近景样帧，不预估耗时。第三轮配置冻结。无数据库/几何/旧API操作，无镜像重建或容器重启。
@@ -17,6 +19,7 @@ $files = @(
   '.\app\room_fire_config.py'
   '.\app\room_demo_plan.py'
   '.\app\F8_prepare_room_asset.py'
+  '.\app\F8_room_helpers.py'
   '.\app\room_fire_round3.json'
 )
 ssh -p 7777 zhaojy@172.25.76.201 'mkdir -p /tmp/room8_final_code'

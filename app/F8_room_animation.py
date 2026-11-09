@@ -21,8 +21,7 @@ import bpy
 from mathutils import Vector
 
 sys.path.insert(0,str(Path(__file__).resolve().parent))
-from F8_room_demo import mesh_faces, camera, closest_hit
-from F8_prepare_room_asset import below, make_mesh
+from F8_room_helpers import mesh_faces, camera, closest_hit, below, make_mesh
 from F8_room_fire_style import configure_render, lighting, add_fire, snapshot_settings, checked
 from room_demo_plan import display_faces, room_timeline
 from room_animation_job import (read_json, write_json, digest, confined, check_guards,
@@ -30,7 +29,7 @@ from room_animation_job import (read_json, write_json, digest, confined, check_g
 
 
 def independent_camera(scene: object, name: str, position: list, target: list, ortho: bool, span: float) -> object:
-    """F8-D camera() MUTATES scene.camera; force a fresh object/data/target here."""
+    """Shared camera() MUTATES scene.camera; force a fresh object/data/target here."""
     scene.camera=None
     obj=camera(scene,position,target,ortho,span)
     obj.name=name; obj.data.name=name+'_Data'; obj.constraints[0].target.name=name+'_Target'

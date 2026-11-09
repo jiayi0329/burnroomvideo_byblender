@@ -26,6 +26,7 @@ class ReleaseSafety(unittest.TestCase):
             shutil.copyfile(ROOT / 'release/scripts' / name, scripts / name)
         for name, content in {
             'app/source.py': 'print("synthetic")', 'app/db/001.sql': 'SELECT 1;',
+            'app/F8_room_helpers.py': '# synthetic Blender shared helper',
             'Dockerfile': 'COPY . .', 'requirements.txt': '', 'docs/database.md': 'synthetic',
             'test/__init__.py': '', 'test/test_synthetic.py': '',
             'tools/__init__.py': '', 'tools/diagnostics/__init__.py': '',
@@ -59,6 +60,7 @@ class ReleaseSafety(unittest.TestCase):
             names = set(archive.getnames())
             self.assertIn('burnroom-deploy-package/.dockerignore', names)
             self.assertIn('burnroom-deploy-package/app/db/001.sql', names)
+            self.assertIn('burnroom-deploy-package/app/F8_room_helpers.py', names)
             self.assertNotIn('burnroom-deploy-package/.env', names)
             self.assertNotIn('burnroom-deploy-package/prod.env', names)
             self.assertNotIn('burnroom-deploy-package/app/.env', names)

@@ -25,7 +25,9 @@ F8-D的camera(scene,...)会更新并返回当前scene.camera。F8-E原先连续�
 
 这些是错误近景下的软件渲染实测，不能当作整体总览或L20 GPU测试，旧全片推算也不能直接复用。报告和原视频继续保留；本轮不顺带调整GPU驱动/EGL/OpenGL配置。只读命令`python3 run_room_animation.py --report-job <旧任务目录>`无需Blender/GPU锁，不创建或修改旧任务。
 
-## 本地PowerShell：上传9个文件
+## 本地PowerShell：上传10个文件
+
+2026-11-09：清单补入共用Blender模块；本页保留相机修复操作依据，不代表本轮要重新出图。新源码对应新任务，不更改旧任务签名续跑。
 
 ```powershell
 cd D:\burnroomvideo_byblender
@@ -38,6 +40,7 @@ $cameraFiles = @(
     '.\app\room_fire_config.py'
     '.\app\room_demo_plan.py'
     '.\app\F8_prepare_room_asset.py'
+    '.\app\F8_room_helpers.py'
     '.\app\room_fire_round3.json'
 )
 scp -P 7777 $cameraFiles zhaojy@172.25.76.201:/tmp/
@@ -58,6 +61,7 @@ docker compose cp /tmp/F8_room_fire_style.py app-server:/tmp/room_animation_came
 docker compose cp /tmp/room_fire_config.py app-server:/tmp/room_animation_camera_fix/room_fire_config.py
 docker compose cp /tmp/room_demo_plan.py app-server:/tmp/room_animation_camera_fix/room_demo_plan.py
 docker compose cp /tmp/F8_prepare_room_asset.py app-server:/tmp/room_animation_camera_fix/F8_prepare_room_asset.py
+docker compose cp /tmp/F8_room_helpers.py app-server:/tmp/room_animation_camera_fix/F8_room_helpers.py
 docker compose cp /tmp/room_fire_round3.json app-server:/tmp/room_animation_camera_fix/room_fire_round3.json
 ```
 

@@ -24,6 +24,7 @@
 | room_demo_plan.py | 展示连接分量分析、房间内部子图 BFS 和渐变时序 | F8-D 使用，无 bpy；小块默认不删除 |
 | room_fire_round1.json / room_fire_round2.json / room_fire_round3.json / room_fire_config.py | 分轮艺术/事件/质量参数、校验、固定种子的曲线火舌及卷曲烟柱网格 | stdlib，无 bpy；默认第三轮，旧轮次可显式选择 |
 | F8_room_fire_style.py | F8-D/E共用Blender辅助，节点/火烟/灯光/设置回读 | **没有独立运行入口，不是新的渲染任务入口** |
+| F8_room_helpers.py | B/D/E共用网格/逐角UV、展示高度截断、内部机位、相机及射线命中辅助 | **Blender专用，无独立入口；旧函数名继续导出，普通Python后端不得导入** |
 | run_room_animation.py | A阶段普通Python启动器，进程锁/单帧核对/子进程/编码/失败保留；report-job只读旧报告 | **当前先camera_check，overview默认；不调用旧API** |
 | room_animation_job.py | 冻结配置、版本任务、绝对时间状态、PNG/MP4契约、耗时统计和审核绑定 | stdlib，无bpy或数据库 |
 
@@ -32,5 +33,7 @@
 2026-11-07 第一批解耦：候选入口直接读取 room_source_inputs，不再通过断面/高度诊断入口加载输入。公共函数保持既有解析/校验行为；未修改高度计算、裁切算法或F8动画/样式。当前出片完成度见 [PROJECT_STATUS](../docs/PROJECT_STATUS.md)。
 
 2026-11-09 第二批：三个断面实现迁入tools/diagnostics，app保留兼容模块。新入口为 `python -m tools.diagnostics.diagnose_room_sections`；旧 `python -m app.diagnose_room_sections` 继续可用。必须连同tools一起安装，不能只上传兼容文件覆盖旧容器脚本。工具只写独立diagnostics，不参与Room8正式渲染。
+
+2026-11-09 第三批：9个Blender共用函数在app内集中到F8_room_helpers，B/D/E保留旧函数名；E不再导入B/D入口。没有修改相机算法或火烟配置。静帧和动画指纹清单、临时上传说明已补入helper。后续上传须将helper与入口放同目录；新源码使用新任务，不给旧V1任务改签名续跑。当前未执行新的远端渲染。
 
 完整操作：[候选资产与检查图](../docs/room_candidate.md)。F8-B 保存的基础房间与 section_preview.blend 分开；三视图使用展示去顶副本。地板参考高度是演示工程近似，扫描平台/家具未自动重建。
