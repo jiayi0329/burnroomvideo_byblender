@@ -1,5 +1,13 @@
 # 测试规范与需求追溯
 
+## 2026-11-09 断面诊断工具迁移
+
+新增 `test_diagnostics_migration.py`，对应 [目录规范](../docs/PROJECT_ORGANIZATION.md) 的工具组迁移和 [架构](../docs/ARCHITECTURE.md) 的诊断/运行边界，兼容原PRD2.2、architecture3.2。12项离线测试覆盖新旧模块同一性、旧函数替换兼容、两条CLI帮助/缺参、延迟绘图依赖、候选导入隔离、HTML索引、诊断成功/失败保留，以及临时安装包内容与解压后导入、工具缺失时打包中止、镜像上下文白名单与BOM。
+
+命令：`python -B -m unittest test.test_diagnostics_migration test.test_release_safety -v`。仅在临时合成目录执行PowerShell/tar及普通Python；绘图流程使用显式替身，不代表实际PNG出图。原有Matplotlib图片测试继续保留，缺依赖时记录跳过。没有运行Docker、真实SSH、数据库或Blender。
+
+本次相关回归共178项：177通过，1项因缺少Matplotlib跳过。12项新增迁移测试与5项发布安全测试均通过；三个迁移文件除新导入路径外与旧实现文本一致，八份冻结运行源码及R3未改变。服务器部署和真实PNG/GPU验收没有在本轮执行。
+
 ## 2026-11-07 公共读取与输入校验解耦
 
 新增 `test_room_source_io.py`、`test_room_source_inputs.py`，追溯当前 [架构的几何/文件边界](../docs/ARCHITECTURE.md) 与 [目录规范第1批](../docs/PROJECT_ORGANIZATION.md)，兼容原 PRD 2.2 / architecture 3.2。22项离线单元测试覆盖数值/索引、原始Z/逐角UV/材质、XY逆变换、路径越界、读取不改源文件、字节SHA、人工review/导入证据/材质指纹拒绝，以及 inspect/diagnose旧接口和候选独立导入。只用临时合成资产，不运行数据库、网络或Blender。

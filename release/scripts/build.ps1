@@ -24,6 +24,10 @@ New-Item -ItemType Directory -Path "$StagingDir/scripts" | Out-Null
 Write-Host "===> [2/4] 组装核心代码与依赖..." -ForegroundColor Cyan
 # 拷贝纯净代码，自动剔除本地缓存
 Copy-Item -Path "$ProjectRoot\app" -Destination $StagingDir -Recurse
+# Include only the diagnostics package Python sources, never other tool data.
+New-Item -ItemType Directory -Path "$StagingDir/tools/diagnostics" | Out-Null
+Copy-Item -LiteralPath "$ProjectRoot/tools/__init__.py" -Destination "$StagingDir/tools/__init__.py"
+Copy-Item -Path "$ProjectRoot/tools/diagnostics/*.py" -Destination "$StagingDir/tools/diagnostics"
 if (Test-Path "$StagingDir\app\__pycache__") {
     $CachePath = (Resolve-Path -LiteralPath "$StagingDir\app\__pycache__").Path
     if ($CachePath -ne [IO.Path]::GetFullPath("$StagingDir\app\__pycache__")) { throw "非预期缓存目录" }

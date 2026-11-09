@@ -1,4 +1,4 @@
-# Default deny: only application source, synthetic tests and dependencies enter images.
+# Default deny: application/diagnostic Python source, synthetic tests and dependencies only.
 **
 !Dockerfile
 !.dockerignore
@@ -7,6 +7,10 @@
 !app/**
 !test/
 !test/**
+!tools/
+!tools/__init__.py
+!tools/diagnostics/
+!tools/diagnostics/*.py
 # Re-exclude secrets/caches even if accidentally placed inside allowed directories.
 **/.env
 **/.env.*

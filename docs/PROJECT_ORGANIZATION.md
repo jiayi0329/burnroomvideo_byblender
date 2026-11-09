@@ -1,6 +1,6 @@
 # 项目职责目录与渐进迁移规范
 
-更新：2026-11-07。**以下为目标目录和处置计划，本轮不创建应用骨架、不批量移动或删除源码。** 当前可执行路径仍为 app/、test/、release/。架构依据见 [ARCHITECTURE](ARCHITECTURE.md)。
+更新：2026-11-09。**除已完成的app公共函数提取与tools/diagnostics断面工具组外，以下仍为目标目录和处置计划。** app旧入口、test、release继续保留，不创建前后端骨架或批量删除源码。架构依据见 [ARCHITECTURE](ARCHITECTURE.md)。
 
 ## 1. 两个分类维度
 
@@ -16,7 +16,7 @@ Frontend/Backend/Render Engine 是职责；运行代码、测试配置、诊断�
 | 待确认删除 | 只有引用、测试、文档、部署与历史依据均核对后再审阅 |
 | Legacy | 旧系统仍有调用，不能与新版互相替换或直接删除 |
 
-## 2. 目标结构（尚未迁移）
+## 2. 目标结构（已落地部分见映射表）
 
 ```text
 frontend/
@@ -76,8 +76,8 @@ release/                       # 当前发布入口，暂不改成 deploy/
 | app/F8_prepare_room_asset.py（F8-B） | 资产导出、重载、展示截断辅助 | render_engine/blender/；D/E 依赖其 below/make_mesh 等函数，须先提取公共辅助 |
 | app/analyze_floorplan.py | 对齐分析，也被导入/候选/诊断复用 | 纯解析与变换进入 render_engine/geometry/；报告CLI再放 tools/diagnostics/ |
 | app/inspect_room_asset.py | 历史坐标/高度检查，保留公共读取函数名导出 | 解析已在app内提取；后续诊断外壳迁入tools，仍须核对build_plan等依赖 |
-| app/diagnose_room_sections.py | 历史断面入口；load_inputs/REQUIRED_CHECKS兼容导出 | 校验已提取到公共模块，后续与断面计算/绘图成组迁移 |
-| app/room_section_geometry.py、app/room_section_plots.py | 断面计算/可选 Matplotlib 绘图 | tools/diagnostics/；一起检查 diagnose 与 test_room_sections 的引用 |
+| app/diagnose_room_sections.py | 旧CLI/导入兼容，保留load_inputs/REQUIRED_CHECKS接口 | 已迁至tools/diagnostics/diagnose_room_sections.py；app指向同一模块 |
+| app/room_section_geometry.py、app/room_section_plots.py | 旧导入兼容，保留断面/绘图函数 | 实现已迁至tools/diagnostics/；Matplotlib仍只在绘图时导入 |
 | app/F8_inspect_room_import.py（F8-A） | 已完成的 Blender 导入检查依据 | tools/diagnostics/blender/；保留追溯脚本与两个测试的静态检查 |
 | app/probe_floorplan.py | 上游 API 探测，相关测试仍在 | tools/diagnostics/；仅移动代码，不提交真实返回包或 appkey |
 | app/F8_blender_render.py（F8-C） | 旧 main 绑定的 Legacy worker | 保留原入口；之后可迁至独立 legacy 区并保留兼容启动路径 |
@@ -92,7 +92,7 @@ release/                       # 当前发布入口，暂不改成 deploy/
 
 ## 4. 必须先拆的依赖
 
-整理前链条：`prepare_room_candidate → diagnose_room_sections.load_inputs → inspect_room_asset → import_rooms → analyze_floorplan`；其中数据库连接是延迟执行，并非引擎必须连库。2026-11-07第1批已将候选入口改为 `prepare_room_candidate → room_source_inputs → room_source_io`，不再导入诊断或后端工具；原 inspect/diagnose 函数名继续兼容导出。高度诊断自身仍复用 analyze_floorplan/import_rooms，不能据此批量移动所有上游工具。
+整理前链条：`prepare_room_candidate → diagnose_room_sections.load_inputs → inspect_room_asset → import_rooms → analyze_floorplan`；其中数据库连接是延迟执行，并非引擎必须连库。2026-11-07第1批已将候选入口改为 `prepare_room_candidate → room_source_inputs → room_source_io`，不再导入诊断或后端工具；原 inspect/diagnose 函数名继续兼容导出。断面工具组现只复用app公共输入与analyze_floorplan几何函数；inspect上游检查仍依赖import_rooms/analyze_floorplan，不能据此批量移动这些上游工具。
 
 动画链条：`F8_room_animation → F8_room_demo / F8_prepare_room_asset / F8_room_fire_style`。D/B 的复用函数先提取为 Blender 内部辅助，保持旧入口包装；普通 Python 业务端不能为了复用而导入这些 bpy 模块。
 
@@ -102,7 +102,7 @@ release/                       # 当前发布入口，暂不改成 deploy/
 
 | 现有约束与证据 | 迁移必须满足的条件 |
 | --- | --- |
-| release/scripts/build.ps1:26、35–37 只复制 app、docs、test；.dockerignore:2–9 默认拒绝且只放行现有源码目录 | 新增目标源码/配置目录时，同一批更新暂存复制和镜像白名单，并用安装包内容测试验证，不能仅验证本地 import 成功 |
+| build.ps1与.dockerignore现已增加tools包初始化文件及diagnostics的Python源码，其他tools目录/数据默认排除 | 后续新增目标源码/配置目录仍须同批更新暂存复制和镜像白名单，用安装包内容/解压导入测试验证，不能只验证本地import |
 | Dockerfile:36 启动 app.main:app，reload路径仍为 /app/app | 保留兼容入口，直到部署启动命令与相关路径一起通过验证；不提前移走 main |
 | F8_room_animation.py:23–29 将脚本目录加入 sys.path，按同目录文件名导入；启动器还支持包导入/直接脚本两种方式 | 明确安装后的包根目录与worker路径，验证普通Python和Blender内两种导入；不依赖启动时恰好位于项目目录 |
 | room_animation_job.py:29–31、102–103 固定八文件清单，并从同一 code_root 计算 SHA | 包装入口、提取模块和实际执行依赖都纳入新指纹清单；不能只更新八个旧文件名而漏掉新 helper |
@@ -128,4 +128,4 @@ release/                       # 当前发布入口，暂不改成 deploy/
 
 2026-11-07：目录职责划分可作为目标规范；修正了 F6 分类和“部署最后迁移”的歧义，补齐打包、双执行环境、源码指纹与共享锁约束。**目标结构可保留，当前尚不具备直接批量移动文件的条件。**
 
-第1批已在 app 内提取 room_source_io（OBJ/MTL/XY/字节SHA）与 room_source_inputs（来源/人工review/Blender证据校验），保留旧函数名，新增两份测试。既有高度、裁切与F8动画算法不动。下一批可评估将 diagnose_room_sections、room_section_geometry、room_section_plots 作为断面诊断工具组迁移；仍须保留旧路径兼容、更新测试/打包/操作入口后再执行，本轮尚未移动。
+第1批已在app内提取room_source_io与room_source_inputs，保留旧函数名，新增两份测试。2026-11-09第2批将diagnose_room_sections、room_section_geometry、room_section_plots实现迁至tools/diagnostics；app保留共享模块对象的兼容入口，打包和镜像上下文只增加这组Python源码。既有高度、裁切与F8动画算法不动；安装包内容/解压导入、旧CLI和相关离线回归分别检查。服务器尚未部署本次迁移。

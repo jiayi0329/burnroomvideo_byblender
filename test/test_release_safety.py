@@ -28,6 +28,8 @@ class ReleaseSafety(unittest.TestCase):
             'app/source.py': 'print("synthetic")', 'app/db/001.sql': 'SELECT 1;',
             'Dockerfile': 'COPY . .', 'requirements.txt': '', 'docs/database.md': 'synthetic',
             'test/__init__.py': '', 'test/test_synthetic.py': '',
+            'tools/__init__.py': '', 'tools/diagnostics/__init__.py': '',
+            'tools/diagnostics/diagnose_room_sections.py': '# synthetic diagnostic entry',
             'release/docker-compose.prod.yml': 'services: {}', 'release/prod.env.example': 'PLACEHOLDER=1',
             '.env': 'SYNTHETIC_SECRET=not-production', 'prod.env': 'SYNTHETIC_SECRET=not-production',
             'app/.env': 'SYNTHETIC_SECRET=not-production', 'test/prod.env': 'SYNTHETIC_SECRET=not-production',

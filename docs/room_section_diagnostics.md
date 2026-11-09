@@ -1,5 +1,7 @@
 # 房间几何断面诊断（只读）
 
+> 2026-11-09 路径整理：实现位于tools/diagnostics，推荐入口为 `python -m tools.diagnostics.diagnose_room_sections`；旧 `python -m app.diagnose_room_sections` 保留兼容。算法、参数、输出目录和物理语义门禁不变。本轮仅迁移，不需重新生成既有诊断图。
+
 > 2026-11-02 更新：本诊断工具仍保持只读，不改历史结论。Room8 后续采用用户接受的平层地板近似（参考 -1.35m），不再将真实物理地板/吊顶/墙厚完全确认作为候选裁切前置条件；后续操作见 [独立候选资产](room_candidate.md)。
 
 对应 PRD 2.2、architecture 3.2。此工具仅生成独立诊断图片/报告，不修改 F8、不裁切/保存网格、不调用视频渲染、不连接 PostgreSQL。
@@ -22,10 +24,12 @@
 ```powershell
 python -m venv .venv-diagnostics
 .\.venv-diagnostics\Scripts\python.exe -m pip install -r requirements-diagnostics.txt
-.\.venv-diagnostics\Scripts\python.exe -m app.diagnose_room_sections --data-root .\data --inspection .\data\KK-EEz16cmU14\diagnostics\room_inspection\20261031T033807Z_79b97ce7\inspection.json --blender-report .\data\KK-EEz16cmU14\diagnostics\room_inspection\20261031T033807Z_79b97ce7\remote_import_user_output.json --alignment-dir .\data\KK-EEz16cmU14\diagnostics\alignment\20261029T032340Z_177df64f
+.\.venv-diagnostics\Scripts\python.exe -m tools.diagnostics.diagnose_room_sections --data-root .\data --inspection .\data\KK-EEz16cmU14\diagnostics\room_inspection\20261031T033807Z_79b97ce7\inspection.json --blender-report .\data\KK-EEz16cmU14\diagnostics\room_inspection\20261031T033807Z_79b97ce7\remote_import_user_output.json --alignment-dir .\data\KK-EEz16cmU14\diagnostics\alignment\20261029T032340Z_177df64f
 ```
 
 requirements-diagnostics.txt 是可选绘图依赖，不改变生产镜像依赖。没有本地 Docker/服务启动。输入变化会拒绝执行，需重新核验，不能修改报告哈希绕过。
+
+新版发布包同时携带app兼容文件和tools/diagnostics的Python源码，镜像构建只放行该工具组，不包含其他tools数据。旧服务器容器在更新前仍使用原脚本，不会因本地迁移自动变化；如以后部署本批代码，应整体打包，不能只SCP一个app兼容文件。本文命令在项目根执行；未安装可选绘图库的容器仍不能生成PNG。
 
 ## 输出和读图
 

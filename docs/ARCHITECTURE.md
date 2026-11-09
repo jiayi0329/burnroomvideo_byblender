@@ -1,6 +1,6 @@
 # 系统架构：当前实现与目标边界
 
-更新：2026-11-07。需求依据：[PRD](PRD.md)。当前结构见代码映射；目标结构与接口均标为待实现。目录规范见 [PROJECT_ORGANIZATION](PROJECT_ORGANIZATION.md)，字段/路径规范见 [DATA_ASSET_SPEC](DATA_ASSET_SPEC.md)。
+更新：2026-11-09。需求依据：[PRD](PRD.md)。当前结构见代码映射；目标结构与接口均标为待实现。目录规范见 [PROJECT_ORGANIZATION](PROJECT_ORGANIZATION.md)，字段/路径规范见 [DATA_ASSET_SPEC](DATA_ASSET_SPEC.md)。
 
 ## 1. 系统目的与执行边界
 
@@ -42,6 +42,8 @@ catalog 的真实数据导入尚未完成；图中的连接表示代码已有，
 `app/room_api.py` 在 `/api/catalog` 下提供房间、点位、资产查询与资产签名；路径中的 room_id/asset_id 是数据库整数主键。数据库连接按请求建立，失败返回 503，不是后端启动的强制前置。该接口没有文件 fallback。
 
 ### 2.2 原始数据到独立房间
+
+2026-11-09目录整理：只读断面入口、断面几何和绘图实现位于tools/diagnostics，app保留兼容路径；公共来源读取/校验仍在app/room_source_io和room_source_inputs，候选裁切及F8动画不导入诊断工具。此迁移不改变高度判断或裁切策略，不表示服务器已部署新目录。
 
 | 阶段 | 当前模块 | 输入与边界 |
 | --- | --- | --- |
