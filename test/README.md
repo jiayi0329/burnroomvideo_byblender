@@ -1,5 +1,15 @@
 # 测试规范与需求追溯
 
+## 2026-11-09 第5批：Backend目录迁移
+
+新增`test_backend_migration.py`（18项），对应[PRD工程要求](../docs/PRD.md)、[架构2.1](../docs/ARCHITECTURE.md)及[目录规范第5批](../docs/PROJECT_ORGANIZATION.md)。验证7份新旧模块同一性/替换兼容、ASGI路由与启动无连库/迁移、12种CLI帮助路径、无bpy依赖、SQL原样复制/缺失及分叉拒绝、已应用校验与应用账号参数、错误脱敏、数据库失效时健康/旧分享可用、Legacy worker和工作目录，以及完整安装包/解压导入、缺文件阻断和重载目录。
+
+本地使用忽略目录下的Python3.13.3隔离环境`release/out/backend-test-env`。FastAPI0.103.1、HTTPX0.27.2、MinIO7.2.13、psycopg3.2.3等与生产固定版本相同；Pydantic使用支持本地Python的2.10.6，生产requirements.txt中的2.3.0不改。因此本地结果不能代替远端Python3.11/原依赖复验。
+
+重点命令：`release/out/backend-test-env/Scripts/python.exe -B -m unittest test.test_backend_migration test.test_room_api test.test_v6_share test.test_catalog_deployment test.test_room_database.ImportValidation -v`。50项全部通过。包含前四批的完整相关回归251项：249通过，2项跳过（真实PostgreSQL集成显式禁用、可选Matplotlib未安装）。18项新增测试全部通过；HTTP使用进程内TestClient，签名使用离线真实SDK，数据库操作使用连接替身，打包只在临时合成目录进行。
+
+没有启动服务器、Docker或Blender，没有连接真实数据库/MinIO，也未执行部署。43个原函数仅有预期导入/寻址适配；引擎39文件SHA及24份V1备份SHA不变，SQL新旧副本字节一致。数据库集成需另行显式授权；不得运行会改写真实timeline的test_api自动发现。
+
 ## 2026-11-09 第4批：引擎/配置目录落位
 
 新增`test_engine_migration.py`（15项）及AST源码定位辅助`engine_paths.py`，对应[PRD工程要求](../docs/PRD.md)、[架构2.2–2.3](../docs/ARCHITECTURE.md)和[目录规范第4批](../docs/PROJECT_ORGANIZATION.md)。检查13份兼容模块与实际实现同一性、旧接口替换、普通Python/Blender帮助替身、跨工作目录寻址、R3及新旧配置副本、引擎不导入Backend/tools、39文件指纹、旧app根参数兼容、源码变动/缺失及旧任务拒绝、worker/锁/输出路径，以及真实临时安装包、解压后导入、私有文件排除和打包失败保护。

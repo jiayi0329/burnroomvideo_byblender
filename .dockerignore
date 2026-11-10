@@ -5,6 +5,16 @@
 !requirements.txt
 !app/
 !app/**
+!backend/
+!backend/**/
+!backend/**/*.py
+!backend/db/migrations/001_rooms.sql
+backend/**/*.json
+backend/**/*.blend
+backend/**/*.glb
+backend/**/*.png
+backend/**/*.jpg
+backend/**/*.mp4
 !render_engine/
 !render_engine/**/
 !render_engine/**/*.py

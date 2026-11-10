@@ -24,6 +24,29 @@ New-Item -ItemType Directory -Path "$StagingDir/scripts" | Out-Null
 Write-Host "===> [2/4] 组装核心代码与依赖..." -ForegroundColor Cyan
 # 拷贝纯净代码，自动剔除本地缓存
 Copy-Item -Path "$ProjectRoot\app" -Destination $StagingDir -Recurse
+# Backend implementations and unchanged baseline SQL accompany all app shims.
+$BackendModules = @{
+    api = @('main', 'room_api')
+    'adapters/postgres' = @('database')
+    'adapters/minio' = @('s3_io')
+    cli = @('import_rooms', 'check_catalog')
+    services = @('observability')
+}
+$BackendFiles = @('backend/__init__.py', 'backend/paths.py', 'backend/adapters/__init__.py', 'backend/db/migrations/001_rooms.sql')
+foreach ($Group in $BackendModules.Keys) {
+    $BackendFiles += "backend/$Group/__init__.py"
+    foreach ($Module in $BackendModules[$Group]) { $BackendFiles += "backend/$Group/$Module.py" }
+}
+foreach ($Relative in $BackendFiles) {
+    $Source = Join-Path $ProjectRoot $Relative
+    if (-not (Test-Path -LiteralPath $Source -PathType Leaf)) { throw "Required backend source/migration missing: $Relative" }
+    $Destination = Join-Path $StagingDir $Relative
+    New-Item -ItemType Directory -Path (Split-Path -Parent $Destination) -Force | Out-Null
+    Copy-Item -LiteralPath $Source -Destination $Destination
+}
+if ((Get-FileHash -LiteralPath (Join-Path $ProjectRoot 'backend/db/migrations/001_rooms.sql') -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath (Join-Path $ProjectRoot 'app/db/001_rooms.sql') -Algorithm SHA256).Hash) {
+    throw 'Baseline migration differs from compatibility SQL; do not change applied migrations'
+}
 # Room8 engine is an installed package; never ship only the app shims.
 $EngineModules = @{
     blender = @('F8_prepare_room_asset', 'F8_room_demo', 'F8_room_animation', 'F8_room_fire_style', 'F8_room_helpers')

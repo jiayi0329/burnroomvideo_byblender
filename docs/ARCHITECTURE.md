@@ -35,11 +35,15 @@ catalog 的真实数据导入尚未完成；图中的连接表示代码已有，
 
 ### 2.1 Legacy 后端与对象存储
 
-`app/main.py` → `F6_detect.py` / `F7_spread.py` → `F8_blender_render.py`；`observability.py` 收敛状态与指标，`s3_io.py` 下载根资产、上传根视频并生成预签名 URL。
+第5批后：`app/main.py`兼容入口 → `backend/api/main.py` → 原app/F6、F7及旧F8-C；`backend/services/observability.py`收敛旧状态/指标，`backend/adapters/minio/s3_io.py`处理原下载/上传及预签名。worker仍为app/F8_blender_render.py，子进程工作目录仍为安装根，未切换到新版Room8引擎。
 
 实际路由包括 `/api/download_scene/{scene_code}`、`POST /api/generate_timeline/{scene_code}`、`POST /api/render/{scene_code}`、`GET /api/render/{scene_code}/status`、`GET /api/render/{scene_code}/share`、`POST /api/pipeline/{scene_code}`。它们是 Legacy 路由。旧 render 会删除场景根旧 output.mp4，不能用于新版 Room8 的网页任务或基线验证。
 
-`app/room_api.py` 在 `/api/catalog` 下提供房间、点位、资产查询与资产签名；路径中的 room_id/asset_id 是数据库整数主键。数据库连接按请求建立，失败返回 503，不是后端启动的强制前置。该接口没有文件 fallback。
+`backend/api/room_api.py`在`/api/catalog`下提供房间、点位、资产查询与资产签名；app/room_api继续兼容。路径中的room_id/asset_id仍是数据库整数主键。数据库连接按请求建立，失败返回503，不是启动强制前置；健康检查及旧分享接口不依赖数据库。没有文件fallback或新版Room8任务API。
+
+数据库连接/迁移位于backend/adapters/postgres，显式导入与核验位于backend/cli；7个app模块与新实现保持同一对象。原SQL字节复制至backend/db/migrations，保留app/db副本；执行前及打包时检查一致，仍用原迁移名/SHA核对已应用记录。包初始化不迁移、不建表、不连服务。本轮不执行数据库写入。
+
+Docker继续启动`app.main:app`，只追加backend重载监控目录；Compose、环境变量和持久化挂载不变。后端目录说明见[backend/README](../backend/README.md)。新版引擎源码清单39份保持原样，不因后端迁移改变Room8任务签名。
 
 ### 2.2 原始数据到独立房间
 

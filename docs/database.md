@@ -1,12 +1,14 @@
 # PostgreSQL 房间目录：部署与核验
 
-2026-10-30：用户已确认设计。此文档是待远端验证的操作步骤，不代表部署已完成。
+**2026-11-09第5批目录更新：** 连接/迁移实现位于backend/adapters/postgres，CLI位于backend/cli，SQL位于backend/db/migrations/001_rooms.sql；app旧模块及SQL副本继续兼容。SQL内容未改，打包和迁移前会检查副本一致性；不会在后端启动时自动执行迁移。下文旧CLI命令仍可用，但本轮不执行部署、建表、真实导入或恢复。最新完成度见[PROJECT_STATUS](PROJECT_STATUS.md)，目录关系见[Backend说明](../backend/README.md)。
+
+2026-10-30设计流程记录；数据库服务已有远端部署，真实场景导入尚未完成。第5批迁移后的代码包尚未远端复验；下列写库/恢复步骤保留供另行授权时使用。
 
 本地验证：69 项检查通过，1 项 PostgreSQL 集成检查跳过；之前建表 SQL 通过语法解析，未实际建库。本地临时 Python 3.13 使用较新 Pydantic 验证接口（原有 2.3.0 缺少该 Python 版本的轮子），生产 requirements 中的原有版本未改，远端原环境仍须执行集成验证。PowerShell 脚本检查语法和 BOM，并在临时合成目录测试真实打包及模拟失败；未对项目执行部署，未启动 Docker 或远端备份/恢复。
 
 ## 数据边界
 
-八张业务表见 `app/db/001_rooms.sql`，迁移记录另存 `schema_migrations`。PostgreSQL 16 只在 Compose 内部监听，图片/模型留在 MinIO 或已有工作目录。运行状态仍以 render_status.json 为准，render_jobs/render_job_assets 本轮仅建表预留，不自动同步、不替代现有渲染流程。后续完整任务历史需独立任务目录，旧 output.mp4 不自动归入客厅。
+八张业务表见`backend/db/migrations/001_rooms.sql`，`app/db/001_rooms.sql`为原样兼容副本，迁移记录另存`schema_migrations`。PostgreSQL16只在Compose内部监听，图片/模型留在MinIO或已有工作目录。运行状态仍以文件JSON为准，render_jobs/render_job_assets未自动同步、不替代渲染流程；旧output.mp4不自动归入客厅。
 
 导入的相机坐标若发生变化，当前工具拒绝覆盖，需先设计明确的场景修订；户型/核验内容变化则生成新户型版本。重复导入相同输入与核验时复用版本，保留已有人工结果和房间名称。新增核验文件会创建新版本，不修改旧版本。未人工确认的点位仍是算法候选，接口的 review_kind 为空。
 

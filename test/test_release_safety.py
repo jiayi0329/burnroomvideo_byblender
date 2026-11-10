@@ -11,6 +11,7 @@ import tarfile
 import tempfile
 import unittest
 from render_engine.paths import CODE_FILES
+from backend.paths import PACKAGE_FILES
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -44,6 +45,11 @@ class ReleaseSafety(unittest.TestCase):
             if not path.exists():
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_text('# synthetic engine fixture', encoding='utf-8')
+        for relative in PACKAGE_FILES:
+            path = self.root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('# synthetic backend fixture', encoding='utf-8')
+        (self.root/'app/db/001_rooms.sql').write_bytes((self.root/'backend/db/migrations/001_rooms.sql').read_bytes())
         shutil.copyfile(ROOT / '.dockerignore', self.root / '.dockerignore')
 
     def run_ps(self, command: str) -> subprocess.CompletedProcess:

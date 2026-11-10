@@ -10,6 +10,7 @@
 | Room8 V1版本、视频、耗时和归档 | [RELEASES](RELEASES.md) |
 | 目标目录、逐组映射、迁移前提 | [PROJECT_ORGANIZATION](PROJECT_ORGANIZATION.md) |
 | 第4批引擎目录、完整代码包与兼容边界 | [room_engine_migration](room_engine_migration.md) |
+| 第5批Backend实际目录、API/CLI与SQL兼容边界 | [backend/README](../backend/README.md) |
 | 编号、路径、数据库/MinIO对应关系 | [DATA_ASSET_SPEC](DATA_ASSET_SPEC.md) |
 
 ## 操作资料与适用范围

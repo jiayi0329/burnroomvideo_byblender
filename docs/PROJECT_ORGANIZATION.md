@@ -1,6 +1,6 @@
 # 项目职责目录与渐进迁移规范
 
-更新：2026-11-09。**第1–4批已完成本地整理；Backend和其余工具/测试部署目录仍为计划。** app旧入口、test、release继续保留，不创建前后端骨架或删除Legacy源码。架构依据见[ARCHITECTURE](ARCHITECTURE.md)。
+更新：2026-11-09。**第1–5批已完成本地整理；其余工具与测试/部署目录仍为计划。** app旧入口、test、release继续保留，不创建前端骨架或删除Legacy源码。架构依据见[ARCHITECTURE](ARCHITECTURE.md)。
 
 ## 1. 两个分类维度
 
@@ -56,12 +56,11 @@ release/                       # 当前发布入口，暂不改成 deploy/
 
 | 当前文件/文件组 | 用途与职责 | 目标位置与前提 |
 | --- | --- | --- |
-| app/main.py | Legacy API 与编排，仍使用 | 先保留；未来 Backend 的 Legacy 兼容路由，不能整体当新版 jobs API |
-| app/room_api.py | 内部数据库目录查询 | backend/api/；现有整数 room_id 与新业务 ID 需明确转换 |
-| app/database.py、app/db/001_rooms.sql | 数据库连接及显式迁移 | backend/adapters/postgres/、backend/db/migrations/；已应用迁移文件不得改写 |
-| app/import_rooms.py、app/check_catalog.py | 导入/只读核验 CLI | backend/cli/；前者依赖 analyze_floorplan，仍被 inspect 间接复用 |
-| app/s3_io.py | Legacy MinIO 适配 | backend/adapters/minio/；保留旧 key 兼容，新增版本 key 另写适配 |
-| app/observability.py | Legacy 文件状态与GPU监控 | 先保留；未来按旧编排与引擎监控边界提取公共部分 |
+| app/main.py、app/room_api.py | API兼容模块，ASGI入口保留 | 实现已迁backend/api；保留Legacy/catalog，不是新版jobs API |
+| app/database.py、app/db/001_rooms.sql | 连接/迁移兼容模块与SQL副本 | 实现已迁backend/adapters/postgres，SQL原样复制至backend/db/migrations；新旧副本不一致则拒绝 |
+| app/import_rooms.py、app/check_catalog.py | 导入/只读核验兼容CLI | 实现已迁backend/cli；依然延迟连库，build_plan被inspect间接复用 |
+| app/s3_io.py | MinIO兼容模块 | 实现已迁backend/adapters/minio；原key/签名不变，新版登记另行开发 |
+| app/observability.py | Legacy日志/状态/GPU监控兼容模块 | 实现已迁backend/services；未与新版引擎监控合并 |
 | app/F6_detect.py | 烧损图像与起火点分析；旧 main 及测试调用 | render_engine/analysis/；保持评分语义，不顺便修改起火点选择 |
 | app/F7_spread.py | 旧传播；旧 main 及测试调用 | render_engine/propagation/；保留旧 BFS 语义，不与房间 BFS 混写 |
 | app/run_room_animation.py、app/room_animation_job.py | 兼容入口；启动/锁/编码/状态/续跑实现 | 已迁入render_engine/jobs；安装根寻址及完整源码指纹已适配 |
@@ -99,7 +98,7 @@ release/                       # 当前发布入口，暂不改成 deploy/
 | 现有约束与证据 | 迁移必须满足的条件 |
 | --- | --- |
 | build.ps1/.dockerignore已包含tools诊断源码及新版引擎/命名预设 | 打包只复制20份命名引擎Python及3份预设；缺失或配置分叉即失败，安装包/解压导入需测试 |
-| Dockerfile:36 启动 app.main:app，reload路径仍为 /app/app | 保留兼容入口，直到部署启动命令与相关路径一起通过验证；不提前移走 main |
+| Dockerfile启动app.main:app，reload监控app及backend | 保留兼容入口；仅增加新源码监控，不改服务、端口、挂载或生产依赖 |
 | 新Blender入口和兼容脚本从自身位置加入安装根，使用包导入 | 普通Python/Blender的导入与帮助替身均检查；不能再单文件上传/tmp |
 | render_engine.paths统一列出39份源码/预设，静帧和动画共用 | 覆盖包初始化、路径模块、兼容脚本及新旧配置；缺失/改动拒绝，不给旧任务改签名 |
 | run_room_animation.py:151 由 points 路径推导共享锁根，worker会核对同一锁 | 目录整理不得把点位移到另一层缓存而造成多个锁根；本阶段保持数据路径不变，未来改动须显式设计共享锁位置 |
@@ -114,7 +113,7 @@ release/                       # 当前发布入口，暂不改成 deploy/
 | 2 | 三个断面工具迁入tools/diagnostics | 已完成；兼容入口、CLI与安装包 |
 | 3 | app内提取B/D/E共用Blender辅助 | 本地实现；UV/材质/坐标、相机、源码指纹、旧接口与打包；未远端渲染 |
 | 4 | 新版Room8引擎及配置迁入render_engine/configs | 本地实现；13个app兼容模块、默认R3、worker、打包/镜像上下文与完整指纹已适配；未远端部署/渲染 |
-| 5 | Backend API、数据库工具和MinIO适配分组整理 | 待执行；保留Legacy，不导入真实数据 |
+| 5 | Backend API、数据库工具和MinIO适配分组整理 | 本地实现；7份兼容模块、原样SQL、完整打包与API回归；未导入数据或远端部署 |
 | 6 | 其余诊断/集成工具逐组迁移 | 待执行；核对引用与历史依据，不直接删除Z轴工具 |
 | 7 | 测试/部署目录收尾及稳定性审阅 | 待执行；旧发布入口兼容，全量相关回归后审阅main合并 |
 
@@ -135,3 +134,5 @@ release/                       # 当前发布入口，暂不改成 deploy/
 第1批已在app内提取room_source_io与room_source_inputs，保留旧函数名，新增两份测试。2026-11-09第2批将diagnose_room_sections、room_section_geometry、room_section_plots实现迁至tools/diagnostics；app保留共享模块对象的兼容入口，打包和镜像上下文只增加这组Python源码。既有高度、裁切与F8动画算法不动；安装包内容/解压导入、旧CLI和相关离线回归分别检查。服务器尚未部署本次迁移。
 
 第4批已按用户授权迁移13个新版实现，保留全部app兼容入口；旧F8-C和Backend未移动。默认预设及完整源码清单按安装根寻址，打包/镜像上下文同批适配。205项相关离线回归中204通过、1项可选绘图库测试跳过；实际GPU未重渲染。剩余第5–7批仍逐批实施，不因本批完成而批量移动其他代码。
+
+第5批已迁移7个Backend实现，保留app入口和原SQL副本；15份后端Python及1份SQL纳入打包，SQL内容不变，增加缺失/副本不一致阻断。ASGI入口仍app.main:app，仅增加backend热重载路径。251项相关回归249通过、2项跳过，真实数据库/远端部署未执行。Room8引擎及其源码指纹完全不改。剩余第6–7批继续分批审核，不删除Z轴工具或混入新网页功能。
