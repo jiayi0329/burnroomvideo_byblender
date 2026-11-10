@@ -13,4 +13,8 @@ def source_path(name: str) -> Path:
         return ROOT/'render_engine'/group/(stem+'.py')
     if stem in BACKEND_MODULES:
         return ROOT/'backend'/BACKEND_MODULES[stem]/(stem+'.py')
+    if stem in ('analyze_floorplan','inspect_room_asset','probe_floorplan'):
+        return ROOT/'tools/diagnostics'/(stem+'.py')
+    if stem == 'F8_inspect_room_import':
+        return ROOT/'tools/diagnostics/blender/F8_inspect_room_import.py'
     return ROOT/'app'/name

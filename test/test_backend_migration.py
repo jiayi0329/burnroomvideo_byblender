@@ -224,6 +224,8 @@ class BackendPackage(unittest.TestCase):
         for name in names:
             target=self.root/name;target.parent.mkdir(parents=True,exist_ok=True)
             shutil.copyfile(ROOT/name,target)
+        shutil.copyfile(ROOT/'render_engine/geometry/floorplan_alignment.py',
+                        self.root/'render_engine/geometry/floorplan_alignment.py')
 
     def test_package_contains_backend_sql_and_imports_asgi_from_extracted_install(self) -> None:
         for name in ('backend/api/private.json','backend/cli/.env','backend/services/video.mp4','backend/db/migrations/private.sql'):

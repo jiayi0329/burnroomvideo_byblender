@@ -53,7 +53,7 @@ $EngineModules = @{
     jobs = @('run_room_animation', 'room_animation_job')
     effects = @('room_fire_config')
     propagation = @('room_demo_plan')
-    geometry = @('room_source_io', 'room_source_inputs', 'room_clip_geometry', 'prepare_room_candidate')
+    geometry = @('room_source_io', 'room_source_inputs', 'room_clip_geometry', 'prepare_room_candidate', 'floorplan_alignment')
 }
 $EngineFiles = @('render_engine/__init__.py', 'render_engine/paths.py')
 foreach ($Group in $EngineModules.Keys) {
@@ -78,10 +78,22 @@ foreach ($Revision in 1, 2, 3) {
     New-Item -ItemType Directory -Path (Split-Path -Parent $Destination) -Force | Out-Null
     Copy-Item -LiteralPath $Source -Destination $Destination
 }
-# Include only the diagnostics package Python sources, never other tool data.
-New-Item -ItemType Directory -Path "$StagingDir/tools/diagnostics" | Out-Null
-Copy-Item -LiteralPath "$ProjectRoot/tools/__init__.py" -Destination "$StagingDir/tools/__init__.py"
-Copy-Item -Path "$ProjectRoot/tools/diagnostics/*.py" -Destination "$StagingDir/tools/diagnostics"
+# Explicit diagnostic sources only. Manual integration tools are not production code.
+$DiagnosticFiles = @(
+    'tools/__init__.py', 'tools/diagnostics/__init__.py',
+    'tools/diagnostics/diagnose_room_sections.py',
+    'tools/diagnostics/room_section_geometry.py', 'tools/diagnostics/room_section_plots.py',
+    'tools/diagnostics/analyze_floorplan.py', 'tools/diagnostics/inspect_room_asset.py',
+    'tools/diagnostics/probe_floorplan.py', 'tools/diagnostics/blender/__init__.py',
+    'tools/diagnostics/blender/F8_inspect_room_import.py'
+)
+foreach ($Relative in $DiagnosticFiles) {
+    $Source = Join-Path $ProjectRoot $Relative
+    if (-not (Test-Path -LiteralPath $Source -PathType Leaf)) { throw "Required diagnostic source missing: $Relative" }
+    $Destination = Join-Path $StagingDir $Relative
+    New-Item -ItemType Directory -Path (Split-Path -Parent $Destination) -Force | Out-Null
+    Copy-Item -LiteralPath $Source -Destination $Destination
+}
 if (Test-Path "$StagingDir\app\__pycache__") {
     $CachePath = (Resolve-Path -LiteralPath "$StagingDir\app\__pycache__").Path
     if ($CachePath -ne [IO.Path]::GetFullPath("$StagingDir\app\__pycache__")) { throw "非预期缓存目录" }

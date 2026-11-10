@@ -23,6 +23,7 @@ from tools.diagnostics import diagnose_room_sections as diagnostic
 from tools.diagnostics import room_section_plots as plots
 from test import test_release_safety as release
 from test import test_room_sections as fixtures
+from test.tool_paths import DIAGNOSTIC_FILES
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULES = ('diagnose_room_sections', 'room_section_geometry', 'room_section_plots')
@@ -174,9 +175,7 @@ class DiagnosticsPackage(unittest.TestCase):
         extracted = self.root / 'extracted'
         with tarfile.open(package) as archive:
             names = set(archive.getnames())
-            expected = {'burnroom-deploy-package/tools/__init__.py',
-                        'burnroom-deploy-package/tools/diagnostics/__init__.py'}
-            expected.update('burnroom-deploy-package/tools/diagnostics/' + name + '.py' for name in MODULES)
+            expected = {'burnroom-deploy-package/' + name for name in DIAGNOSTIC_FILES}
             self.assertEqual({n for n in names if n.startswith('burnroom-deploy-package/tools/') and n.endswith('.py')}, expected)
             for name in names:
                 if name.startswith('burnroom-deploy-package/tools/'):

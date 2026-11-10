@@ -12,6 +12,7 @@ import tempfile
 import unittest
 from render_engine.paths import CODE_FILES
 from backend.paths import PACKAGE_FILES
+from test.tool_paths import DIAGNOSTIC_FILES
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -50,6 +51,10 @@ class ReleaseSafety(unittest.TestCase):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text('# synthetic backend fixture', encoding='utf-8')
         (self.root/'app/db/001_rooms.sql').write_bytes((self.root/'backend/db/migrations/001_rooms.sql').read_bytes())
+        for relative in DIAGNOSTIC_FILES:
+            path = self.root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('# synthetic diagnostic fixture', encoding='utf-8')
         shutil.copyfile(ROOT / '.dockerignore', self.root / '.dockerignore')
 
     def run_ps(self, command: str) -> subprocess.CompletedProcess:

@@ -31,6 +31,6 @@ python -m backend.adapters.postgres.database --help
 
 初始化包不连接服务。数据库连接仍延迟到请求或显式CLI调用；不可用时catalog返回503，健康检查和既有视频分享不依赖数据库。MinIO配置名、桶/key、7天签名及错误脱敏不变；新版Room8视频并未因此自动登记。
 
-引擎不反向导入Backend，也不导入bpy到后端。旧import_rooms仍复用app/analyze_floorplan的离线校验；inspect诊断仍通过兼容入口读取build_plan，不会自动连库。该上游工具依赖留待第6批核对，不在本轮重构算法。
+引擎不反向导入Backend，也不导入bpy到后端。第6批后import_rooms直接复用render_engine/geometry/floorplan_alignment的只读分析，不再导入诊断CLI；inspect诊断仍复用纯build_plan，不会自动连库。分析算法、SQL与导入事务不变。
 
 发布包增加15份后端Python及1份原样SQL，保留app入口；不携带后端目录内的私有JSON、视频、env或额外SQL。必须使用完整包，不能单独覆盖app兼容文件。部署、数据库持久化和MinIO对象均未改动。

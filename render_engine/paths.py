@@ -23,6 +23,7 @@ MODULE_LOCATIONS = {
 }
 CODE_FILES = (
     'render_engine/__init__.py', 'render_engine/paths.py',
+    'render_engine/geometry/floorplan_alignment.py',
     *(f'render_engine/{group}/__init__.py' for group in
       ('blender', 'jobs', 'effects', 'propagation', 'geometry')),
     *(f'render_engine/{group}/{name}.py' for name, group in MODULE_LOCATIONS.items()),

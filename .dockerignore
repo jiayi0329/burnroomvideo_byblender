@@ -35,6 +35,8 @@ render_engine/**/*.mp4
 !tools/__init__.py
 !tools/diagnostics/
 !tools/diagnostics/*.py
+!tools/diagnostics/blender/
+!tools/diagnostics/blender/*.py
 # Re-exclude secrets/caches even if accidentally placed inside allowed directories.
 **/.env
 **/.env.*

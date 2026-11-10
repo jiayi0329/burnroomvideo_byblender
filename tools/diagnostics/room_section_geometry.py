@@ -9,7 +9,7 @@ import math
 from statistics import median
 from typing import Any
 
-from app.analyze_floorplan import contains, edges
+from render_engine.geometry.floorplan_alignment import contains, edges
 
 
 def cross(a: list | tuple, b: list | tuple) -> float:

@@ -32,7 +32,7 @@ python -m app.inspect_room_asset --scene KK-EEz16cmU14 --room Room8 --data-root 
 本地 PowerShell：
 
 ```text
-scp -P 7777 .\app\F8_inspect_room_import.py zhaojy@172.25.76.201:/tmp/burnroom_room_import_check.py
+scp -P 7777 .\tools\diagnostics\blender\F8_inspect_room_import.py zhaojy@172.25.76.201:/tmp/burnroom_room_import_check.py
 scp -P 7777 .\data\KK-EEz16cmU14\diagnostics\room_inspection\实际检查目录\inspection.json zhaojy@172.25.76.201:/tmp/burnroom_room_inspection.json
 ```
 

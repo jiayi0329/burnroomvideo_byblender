@@ -43,7 +43,7 @@ catalog 的真实数据导入尚未完成；图中的连接表示代码已有，
 
 数据库连接/迁移位于backend/adapters/postgres，显式导入与核验位于backend/cli；7个app模块与新实现保持同一对象。原SQL字节复制至backend/db/migrations，保留app/db副本；执行前及打包时检查一致，仍用原迁移名/SHA核对已应用记录。包初始化不迁移、不建表、不连服务。本轮不执行数据库写入。
 
-Docker继续启动`app.main:app`，只追加backend重载监控目录；Compose、环境变量和持久化挂载不变。后端目录说明见[backend/README](../backend/README.md)。新版引擎源码清单39份保持原样，不因后端迁移改变Room8任务签名。
+Docker继续启动`app.main:app`，监控app/backend源码；Compose、环境变量和挂载不变。第6批Backend的对齐分析改为直接依赖只读Core，不导入tools；其余后端行为不变。目录说明见[backend/README](../backend/README.md)。
 
 ### 2.2 原始数据到独立房间
 
@@ -51,7 +51,7 @@ Docker继续启动`app.main:app`，只追加backend重载监控目录；Compose�
 
 | 阶段 | 当前模块 | 输入与边界 |
 | --- | --- | --- |
-| 户型探测/对齐 | probe_floorplan、analyze_floorplan | 私有探测数据；算法归属与人工 review 分开，绑定指纹 |
+| 户型探测/对齐 | tools/diagnostics/probe_floorplan、analyze_floorplan；render_engine/geometry/floorplan_alignment | Core只读解析/分析；tools写报告，算法归属与人工review分开 |
 | 裁切准备 | render_engine/geometry | 已核验多边形；三角面裁切插值保留 UV、XYZ、材质归属 |
 | 独立资产 | render_engine/blender/F8_prepare_room_asset（F8-B） | 复用通过验证的OBJ导入轴向，保存blend后重开核验，再导出GLB |
 | 展示/静帧 | render_engine/blender/F8_room_demo（F8-D）、propagation/room_demo_plan | 在基础资产上派生低墙/去顶展示副本，基础墙顶保持原样 |
@@ -64,7 +64,7 @@ Room8 使用 11 顶点多边形、零外扩，源房间 6,835 个三角形，独
 
 第3批提取B/D/E辅助后，第4批将实现迁入`render_engine/{geometry,propagation,effects,blender,jobs}`，旧app函数名/CLI继续兼容；E不导入D/B入口，普通Python不导入bpy。默认配置按安装位置读取`configs/render/room_fire_round3.json`，与工作目录无关，旧app JSON保留原样兼容副本。
 
-`render_engine.paths.CODE_FILES`统一覆盖20份引擎Python、13份兼容入口与6份预设/兼容副本，共39份文件；静帧和动画均使用。预检接受安装根或旧app目录。源码/配置缺失时拒绝新任务；变动后拒绝旧任务续跑。R3、火烟算法及历史任务不改，复现V1使用归档代码。完整包操作见[迁移说明](room_engine_migration.md)，不能再平铺上传几个脚本。
+第6批将18个共用读取/解析/分析函数提取到floorplan_alignment，工具输出仍位于tools。`render_engine.paths.CODE_FILES`随之增加该Core，现为21份引擎Python、13份兼容入口与6份预设/兼容副本，共40份。预检接受安装根或旧app目录；缺失/改动拒绝，不能重签旧任务。R3、火烟和裁切算法不变，复现V1使用归档代码。完整包操作见[迁移说明](room_engine_migration.md)。
 
 ```mermaid
 flowchart LR

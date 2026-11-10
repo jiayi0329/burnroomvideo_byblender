@@ -1,5 +1,7 @@
 # app 脚本索引
 
+**2026-11-10第6批：** analyze_floorplan、inspect_room_asset、probe_floorplan和F8_inspect_room_import现为tools兼容入口。共用18个分析函数位于render_engine/geometry/floorplan_alignment，Backend直接复用Core；Z轴/高度和断面工具全部保留。实际文件及手工联网限制见[tools说明](../tools/README.md)。不能单独复制app兼容脚本到/tmp运行。
+
 **2026-11-09第4–5批更新：** 下表保留旧名称与职责。13份新版引擎模块为兼容入口，实际实现见[引擎目录](../render_engine/README.md)；main、room_api、database、s3_io、import_rooms、check_catalog、observability共7份同样为兼容模块，实际位置见[Backend目录](../backend/README.md)。F6/F7和旧F8-C仍在app。默认预设读取configs/render，旧app JSON及SQL保留字节一致副本。必须用完整安装包，不能单独上传兼容脚本覆盖容器。
 
 保留现有API和app兼容路径；已迁移工具的实际位置见下表。F8文件必须在远端Blender内执行，不能用普通Python直接运行，也不能由后端import。

@@ -1,5 +1,13 @@
 # 测试规范与需求追溯
 
+## 2026-11-10 第6批：诊断与手工集成工具迁移
+
+新增`test_tools_migration.py`（16项），对应[PRD工程要求](../docs/PRD.md)、[架构工具边界](../docs/ARCHITECTURE.md)及[目录规范第6批](../docs/PROJECT_ORGANIZATION.md)。验证4份新旧模块同一性、公共函数导出及旧CLI替换兼容、12条普通CLI帮助路径、Blender帮助替身、导入无网络/连库/写入、共享核心只读且不反向依赖Backend/tools、合成对齐/高度结果与输入保护、40文件指纹变更拒绝、手工API显式开关/凭证缺失/假响应脱敏，以及完整临时安装包和缺少必需工具/核心时阻断。旧包装测试更新实际文件清单，保留原断言。
+
+重点命令：`release/out/backend-test-env/Scripts/python.exe -B -m unittest test.test_tools_migration -v`。16项全部通过。包含前五批、诊断、API、资产、静帧、动画、GPU守卫和发布保护的完整相关回归279项：277通过、2项跳过（真实PostgreSQL集成显式禁用、可选Matplotlib缺少）。使用前述Python3.13隔离环境，生产依赖不改，仍需远端原环境复验。
+
+实际网络全部使用假响应；未运行Blender/GPU/真实诊断、数据库、Docker或部署。模拟进程的出片日志不代表新视频。原算法函数AST与备份核对，原火烟/传播/裁切与R3配置、24份V1备份SHA保持不变。新增分析核心导致源码清单从39扩为40，测试确认旧签名任务拒绝续跑。手工工具不自动执行，不得将test_api或真实服务探测纳入无授权的全仓库自动发现。
+
 ## 2026-11-09 第5批：Backend目录迁移
 
 新增`test_backend_migration.py`（18项），对应[PRD工程要求](../docs/PRD.md)、[架构2.1](../docs/ARCHITECTURE.md)及[目录规范第5批](../docs/PROJECT_ORGANIZATION.md)。验证7份新旧模块同一性/替换兼容、ASGI路由与启动无连库/迁移、12种CLI帮助路径、无bpy依赖、SQL原样复制/缺失及分叉拒绝、已应用校验与应用账号参数、错误脱敏、数据库失效时健康/旧分享可用、Legacy worker和工作目录，以及完整安装包/解压导入、缺文件阻断和重载目录。

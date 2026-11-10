@@ -99,7 +99,7 @@ class InspectionWorkflow(unittest.TestCase):
 
 class BlenderDiagnosticBoundary(unittest.TestCase):
     def test_script_has_no_render_cut_or_blend_save_calls(self) -> None:
-        path = Path(__file__).resolve().parents[1] / 'app/F8_inspect_room_import.py'
+        path = Path(__file__).resolve().parents[1] / 'tools/diagnostics/blender/F8_inspect_room_import.py'
         source = path.read_text(encoding='utf-8')
         tree = ast.parse(source)
         calls = [ast.unparse(node.func) for node in ast.walk(tree) if isinstance(node, ast.Call)]

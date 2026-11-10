@@ -13,7 +13,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from app.analyze_floorplan import analyze, resolve_source, sha256
+from render_engine.geometry.floorplan_alignment import analyze, resolve_source, sha256
 
 
 def build_plan(scene_dir: Path, probe_dir: Path, alignment_dir: Path, review_file: Path | None) -> dict:
