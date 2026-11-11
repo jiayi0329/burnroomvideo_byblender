@@ -1,20 +1,18 @@
-# 发布实现与兼容入口
+# 发布实现与执行边界
 
-> 2026-11-11：结束兼容期，release受跟踪脚本/模板已删除。只使用deploy/scripts/build.ps1、deploy.ps1和本目录模板；输出仍在忽略的release/out，原备份不删除。下文第7批双副本约定已被替代。构建只读取backend/database SQL及configs/render预设，固定指纹保护不依赖旧副本。当前见[正式路径](../docs/canonical_paths.md)。
+只使用deploy/scripts和本目录生产/GPU模板；release源码及兼容副本已移除。根Dockerfile/开发Compose仍有效，服务、端口、GPU风格和数据盘不因文档整理改变。逐文件用途见[根清单](../README.md#完整文件清单)。
 
-2026-11-10第7批。正式实现位于`deploy/scripts/{build.ps1,deploy.ps1,prepare_deploy.sh}`；生产/GPU模板及无密钥示例位于本目录。根Dockerfile和开发docker-compose.yml仍为有效入口，不移动、不改部署拓扑。
-
-旧的`release/scripts/build.ps1`和`deploy.ps1`只转调新实现，原命令继续可用；输出仍在被Git忽略的`release/out/`。`release/`下三个模板及prepare_deploy.sh保留兼容副本，打包比较字节SHA，不一致或缺失即停止。修改模板/保护脚本时须同步副本；真实prod.env仍仅存在于服务器，不用本地模板覆盖。
-
-| 位置 | 操作与边界 |
+| 位置 | 操作 |
 | --- | --- |
-| 本地PowerShell | 离线回归：`python -B -m tests.run_regression`；打包：`.\release\scripts\build.ps1`或`.\deploy\scripts\build.ps1` |
-| 本地PowerShell，另行确认后 | `.\release\scripts\deploy.ps1`或`.\deploy\scripts\deploy.ps1`会连接SSH/SCP、备份并解压；本轮不执行 |
-| WinSCP | 以后需要时手工传输安装包/下载产物，不编辑远端源码，不覆盖数据盘 |
-| 远程SSH，另行确认后 | 进入既有Compose目录；独立安装包帮助检查按[引擎说明](../docs/room_engine_migration.md)；构建/重建/数据库导入不随本次迁移自动执行 |
+| 本地PowerShell项目根 | python -B -m tests.run_regression；.\deploy\scripts\build.ps1打包到release/out |
+| 本地PowerShell，另行安排 | .\deploy\scripts\deploy.ps1通过SSH/SCP上传、备份/检查、解压；不是启动服务或自动获准部署 |
+| WinSCP | 传唯一版本包和核验输入、下载产物，不远端改源码/覆盖数据 |
+| 远程SSH | 进入既有Compose目录，安排完整包验收或明确的镜像/服务升级；独立包步骤见[动画指南](../docs/rendering/animation.md#完整代码包与执行位置) |
 
-prepare_deploy在任何备份/解压前只读核对旧render_status和房间render_jobs状态；created/preparing/rendering/encoding会阻断，损坏JSON也会失败。历史状态过期时需人工核对，不自动删除状态或强行放行。该检查不是原子调度锁；维护期间仍须暂停提交新任务，避免检查后又启动渲染。
+打包只复制明确Backend/引擎/诊断源码、三份预设、SQL和测试源码；固定SHA保护批准SQL/预设，排除env/密钥/私有产物。PowerShell保留BOM，Shell为LF，外部命令失败停止；旧release/out备份不删除、不移动。
 
-打包保留Backend、引擎、诊断和原SQL/R3校验，新增tests入口必需文件检查；test/tests只收Python和README，不带PNG/JSON/模型/缓存。生产包不是完整开发仓库，不携带本地发布工具及真实数据；发布回归应在完整源码检出中执行，而不是声称所有本地PowerShell测试都能在Linux运行镜像里执行。
+prepare_deploy在备份前只读检查Legacy running及房间created/preparing/rendering/encoding；损坏JSON也停止。过期状态人工核对，不自动删除。检查与部署之间仍有竞争窗口，维护期须冻结新任务，不能宣称有全局原子调度。
 
-本轮没有运行Docker、部署、数据库或Blender。Windows离线验证不替代远端原Python/依赖、NVIDIA库和实际GPU验收；Room8 V1及旧任务不因目录整理重签续跑。下一步合并审阅见[收尾说明](../docs/migration_closeout.md)。
+现有保护会保存部署代码/配置、旧镜像标签、根视频及相应数据库备份条件；它不等于对所有新版Room8资产/帧做完整异地备份。V1私有归档范围见[发布记录](../docs/RELEASES.md)，数据库备份/恢复另验收。回退代码不清空数据库或数据盘。
+
+本轮没有构建/启动Docker、SSH、数据库或Blender。Linux原环境/GPU验收须后续安排；生产包不是完整开发仓库，Windows发布回归在完整源码检出执行。

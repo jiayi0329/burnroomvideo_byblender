@@ -1,144 +1,34 @@
-# 项目职责目录与渐进迁移规范
+# 当前目录分类与依赖规则
 
-2026-11-11后续用户决定：结束以下七批的兼容保留阶段。正式源码只使用backend/render_engine/tools/deploy/tests，移除app/release源码及test旧包，SQL改为backend/database。下面映射表中的“保留旧入口/副本”记录分批迁移过程，不再是当前执行约束。最新路径和边界见[正式说明](canonical_paths.md)。
+更新：2026-11-11。只保留新路径，没有app、release源码或test旧包。逐文件用途以[根README](../README.md)为准；七批兼容与去重过程在[历史记录](archive/20261111_process/engineering_history.md)，不再要求保留副本。
 
-更新：2026-11-10。**第1–7批已完成本地目录整理；远端复验与main合并仍待单独审阅。** app旧入口、test用例实体、release兼容入口继续保留，不创建前端骨架或删除Legacy源码。架构依据见[ARCHITECTURE](ARCHITECTURE.md)。
+## 分类标准
 
-## 1. 两个分类维度
+职责分Backend、Engine、Tools、Tests、Deploy、配置、文档；用途分实际实现、Legacy、诊断、测试、公共预设、历史资料和私有产物。不因文件名带diagnose删除，不因可传房间ID宣称多房间已验证。
 
-Frontend/Backend/Render Engine 是职责；运行代码、测试配置、诊断、历史资料、生成产物是用途。同一份几何函数可以被运行与诊断同时使用，不能因为文件名带 diagnose 就认定可删除。
-
-| 用途 | 处理原则 |
-| --- | --- |
-| 正式运行 | 保留；迁移须保留入口、导入与部署兼容 |
-| 测试/公共配置 | 与被测模块一同维护；R1/R2 仍用于回归，R3 冻结 |
-| 辅助诊断 | 先拆正式链路依赖，再迁移 tools/diagnostics |
-| 历史资料 | 原样归档并标明日期；过期指令不继续执行 |
-| 可再生产物 | 放私有 data/ 或 release/out/，不提交模型/视频/真实诊断 |
-| 待确认删除 | 只有引用、测试、文档、部署与历史依据均核对后再审阅 |
-| Legacy | 旧系统仍有调用，不能与新版互相替换或直接删除 |
-
-## 2. 目标结构（已落地部分见映射表）
-
-```text
-frontend/
-  src/{pages,components,api,types}/
-backend/
-  api/{rooms,jobs,assets}/
-  services/                    # 参数/任务/交付编排
-  repositories/                # 关系目录抽象
-  adapters/{files,postgres,minio}/
-  cli/                         # 显式导入/核验
-  db/migrations/
-render_engine/
-  analysis/                    # 烧损图像/起火点分析，独立于传播算法
-  geometry/                    # OBJ/UV、多边形裁切、未来高度候选
-  propagation/                 # 点位拓扑与房间 BFS
-  effects/                     # 纯参数/几何生成
-  blender/                     # bpy 专用入口及节点/镜头辅助
-  jobs/                        # 普通 Python launcher、状态、编码、GPU监控
-tools/
-  diagnostics/                 # 非正式流程检查、断面图与API探测
-  integration/                 # 需明确环境的手工集成检查
-tests/{backend,engine,tools,deploy}/ # 分组入口已落地，旧test用例实体继续复用
-configs/{render,schemas}/       # 公共预设；数据契约模式待落地
-docs/                          # 当前需求、架构、状态、运行手册
-  archive/                     # 不可当成当前操作指南
-deploy/                        # 发布脚本/生产模板已落地；根Dockerfile/开发Compose保留
-app/                           # 过渡保留，含新版及Legacy入口
-test/                          # 原用例/替身及旧unittest模块路径
-release/                       # 兼容入口/模板副本及原out目录
-```
-
-`configs/schemas/` 为以后实现请求校验的目标位置，本轮 Markdown 示例不等于已实现 JSON Schema。职责拆分不承诺同时拆镜像、服务或引入任务队列。
-
-目标依赖方向：Frontend 通过 API 访问 Backend；Backend 通过文件契约和普通 Python 启动器调用 Render Engine；tools 可以使用引擎纯函数，Render Engine 不反向导入 tools 或 Backend。普通 Python 端不能导入 render_engine/blender 中的 bpy 模块。数据库 CLI 与引擎都需要的读取/变换逻辑归纯函数层，不再放在带业务编排的导入 CLI 内。
-
-## 3. 当前文件到目标位置
-
-| 当前文件/文件组 | 用途与职责 | 目标位置与前提 |
+| 目录 | 当前职责 | 边界 |
 | --- | --- | --- |
-| app/main.py、app/room_api.py | API兼容模块，ASGI入口保留 | 实现已迁backend/api；保留Legacy/catalog，不是新版jobs API |
-| app/database.py、app/db/001_rooms.sql | 连接/迁移兼容模块与SQL副本 | 实现已迁backend/adapters/postgres，SQL原样复制至backend/db/migrations；新旧副本不一致则拒绝 |
-| app/import_rooms.py、app/check_catalog.py | 导入/只读核验兼容CLI | 实现已迁backend/cli；依然延迟连库，build_plan被inspect间接复用 |
-| app/s3_io.py | MinIO兼容模块 | 实现已迁backend/adapters/minio；原key/签名不变，新版登记另行开发 |
-| app/observability.py | Legacy日志/状态/GPU监控兼容模块 | 实现已迁backend/services；未与新版引擎监控合并 |
-| app/F6_detect.py | 烧损图像与起火点分析；旧 main 及测试调用 | render_engine/analysis/；保持评分语义，不顺便修改起火点选择 |
-| app/F7_spread.py | 旧传播；旧 main 及测试调用 | render_engine/propagation/；保留旧 BFS 语义，不与房间 BFS 混写 |
-| app/run_room_animation.py、app/room_animation_job.py | 兼容入口；启动/锁/编码/状态/续跑实现 | 已迁入render_engine/jobs；安装根寻址及完整源码指纹已适配 |
-| app/F8_room_animation.py（E）、F8_room_demo.py（D）、F8_prepare_room_asset.py（B） | Blender兼容入口 | 实现已迁入render_engine/blender；保留原函数接口与CLI |
-| app/F8_room_helpers.py、F8_room_fire_style.py | Blender公共辅助兼容模块 | 实现已迁入render_engine/blender；不被普通Python业务端导入 |
-| app/room_fire_config.py | 配置校验、火舌/烟柱几何兼容模块 | 实现已迁入render_engine/effects；算法不变 |
-| app/room_demo_plan.py | 展示分量/BFS兼容模块 | 整体迁入render_engine/propagation，暂不继续拆算法 |
-| app/prepare_room_candidate.py、room_clip_geometry.py、room_source_io.py、room_source_inputs.py | 候选/几何/输入兼容模块 | 实现已迁入render_engine/geometry，不反向导入app/Backend/tools |
-| app/analyze_floorplan.py | 对齐分析兼容模块 | 18个只读公共函数已进入render_engine/geometry/floorplan_alignment.py；报告CLI在tools/diagnostics/，继续导出原函数名 |
-| app/inspect_room_asset.py | 历史坐标/高度检查兼容模块，保留公共函数名 | 实现已迁tools/diagnostics；继续复用Backend纯build_plan，无导入即连库行为 |
-| app/diagnose_room_sections.py | 旧CLI/导入兼容，保留load_inputs/REQUIRED_CHECKS接口 | 已迁至tools/diagnostics/diagnose_room_sections.py；app指向同一模块 |
-| app/room_section_geometry.py、app/room_section_plots.py | 旧导入兼容，保留断面/绘图函数 | 实现已迁至tools/diagnostics/；Matplotlib仍只在绘图时导入 |
-| app/F8_inspect_room_import.py（F8-A） | Blender导入检查兼容入口 | 实现已迁tools/diagnostics/blender/；实际源文件仍支持独立上传，保留历史依据与静态测试 |
-| app/probe_floorplan.py | 上游API探测兼容入口 | 实现已迁tools/diagnostics；实际源文件可独立使用，不提交真实返回包或appkey |
-| app/F8_blender_render.py（F8-C） | 旧 main 绑定的 Legacy worker | 保留原入口；之后可迁至独立 legacy 区并保留兼容启动路径 |
-| configs/render/room_fire_round1/2/3.json、旧app副本 | 默认预设与兼容副本 | 第4批原样复制，默认寻址已迁移；打包拒绝新旧副本不一致 |
-| test/*.py、test/__init__.py | 当前用例/替身及显式集成测试，实体保留 | 第7批tests分组入口复用原模块；旧命令保留，不复制第二套测试类；新增收尾用例在tests/deploy |
-| test_4dkankan.py | 根目录手工API兼容入口，不自动执行 | 实现已迁tools/integration/probe_scene_api.py；不再自动加载.env，必须显式--allow-network，输出脱敏；不随生产包发布 |
-| release/scripts/*、release/*.yml、release/prod.env.example、Dockerfile、docker-compose.yml | 发布兼容入口与开发配置 | 第7批发布实现迁deploy/scripts，模板迁deploy；release保留PS转调/受校验副本，输出仍release/out；根Dockerfile/开发Compose不移动 |
-| requirements*.txt、.gitignore、.dockerignore | 构建与依赖边界 | 根目录先保留；诊断绘图库继续与生产依赖分开 |
-| docs/room_*.md、docs/database.md | 操作依据与部分历史实验 | 建索引标明适用版本；核对引用后再逐篇归档，不能全量移走 |
-| PRD_V1.1.md、architecture.md | 原始累积文档 | 原样快照在 archive；根文件保留兼容链接，新有效规范在 docs/ |
-| data/**、release/out/** | 私有资产/诊断/任务/备份/安装包 | 继续忽略；服务器/本地目录不因代码迁移而改名 |
+| backend | API、数据连接、导入、Legacy编排 | 不import bpy，不把旧API当新版房间任务 |
+| backend/database/migrations | 唯一SQL位置 | 已应用迁移不可改；目录改名不重建库 |
+| render_engine/geometry | 来源/坐标/指纹、对齐、面级裁切 | 不依赖诊断CLI或数据库 |
+| render_engine/propagation、effects | BFS、展示分量、火烟曲线/几何 | 不访问HTTP/数据库，不擅自调R3 |
+| render_engine/blender | B资产、D静帧、E动画及辅助 | bpy仅在Blender进程执行 |
+| render_engine/jobs | 启动、锁、编码、续跑、报告 | 固定输入版本，真实NVIDIA上下文校验 |
+| render_engine/legacy | 原F6/F7/F8-C | 保留旧功能，不替代Room8入口 |
+| tools | 户型/高度/断面诊断和手工API | 历史依据保留；显式运行才联网/写诊断 |
+| tests | 四组回归及隔离集成 | 不默认发现真实数据写入；用例只有一份 |
+| deploy | 唯一发布脚本和生产模板 | 根Dockerfile/开发Compose有效，产物release/out忽略 |
+| configs/render | R1/R2/R3各一份 | R3默认，R1/R2回归，内容不同 |
+| docs | 当前规范/指南与archive | 历史命令不作当前指令 |
 
-## 4. 必须先拆的依赖
+frontend尚未建立；未来经API访问Backend，不直接连库或取得MinIO管理凭证，不为目录齐全创建空前端。
 
-整理前链条：`prepare_room_candidate → diagnose_room_sections.load_inputs → inspect_room_asset → import_rooms → analyze_floorplan`；其中数据库连接是延迟执行，并非引擎必须连库。第1批已将候选入口改为 `prepare_room_candidate → room_source_inputs → room_source_io`，不再导入诊断或后端工具。第6批将公共读取/对齐函数抽到引擎只读层：Backend导入CLI直接使用floorplan_alignment，不依赖tools；对齐/断面诊断使用同一核心。inspect仍可使用Backend的纯build_plan，原inspect/diagnose函数名继续兼容。Render Engine不反向导入Backend/tools。
+## 依赖与版本
 
-整理前动画链条：`F8_room_animation → F8_room_demo / F8_prepare_room_asset / F8_room_fire_style`。第3批改为B/D/E直接依赖`F8_room_helpers`，E不再导入D/B入口；D/B旧函数名继续导出。辅助函数实现不变，普通Python业务端不能导入这些bpy模块。
+Backend可复用引擎纯函数；Engine不得反向依赖Backend/tools。诊断可用只读核心和Backend纯build_plan，不自动连库。包初始化不启动服务、建表或导入bpy。
 
-测试既有普通导入，也有 AST 提取和按文件路径读取。候选、断面、导入、静帧、动画及 GPU 测试都要随实际引用回归，不能只替换 import 字符串。
+旧worker为render_engine/legacy/F8_blender_render.py，工作目录显式为安装根。Room8用jobs启动器及独立输出；保留由源点位数据根推导的共享锁位置，不能移动缓存而产生互不排斥的锁根。
 
-### 打包与双执行环境也是迁移依赖
+render_engine.paths登记25份Python和3份预设，共28份；打包白名单随路径维护。新代码/位置不重签旧任务，原40文件任务及V1用归档版本。模型、状态、核验、视频不因代码改名移动。
 
-| 现有约束与证据 | 迁移必须满足的条件 |
-| --- | --- |
-| build.ps1/.dockerignore已包含tools诊断源码及新版引擎/命名预设 | 打包只复制21份命名引擎Python、3份预设与10份明确诊断Python；integration及额外工具不发布；缺失或配置分叉即失败，安装包/解压导入需测试 |
-| Dockerfile启动app.main:app，reload监控app及backend | 保留兼容入口；仅增加新源码监控，不改服务、端口、挂载或生产依赖 |
-| 新Blender入口和兼容脚本从自身位置加入安装根，使用包导入 | 普通Python/Blender的导入与帮助替身均检查；不能再单文件上传/tmp |
-| render_engine.paths统一列出40份源码/预设，静帧和动画共用 | 第6批新增只读分析核心，从39扩为40；覆盖包初始化、路径模块、兼容脚本及新旧配置；缺失/改动拒绝，不给旧任务改签名 |
-| run_room_animation.py:151 由 points 路径推导共享锁根，worker会核对同一锁 | 目录整理不得把点位移到另一层缓存而造成多个锁根；本阶段保持数据路径不变，未来改动须显式设计共享锁位置 |
-
-以上是迁移约束；已落地范围按下表标明。新增目录的产物仍只写入私有data/，不能混入源码安装包。
-
-## 5. 已确认的七批迁移
-
-| 批次 | 范围 | 当前状态/回归重点 |
-| --- | --- | --- |
-| 1 | app内提取OBJ/MTL、坐标与指纹公共函数 | 已完成；输入保护及旧接口 |
-| 2 | 三个断面工具迁入tools/diagnostics | 已完成；兼容入口、CLI与安装包 |
-| 3 | app内提取B/D/E共用Blender辅助 | 本地实现；UV/材质/坐标、相机、源码指纹、旧接口与打包；未远端渲染 |
-| 4 | 新版Room8引擎及配置迁入render_engine/configs | 本地实现；13个app兼容模块、默认R3、worker、打包/镜像上下文与完整指纹已适配；未远端部署/渲染 |
-| 5 | Backend API、数据库工具和MinIO适配分组整理 | 本地实现；7份兼容模块、原样SQL、完整打包与API回归；未导入数据或远端部署 |
-| 6 | 其余诊断/集成工具逐组迁移 | 本地完成；4份app兼容入口、只读分析核心、手工API显式开关及10份诊断打包；历史Z轴工具保留，未真实联网/诊断 |
-| 7 | 测试/部署目录收尾及稳定性审阅 | 本地完成；tests分组/离线报告、deploy实现/release兼容、房间任务部署保护；原测试实体保留；不自动合并main |
-
-每批结束均回看diff、调用链与对应测试。新源码使用新任务；复现V1从原基线归档恢复，不能把旧任务改签名后续跑。跨目录迁移时立即更新部署引用，不能等第7批才修打包。
-
-每批分独立提交，说明改变的路径、兼容入口、实际测试和回退提交。不把高度算法、Hybrid、网页或数据库导入混入迁移。
-
-## 6. 文档与产物边界
-
-当前新文档是有效入口；原文档和过期配置过程作为历史材料。Git 当前已忽略 /data/ 与 release/out/，但不代表任意目录下的 PNG/BLEND/GLB 都自动忽略。真实产物一律进入上述私有目录；不为此全局忽略所有 PNG，避免屏蔽以后合法的合成测试图。
-
-下一次提交前看 diff 与新增文件清单，只提交源码/测试/公共配置/脱敏文档。文件移动需用户审阅处置清单后实施，本次没有任何待自动删除的文件。
-
-## 7. 本次工程审阅结论
-
-2026-11-07：目录职责划分可作为目标规范；修正了 F6 分类和“部署最后迁移”的歧义，补齐打包、双执行环境、源码指纹与共享锁约束。**目标结构可保留，当前尚不具备直接批量移动文件的条件。**
-
-第1批已在app内提取room_source_io与room_source_inputs，保留旧函数名，新增两份测试。2026-11-09第2批将diagnose_room_sections、room_section_geometry、room_section_plots实现迁至tools/diagnostics；app保留共享模块对象的兼容入口，打包和镜像上下文只增加这组Python源码。既有高度、裁切与F8动画算法不动；安装包内容/解压导入、旧CLI和相关离线回归分别检查。服务器尚未部署本次迁移。
-
-第4批已按用户授权迁移13个新版实现，保留全部app兼容入口；旧F8-C和Backend未移动。默认预设及完整源码清单按安装根寻址，打包/镜像上下文同批适配。205项相关离线回归中204通过、1项可选绘图库测试跳过；实际GPU未重渲染。剩余第5–7批仍逐批实施，不因本批完成而批量移动其他代码。
-
-第5批已迁移7个Backend实现，保留app入口和原SQL副本；15份后端Python及1份SQL纳入打包，SQL内容不变，增加缺失/副本不一致阻断。ASGI入口仍app.main:app，仅增加backend热重载路径。251项相关回归249通过、2项跳过，真实数据库/远端部署未执行。Room8引擎及其源码指纹完全不改。剩余第6–7批继续分批审核，不删除Z轴工具或混入新网页功能。
-
-2026-11-10第6批完成4个诊断实现及1个手工集成实现迁移。18个共享函数独立进入引擎只读层，Backend不再导入诊断CLI；旧函数与CLI保留。279项相关回归277通过、2项跳过，新增16项全部通过。原火烟、传播、裁切及R3字节不变；完整源码清单新增分析核心为40份，旧任务不能重签续跑。第7批仅继续测试/部署收尾与稳定性审阅，不自动合并main。
-
-第7批完成发布实现/生产模板归位与分组离线回归入口。原test实体和根Dockerfile/开发Compose明确保留，避免批量路径变化；release命令不变。模板/独立shell新旧副本一致才打包；准备/渲染/编码中的房间任务阻断部署，真实timeline测试显式启用。实际测试、尚未远端验证项及合并边界见[收尾说明](migration_closeout.md)与[test/README](../tests/README.md)。没有数据库操作、Docker运行、渲染、提交或main合并。
+新增公共函数须核查运行、工具、测试、AST定位、打包和文档引用。按职责拆模块，不重新建立兼容副本，不把不同功能堆成大脚本。提交按职责拆分；部署、导入、渲染、main合并分别授权与验收。

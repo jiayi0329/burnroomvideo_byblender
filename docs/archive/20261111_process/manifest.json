@@ -1,0 +1,224 @@
+{
+  "schema_version": 1,
+  "created_on": "2026-11-11",
+  "source_commit": "fd3b3724a6526040f09dee8dd5eab57e64e33af3",
+  "normalization": "Normalize the whole archive to UTF-8 without BOM and LF before archive SHA256 or offset extraction; source_worktree_sha256 uses original bytes",
+  "sources": [
+    {
+      "source_path": "docs/room_style_round1.md",
+      "source_commit": "fd3b3724a6526040f09dee8dd5eab57e64e33af3",
+      "source_git_blob": "91797be1a0c178a1c876506d39930e48295e0ccb",
+      "source_worktree_sha256": "d7065b0664d1bfcd952d293851d001ff36c06568071078cc2d3c35e6ffc5497a",
+      "archive_path": "docs/archive/20261111_process/render_style_history.md",
+      "content_offset_bytes": 497,
+      "content_size_bytes": 6867,
+      "normalized_content_sha256": "a9433f7ddd8bff51332a05080bdd5c8ff907f9aaa92ae29d24036dd688f0a57a"
+    },
+    {
+      "source_path": "docs/room_style_round2.md",
+      "source_commit": "fd3b3724a6526040f09dee8dd5eab57e64e33af3",
+      "source_git_blob": "cc0ebb68792c1eeabe05befc70f0b3be642cec19",
+      "source_worktree_sha256": "8294c3d86d6b0d3eedd746264faf37a34b4ecd2ec759563b841fb778203ce778",
+      "archive_path": "docs/archive/20261111_process/render_style_history.md",
+      "content_offset_bytes": 7452,
+      "content_size_bytes": 7325,
+      "normalized_content_sha256": "db017cf0b6f8370876bc03115816e49ffc0e321ff6b3ff6f5acd91746cf8d4bc"
+    },
+    {
+      "source_path": "docs/room_style_round3.md",
+      "source_commit": "fd3b3724a6526040f09dee8dd5eab57e64e33af3",
+      "source_git_blob": "536073908b772912c4c2dc0f611dc529efdc9a89",
+      "source_worktree_sha256": "7f1abd0b0cddff8ceca7805c834b9b04f8aa7a02207240160a525a6d28afa9c8",
+      "archive_path": "docs/archive/20261111_process/render_style_history.md",
+      "content_offset_bytes": 14865,
+      "content_size_bytes": 4785,
+      "normalized_content_sha256": "7f4757dfde5245c6f202bfd553507f9acc8f9ba382e0d7b8b60239d500d7abc4"
+    },
+    {
+      "source_path": "docs/room_animation.md",
+      "source_commit": "fd3b3724a6526040f09dee8dd5eab57e64e33af3",
+      "source_git_blob": "9dca624f0f9d1843d94ae5421981782a7ad70439",
+      "source_worktree_sha256": "acd495c928e9609b0f7cb88714eec723d757bd18bec3f09874ac9d3d361069e9",
+      "archive_path": "docs/archive/20261111_process/animation_history.md",
+      "content_offset_bytes": 491,
+      "content_size_bytes": 12594,
+      "normalized_content_sha256": "d635ac131b9c0d1692d8b79c2b1646f2b779488f8b1c78c61a71e7d58945d63e"
+    },
+    {
+      "source_path": "docs/room_animation_camera_fix.md",
+      "source_commit": "fd3b3724a6526040f09dee8dd5eab57e64e33af3",
+      "source_git_blob": "6c9a867c595a279e24f8f6399ac87a93d32728ea",
+      "source_worktree_sha256": "9b3eb409b72ffa9100115b36dd4fe096c0f84042bddcab72838880b920ea7ae0",
+      "archive_path": "docs/archive/20261111_process/animation_history.md",
+      "content_offset_bytes": 13181,
+      "content_size_bytes": 7973,
+      "normalized_content_sha256": "815b13b2137f064c703f9bffad1af0c81105633f237f4cc3f0191e00993d0931"
+    },
+    {
+      "source_path": "docs/room_animation_final.md",
+      "source_commit": "fd3b3724a6526040f09dee8dd5eab57e64e33af3",
+      "source_git_blob": "45f475881c3043b1e4387bcb486d8d3d87a37d8b",
+      "source_worktree_sha256": "8817a7a604c927313c491be65a2617a71c8bc0cbb98ec23c6323744c2729b263",
+      "archive_path": "docs/archive/20261111_process/animation_history.md",
+      "content_offset_bytes": 21245,
+      "content_size_bytes": 4885,
+      "normalized_content_sha256": "f7c7e5704adb5a3edc79cf6d67dc69df197b511a30b7ab73c39f17b964c058dd"
+    },
+    {
+      "source_path": "docs/room_gpu_fix.md",
+      "source_commit": "fd3b3724a6526040f09dee8dd5eab57e64e33af3",
+      "source_git_blob": "c3c1e09d091040f5e7f093d58cf18b9ca5b4281c",
+      "source_worktree_sha256": "6b6020d59be3de3b9098e7e47b6659328af4fa2986aa345b415f32e0f59f25b6",
+      "archive_path": "docs/archive/20261111_process/animation_history.md",
+      "content_offset_bytes": 26213,
+      "content_size_bytes": 4590,
+      "normalized_content_sha256": "6b6020d59be3de3b9098e7e47b6659328af4fa2986aa345b415f32e0f59f25b6"
+    },
+    {
+      "source_path": "docs/room_asset_checks.md",
+      "source_commit": "fd3b3724a6526040f09dee8dd5eab57e64e33af3",
+      "source_git_blob": "657195320ada28025c9f9c759a6bb67d0187ae0c",
+      "source_worktree_sha256": "43cb540c6adfd66072263a173c3ac16b45ccf3ecd0db42fe02bb0cb6f877a8e1",
+      "archive_path": "docs/archive/20261111_process/room_assets_history.md",
+      "content_offset_bytes": 496,
+      "content_size_bytes": 5431,
+      "normalized_content_sha256": "207dbef2dc8c6938347478ce5035a399e998cf2fdc22351d764e574bc457b1b2"
+    },
+    {
+      "source_path": "docs/room_section_diagnostics.md",
+      "source_commit": "fd3b3724a6526040f09dee8dd5eab57e64e33af3",
+      "source_git_blob": "ff3deda16b8540517c4f61ee04d362e6e6e96d67",
+      "source_worktree_sha256": "4f842cb50dd97cb86980f731c4de721accbb1d8245556ee8cbf4892d1c8f1c81",
+      "archive_path": "docs/archive/20261111_process/room_assets_history.md",
+      "content_offset_bytes": 6022,
+      "content_size_bytes": 6764,
+      "normalized_content_sha256": "4f842cb50dd97cb86980f731c4de721accbb1d8245556ee8cbf4892d1c8f1c81"
+    },
+    {
+      "source_path": "docs/room_candidate.md",
+      "source_commit": "fd3b3724a6526040f09dee8dd5eab57e64e33af3",
+      "source_git_blob": "7a76635a22857117726bf502cc84b7dcd000b266",
+      "source_worktree_sha256": "61261e97e60fe0127d8ccc7fa8de3f8ba78cde12df1ea8c0f1cdb8cba19e4dae",
+      "archive_path": "docs/archive/20261111_process/room_assets_history.md",
+      "content_offset_bytes": 12871,
+      "content_size_bytes": 7084,
+      "normalized_content_sha256": "59d8b8d7feb125156d7e1c5e7f24318243e40633460ab194f60dca6a3e5f7555"
+    },
+    {
+      "source_path": "docs/room_display.md",
+      "source_commit": "fd3b3724a6526040f09dee8dd5eab57e64e33af3",
+      "source_git_blob": "6006b8fd4e8d22b883d2b003b8a35a950eeca203",
+      "source_worktree_sha256": "20304c4fd5d55e4a3e3fa3e2ed631372da4b91dab30dd0854b190ed7092c61e1",
+      "archive_path": "docs/archive/20261111_process/room_assets_history.md",
+      "content_offset_bytes": 20038,
+      "content_size_bytes": 6865,
+      "normalized_content_sha256": "20304c4fd5d55e4a3e3fa3e2ed631372da4b91dab30dd0854b190ed7092c61e1"
+    },
+    {
+      "source_path": "docs/room_engine_migration.md",
+      "source_commit": "fd3b3724a6526040f09dee8dd5eab57e64e33af3",
+      "source_git_blob": "1d8b774f1836a70538247139628efd4109624d23",
+      "source_worktree_sha256": "8e8adef2470895cbe7b90d47f631f1e7f6ee57f836be3e20227666feb6bc8060",
+      "archive_path": "docs/archive/20261111_process/engineering_history.md",
+      "content_offset_bytes": 500,
+      "content_size_bytes": 5539,
+      "normalized_content_sha256": "b5e38992a00d9ff8dd98235222b851d174699eda2002b3d6880dcdb6805f819e"
+    },
+    {
+      "source_path": "docs/migration_closeout.md",
+      "source_commit": "fd3b3724a6526040f09dee8dd5eab57e64e33af3",
+      "source_git_blob": "a2716b5294aec835fe579d6f02b6d34073880d9c",
+      "source_worktree_sha256": "44181a7ab65bc0f385d8f8586b8cc439a3d9acb46b8ac4c942a9af9695335517",
+      "archive_path": "docs/archive/20261111_process/engineering_history.md",
+      "content_offset_bytes": 6128,
+      "content_size_bytes": 3061,
+      "normalized_content_sha256": "b97fca743639235c7109569daac7834d13ce2f737efb83bfb7746f6a904ccce4"
+    },
+    {
+      "source_path": "docs/canonical_paths.md",
+      "source_commit": "fd3b3724a6526040f09dee8dd5eab57e64e33af3",
+      "source_git_blob": "33332b2edc888487bb92c8fe2022a90ddba01ed6",
+      "source_worktree_sha256": "fdf221dd15a187011278413f6e57acaae839aba016be6d52b6d053da592f97f0",
+      "archive_path": "docs/archive/20261111_process/engineering_history.md",
+      "content_offset_bytes": 9275,
+      "content_size_bytes": 4012,
+      "normalized_content_sha256": "825e55dfa5c463468a988913a468f87ae4071725e01169c41eeee3bf579dc96f"
+    },
+    {
+      "source_path": "docs/PROJECT_ORGANIZATION.md",
+      "source_commit": "fd3b3724a6526040f09dee8dd5eab57e64e33af3",
+      "source_git_blob": "e6ca2b4337f7ca4827e890f51f974e05d47125f5",
+      "source_worktree_sha256": "f3bcf86f0c3e9aa1d0ff8476dde67e0a6e5ba7ca717e9023ba344f42faee3ec8",
+      "archive_path": "docs/archive/20261111_process/engineering_history.md",
+      "content_offset_bytes": 13378,
+      "content_size_bytes": 15920,
+      "normalized_content_sha256": "7d2e89e0fcd9c0c9092eb51463800e08b5078edf3b0c8f22c37b59e1cb915006"
+    },
+    {
+      "source_path": "docs/PROJECT_STATUS.md",
+      "source_commit": "fd3b3724a6526040f09dee8dd5eab57e64e33af3",
+      "source_git_blob": "776f8e9e25170644947e6a0f3ae177d97fc8fac7",
+      "source_worktree_sha256": "f1a46e483a1ed96298209d5d721adf09a3491c6c41c27c35b5a6edd742ad8231",
+      "archive_path": "docs/archive/20261111_process/engineering_history.md",
+      "content_offset_bytes": 29383,
+      "content_size_bytes": 7584,
+      "normalized_content_sha256": "62a476908d5fac112434cb693c1a80331ec50adf0d7794560671ed69095a1853"
+    },
+    {
+      "source_path": "docs/ARCHITECTURE.md",
+      "source_commit": "fd3b3724a6526040f09dee8dd5eab57e64e33af3",
+      "source_git_blob": "76f03d879534dff3405de98d93b5d34c390340ef",
+      "source_worktree_sha256": "2b652d2d63f76c2f98a58b9a88db8909456c35f29747ba7c5f5be03d0e7cf432",
+      "archive_path": "docs/archive/20261111_process/engineering_history.md",
+      "content_offset_bytes": 37050,
+      "content_size_bytes": 13971,
+      "normalized_content_sha256": "827e211da1c4ab4fff94141604ee675ff33cf089071e2f474809927500bf46aa"
+    },
+    {
+      "source_path": "docs/database.md",
+      "source_commit": "fd3b3724a6526040f09dee8dd5eab57e64e33af3",
+      "source_git_blob": "f5040b391e0db2f144f3bf19a9d7227896a45ae7",
+      "source_worktree_sha256": "9412b68871ba09788ed5efb5b9a46f592e6dae3d7180beeffab582fc6c70ee0f",
+      "archive_path": "docs/archive/20261111_process/database_history.md",
+      "content_offset_bytes": 484,
+      "content_size_bytes": 15366,
+      "normalized_content_sha256": "9412b68871ba09788ed5efb5b9a46f592e6dae3d7180beeffab582fc6c70ee0f"
+    },
+    {
+      "source_path": "tests/TEST_HISTORY.md",
+      "source_commit": "fd3b3724a6526040f09dee8dd5eab57e64e33af3",
+      "source_git_blob": "a6d0f2b8bc8eb4462116da2da883f346d9ef994b",
+      "source_worktree_sha256": "f142c603dc60d75cdf5a234cf63f379a6187081d5510f68e34b70393bff92bdd",
+      "archive_path": "docs/archive/20261111_process/testing_history.md",
+      "content_offset_bytes": 488,
+      "content_size_bytes": 24636,
+      "normalized_content_sha256": "bfcb2ba734e27801c6072fde3e98029b52aa7f62fd996b6baa60b845045d27ec"
+    }
+  ],
+  "archives": [
+    {
+      "path": "docs/archive/20261111_process/render_style_history.md",
+      "sha256": "e1c314e9a38c9f20422c6038d7b228752905f7a6d35f806cecd0e6ceb9a28881"
+    },
+    {
+      "path": "docs/archive/20261111_process/animation_history.md",
+      "sha256": "93444879a35f8a20d844aa96c2ffcc4d4de095417214cce1a17cb9013a2b9ab4"
+    },
+    {
+      "path": "docs/archive/20261111_process/room_assets_history.md",
+      "sha256": "14ff6416661aa15189025fa4999c3edfef1bf383bf0859d772500d60db71fb0e"
+    },
+    {
+      "path": "docs/archive/20261111_process/engineering_history.md",
+      "sha256": "4f6fc4bb266bb78c839c9b17e8f93720f324f5e8ea56aecde32b6f65fb846a51"
+    },
+    {
+      "path": "docs/archive/20261111_process/database_history.md",
+      "sha256": "fa806a213fdba099da47a4a0fa89f82bd048c398612665cfc89036900f9d4b2b"
+    },
+    {
+      "path": "docs/archive/20261111_process/testing_history.md",
+      "sha256": "35677b2df59ee1219381f7cf2c020b0171f7e073d91846434ca750746d4f7e73"
+    }
+  ]
+}

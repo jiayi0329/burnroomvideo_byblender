@@ -1,3 +1,11 @@
+# testing_history.md
+
+2026-11-11合并的历史原文。来源提交：`fd3b3724a6526040f09dee8dd5eab57e64e33af3`。以下旧命令、路径、门禁和“当前状态”仅用于追溯，不作为运行指令。当前说明从[文档索引](../../README.md)进入。原文以Markdown源码保存，换行统一为LF；manifest.json记录原路径、工作副本SHA、Git blob及合并后字节范围，可提取校验。
+
+<details>
+<summary>tests/TEST_HISTORY.md</summary>
+
+````markdown
 # 测试规范与需求追溯
 
 > 本文保留前七批历史测试记录。2026-11-11原test实体已归入tests，旧命令/兼容约定不再有效；当前运行入口见[README](README.md)，本轮结果见[正式路径说明](../docs/canonical_paths.md)。
@@ -148,3 +156,7 @@ GPU修复新增 `test_room_gpu_rendering.py`（6项），追溯PRD2.3/architectu
 2026-11-04 直接正式出片：新增 `test_room_animation_final.py`（5项），对应PRD 2.3 / architecture 3.3。验证显式直接出片授权、冻结风格、24秒720p24fps576个纯总览帧、错误模式拒绝、续跑授权一致、保留冲突检查、不调用短片审核/耗时预估、完整解码通过才发布、解码失败保留帧和编码产物。原编码替身适配新增解码步骤；不运行真实Blender/ffmpeg。命令：`python -m unittest test.test_room_animation_final test.test_room_animation_camera test.test_room_animation -v`。模拟耗时与视频字节不是服务器实测或真实成片。
 
 说明新增测试名称、对应需求、命令、通过/失败/跳过数量、未验证项及原因。涉及 app 行为修改但缺少对应新增测试时，不标记该功能为完成。本规范目前是开发约定，尚未添加自动 CI 强制检查。
+
+````
+
+</details>
