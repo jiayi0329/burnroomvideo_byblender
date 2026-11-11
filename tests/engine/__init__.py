@@ -7,4 +7,5 @@ MODULES = (
     'tests.engine.test_room_animation', 'tests.engine.test_room_animation_camera',
     'tests.engine.test_room_animation_final', 'tests.engine.test_room_gpu_rendering',
     'tests.engine.test_blender_room_helpers', 'tests.engine.test_engine_migration',
+    'tests.engine.test_room_operation_logging',
 )

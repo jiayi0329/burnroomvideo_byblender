@@ -12,6 +12,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from backend.paths import migration_files
+from render_engine.jobs.operation_logging import cli_operation, traced
 
 
 def connect(admin: bool = False) -> Any:
@@ -29,6 +30,7 @@ def connect(admin: bool = False) -> Any:
     )
 
 
+@traced('catalog.migrate', 'schema_and_grants')
 def migrate() -> None:
     files = migration_files()
     from psycopg import sql
@@ -60,6 +62,7 @@ def migrate() -> None:
     print('[database] migrations applied', flush=True)
 
 
+@cli_operation('catalog.migrate')
 def main() -> int:
     import argparse
     parser = argparse.ArgumentParser(description='Apply catalog migrations explicitly; never run at startup')

@@ -6,12 +6,15 @@ import json  # 新增了 json 库用来保存文件
 import subprocess
 import threading
 import traceback
+from contextvars import copy_context
 from pathlib import Path
 from backend.paths import legacy_render_script, project_root
 
 from render_engine.legacy.F6_detect import find_ignition_point
 from render_engine.legacy.F7_spread import SpreadTimeline, bfs_spread, load_adjacency
 from backend.api.room_api import router as room_router
+from backend.services.request_logging import OperationLoggingMiddleware
+from render_engine.jobs.operation_logging import mark_failure, stage, traced
 from backend.services.observability import (
     append_log,
     now_iso,
@@ -31,6 +34,7 @@ from backend.adapters.minio.s3_io import (
 )
 
 app = FastAPI(title="火灾蔓延视频生成系统 API")
+app.add_middleware(OperationLoggingMiddleware)
 
 app.include_router(room_router)
 
@@ -52,6 +56,7 @@ def read_root():
     return {"status": "Backend is running!", "appkey_loaded": bool(APP_KEY)}
 
 @app.get("/api/scenes")
+@traced('legacy.scenes', 'external_api')
 def get_all_scenes():
     url = f"{BASE_URL}/scene/getSceneList"
     payload = {"pageNum": 1, "pageSize": 50}
@@ -81,6 +86,7 @@ def scene_assets_cached(scene_dir: Path) -> bool:
 
 
 @app.get("/api/download_scene/{scene_code}")
+@traced('legacy.download', 'assets')
 def download_scene_files(scene_code: str):
     '''终极版：下载场景全景图、模型，并额外保存点位信息 points.json'''
     
@@ -140,6 +146,7 @@ def download_scene_files(scene_code: str):
 
 
 @app.post("/api/generate_timeline/{scene_code}")
+@traced('legacy.timeline', 'analysis_and_spread')
 def generate_timeline(scene_code: str) -> SpreadTimeline:
     """串联 F6 + F7：识别全局起火点，生成蔓延时序并落盘 timeline.json。"""
 
@@ -179,6 +186,7 @@ def generate_timeline(scene_code: str) -> SpreadTimeline:
 
 
 @app.post("/api/render/{scene_code}")
+@traced('legacy.render', 'prepare_and_launch')
 def start_render(scene_code: str, quality: str = "preview") -> dict:
     """F8 渲染接口: 拉取资产 -> 启动 Blender 子进程 -> 后台守护线程完成验证与上传。
 
@@ -252,8 +260,8 @@ def start_render(scene_code: str, quality: str = "preview") -> dict:
         on_overheat=lambda _temp: proc.terminate(),  # GPU 超温自动终止渲染
     )
     threading.Thread(
-        target=_watch_render,
-        args=(proc, scene_dir, scene_code),
+        target=copy_context().run,
+        args=(_watch_render, proc, scene_dir, scene_code),
         name=f"render-watcher-{scene_code}",
         daemon=True,
     ).start()
@@ -266,6 +274,7 @@ def start_render(scene_code: str, quality: str = "preview") -> dict:
     }
 
 
+@traced('legacy.render', 'background_watch')
 def _watch_render(proc: subprocess.Popen[bytes], scene_dir: Path, scene_code: str) -> None:
     """守护线程: 等待 Blender 退出 -> 验证产物 -> 上传 MinIO -> 收敛任务状态。"""
     try:
@@ -279,7 +288,8 @@ def _watch_render(proc: subprocess.Popen[bytes], scene_dir: Path, scene_code: st
             )
             output_object: str | None = None
             try:
-                output_object = upload_output(scene_code, output_path)
+                with stage('legacy.render', 'publish_output'):
+                    output_object = upload_output(scene_code, output_path)
                 write_event(
                     scene_dir, "upload", "output_uploaded",
                     detail=f"MinIO 对象: {output_object}",
@@ -297,6 +307,7 @@ def _watch_render(proc: subprocess.Popen[bytes], scene_dir: Path, scene_code: st
                 finished_at=now_iso(),
             )
         else:
+            mark_failure('legacy_render_failed')
             summary = f"Blender 退出码 {return_code}, output.mp4 {'存在' if output_path else '不存在'}"
             write_failure(scene_dir, summary)
             write_render_status(
@@ -308,6 +319,7 @@ def _watch_render(proc: subprocess.Popen[bytes], scene_dir: Path, scene_code: st
                 finished_at=now_iso(),
             )
     except Exception:
+        mark_failure('legacy_watch_failed')
         write_failure(scene_dir, f"守护线程异常: {traceback.format_exc()}")
         write_render_status(
             scene_dir, scene_code=scene_code, status="failed", finished_at=now_iso()
@@ -332,6 +344,7 @@ def get_render_status(scene_code: str) -> dict:
 
 
 @app.get("/api/render/{scene_code}/share")
+@traced('legacy.share', 'ensure_and_sign')
 def get_render_share(scene_code: str) -> dict:
     """V6.0: 复用已有成片，补齐 MinIO 对象并生成七天预签名播放链接。"""
     if not scene_code.isascii() or not all(c.isalnum() or c in "-_" for c in scene_code):
@@ -367,6 +380,7 @@ def get_render_share(scene_code: str) -> dict:
 
 
 @app.post("/api/pipeline/{scene_code}")
+@traced('legacy.pipeline', 'orchestrate')
 def run_pipeline(scene_code: str, quality: str = "preview") -> dict:
     """V6.0 流水线编排: 一键执行 下载(缓存去重) -> 起火点与时序 -> 渲染。"""
     if quality not in ("preview", "final"):

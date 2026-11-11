@@ -13,7 +13,7 @@ python -B -m tests.run_regression --group backend --group tools
 
 本机可用release/out/backend-test-env/Scripts/python.exe替代python。--list不导入测试；分组去重。--report写新JSON报告，已存在就拒绝；失败返回非零。使用显式清单，不以全仓库discover替代。默认入口拒绝ROOM_DB_INTEGRATION=1和ROOM_TIMELINE_INTEGRATION=1，不因继承环境而误操作。
 
-最近代码回归（fd3b372对应本地证据）303项：301通过、2项跳过；另9项F6/F7合成逻辑通过。跳过为未启用真实PostgreSQL、未安装可选Matplotlib，不算通过。测试环境Python3.13.3/Pydantic2.10.6不替代远端原依赖；生产requirements未改。本轮文档整理不重跑代码测试，只核对文档/文件/指纹。
+2026-11-11操作日志实现后，全量离线回归329项：327通过、2项跳过；测试执行169.423秒，含加载的runner总耗时171.003秒。新增26项位于backend/test_operation_logging和engine/test_room_operation_logging，覆盖请求/CLI/任务关联、异常与取消、脱敏、线程/进程分片、轮转、响应后后台耗时、输出隔离和日志故障。报告为本地忽略产物release/out/operation-logging-final-offline-20261111.json。跳过为未启用真实PostgreSQL、未安装可选Matplotlib，不算通过。先前fd3b372对应303项及9项F6/F7合成逻辑仍保留为历史证据；本轮未重复运行私有场景。测试环境Python3.13.3/Pydantic2.10.6不替代远端原依赖，生产requirements未改。
 
 常规回归使用合成数据、HTTP/DB/进程/Blender对象替身和临时PowerShell/tar；不运行真实Blender/GPU、Docker、SSH/SCP或生产服务。模拟日志出现fire_final.mp4不代表新成片。
 

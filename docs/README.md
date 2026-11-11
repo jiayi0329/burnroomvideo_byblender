@@ -14,7 +14,7 @@
 | 当前R3火烟/灯光与六张样帧 | [R3风格](rendering/style.md) |
 | 完整包、总览动画、GPU证据和续跑 | [动画运行](rendering/animation.md) |
 | PostgreSQL现状及真实导入计划 | [数据库](database.md) |
-| 老师要求的操作时间线/监控 | [日志契约，待实现](OBSERVABILITY.md) |
+| 老师要求的操作时间线/监控 | [日志实现、使用与待验收边界](OBSERVABILITY.md) |
 
 当前指南标出环境，命令存在不等于授权执行。源码与资产换版本后应新建任务；旧全场景HTTP渲染不能代替Room8入口。
 

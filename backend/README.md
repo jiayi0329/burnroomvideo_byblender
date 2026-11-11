@@ -7,6 +7,6 @@
 - adapters/postgres负责延迟连接和显式迁移；SQL唯一位置database/migrations。原001文件/已应用SHA不变，不随启动建表或导入。
 - adapters/minio保留下载、上传和7天预签名；新版Room8产物未完整登记。
 - cli/import_rooms默认预览，--apply才写库，--upload-assets另行明确；cli/check_catalog只读核验应用账号/目录。
-- services/observability是已有Legacy日志/GPU能力；统一请求/操作/CLI关联尚待实现，遵守[日志契约](../docs/OBSERVABILITY.md)。
+- services/observability保留Legacy日志/GPU能力；services/request_logging和引擎公共operation_logging已接入请求、主要CLI及Room8追踪，cli/log_timeline生成只读时间线；远端/前端待验收，遵守[日志契约](../docs/OBSERVABILITY.md)。
 
 CLI帮助支持`python -m backend.cli.import_rooms --help`、`python -m backend.cli.check_catalog --help`、`python -m backend.adapters.postgres.database --help`。帮助不写库；数据库CLI不带--help会执行迁移，不能当作只读检查。真实导入按[数据库计划](../docs/database.md)安排。

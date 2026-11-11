@@ -26,6 +26,7 @@ from render_engine.blender.F8_room_fire_style import configure_render, lighting,
 from render_engine.propagation.room_demo_plan import display_faces, room_timeline
 from render_engine.jobs.room_animation_job import (read_json, write_json, digest, confined, check_guards,
                                 effect_state, requests, verified_record, png_ok, phase_name, verify_nvidia_renderer)
+from render_engine.jobs.operation_logging import JsonlSink, emit, inherited_context, stage, traced
 
 
 def independent_camera(scene: object, name: str, position: list, target: list, ortho: bool, span: float) -> object:
@@ -92,6 +93,7 @@ def fit_overview(scene: object, obj: object, coverage_points: list, margin: floa
             'scope':'Reviewed polygon floor/wall display envelope and all 13 peak flame envelopes; not an occlusion test'}
 
 
+@traced('room.animation', 'asset_and_effects_prepare')
 def prepare(spec: dict) -> tuple:
     inputs=spec['inputs']; a=spec['animation']; timings={}
     check_guards(inputs)
@@ -251,6 +253,8 @@ def run(job: Path, attempt: str, launch_monotonic: float) -> None:
         write_json(job/'render_manifest.json',manifest)
         write_json(job/'status.json',{'state':'rendering','attempt':attempt,'completed_outputs':len(records),
                                     'last_output':request['path'],'worker_pid':__import__('os').getpid()})
+        if len(records) == 1 or len(records) % 24 == 0:
+            emit('progress', operation='room.animation', stage='render_frames', completed_outputs=len(records))
         print(f'[room-animation] output={request["path"]} frame={request["frame"]} time={request["seconds"]:.3f} render_seconds={elapsed:.3f}',flush=True)
     reference=spec['inputs'].get('camera_reference')
     if spec['animation']['stage']=='camera_check' and reference and spec['animation']['camera_mode']=='overview':
@@ -288,7 +292,12 @@ def main() -> None:
     parser.add_argument('--job',type=Path,required=True); parser.add_argument('--attempt',required=True)
     parser.add_argument('--launch-monotonic',type=float,required=True)
     args=parser.parse_args(sys.argv[sys.argv.index('--')+1:])
-    try:run(args.job.resolve(),args.attempt,args.launch_monotonic)
+    try:
+        work=confined(args.job,'attempts/'+args.attempt)
+        if not work.is_dir():raise ValueError('Launcher attempt directory required')
+        with inherited_context(JsonlSink(work/'operations')):
+            with stage('room.animation','worker',job_id=args.job.name,attempt_id=args.attempt):
+                run(args.job.resolve(),args.attempt,args.launch_monotonic)
     except Exception:
         work=confined(args.job,'attempts/'+args.attempt)
         (work/'failure_worker.log').write_text(traceback.format_exc(),encoding='utf-8')

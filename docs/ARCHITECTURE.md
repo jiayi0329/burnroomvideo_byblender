@@ -52,7 +52,7 @@ jobs启动器执行预检、共享GPU锁/冲突检查，再启动F8-E；每帧�
 
 任务写rooms/<room_id>/render_jobs/<run_id>，尝试写attempts/<attempt_id>；失败保留帧和日志。PNG/相机/时刻/SHA与视频完整解码通过后才发布，状态为awaiting_visual_review；技术成功不自动视觉批准或启动另一任务。
 
-render_engine.paths清单为25份Python和3份公共预设，共28份。旧40文件及V1任务不能用新代码改签续跑；当前快照包含绝对路径，同内容换路径也不保证续跑。复现V1恢复其归档版本，详情见[动画指南](rendering/animation.md)。
+render_engine.paths清单为26份Python和3份公共预设，共29份，包含公共operation_logging模块。旧28/40文件及V1任务不能用新代码改签续跑；当前快照包含绝对路径，同内容换路径也不保证续跑。复现V1恢复其归档版本，详情见[动画指南](rendering/animation.md)。
 
 生产NVIDIA runtime请求compute,utility,graphics；GPU覆盖清除旧DeviceRequests。正式首帧验证真实NVIDIA上下文，拒绝llvmpipe/未知后端；nvidia-smi可见不等于EEVEE实际使用GPU。约5秒采样、85°C告警、90°C终止本任务；4卡可见不等于4卡并行。锁和部署状态检查不是共享服务器全局原子调度器。
 
@@ -69,7 +69,7 @@ render_engine.paths清单为25份Python和3份公共预设，共28份。旧40文
 
 ## 4. 下一阶段目标（未实现）
 
-先实现[公共操作日志](OBSERVABILITY.md)，覆盖请求/CLI/任务阶段、关联ID与耗时；当前只有部分渲染观测。再按[数据库计划](database.md)远端验收及真实导入；后续网页只支持Room8/R3受控任务，前端按钮经Backend调用现有安全启动器，查询状态和播放指定任务产物。
+[公共操作日志](OBSERVABILITY.md)已本地实现：纯ASGI中间件覆盖HTTP结果，公共ContextVar/span连接主要CLI、Legacy守护线程与Room8子进程；JSONL服务分片和attempt事件分开存储，Markdown时间线由CLI生成。无前端上报或新监控API，旧状态/逐帧/GPU/timing证据保持原职责，远端尚未验收。再按[数据库计划](database.md)远端验收及真实导入；后续网页只支持Room8/R3受控任务，前端按钮经Backend调用现有安全启动器，查询状态和播放指定任务产物。
 
 拟议/api/room-jobs和业务房间查询尚未注册；不得调用旧渲染API代替。前端不传任意脚本/配置路径、工作目录或绕过审核参数；数据库ID与业务ID由适配器转换。MinIO上传后核对SHA再登记，对象成功/登记失败可重试，不能重启渲染补偿登记。
 

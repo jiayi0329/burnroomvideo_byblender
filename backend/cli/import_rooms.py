@@ -14,8 +14,10 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from render_engine.geometry.floorplan_alignment import analyze, resolve_source, sha256
+from render_engine.jobs.operation_logging import cli_operation, traced
 
 
+@traced('catalog.import', 'validate_inputs')
 def build_plan(scene_dir: Path, probe_dir: Path, alignment_dir: Path, review_file: Path | None) -> dict:
     report_path = alignment_dir / 'alignment_report.json'
     report = json.loads(report_path.read_text(encoding='utf-8'))
@@ -82,6 +84,7 @@ def build_plan(scene_dir: Path, probe_dir: Path, alignment_dir: Path, review_fil
             'review': review, 'points': raw_points, 'assets': assets}
 
 
+@traced('catalog.import', 'apply_and_optional_upload')
 def import_plan(plan: dict, upload_assets: bool = False) -> dict:
     from backend.adapters.postgres.database import connect
     from psycopg.types.json import Jsonb
@@ -141,6 +144,7 @@ def import_plan(plan: dict, upload_assets: bool = False) -> dict:
     return {'layout_version_id': version_id, 'reused': False}
 
 
+@cli_operation('catalog.import')
 def main() -> int:
     parser = argparse.ArgumentParser(description='Preview/import room catalog, without rendering')
     parser.add_argument('--scene', required=True)

@@ -14,6 +14,7 @@ MODULE_LOCATIONS = {
     'F8_room_helpers': 'blender',
     'run_room_animation': 'jobs',
     'room_animation_job': 'jobs',
+    'operation_logging': 'jobs',
     'room_fire_config': 'effects',
     'room_demo_plan': 'propagation',
     'room_source_io': 'geometry',

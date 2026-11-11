@@ -6,12 +6,14 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 
 from backend.adapters.postgres.database import connect
+from render_engine.jobs.operation_logging import traced
 
 router = APIRouter(prefix='/api/catalog', tags=['room catalog'])
 
 EFFECTIVE_ROOM = 'CASE WHEN m.review_kind IS NULL THEN m.algorithm_room_id ELSE m.reviewed_room_id END'
 
 
+@traced('catalog.query', 'database_read')
 def query(statement: str, params: tuple) -> list[dict[str, Any]]:
     try:
         with connect() as conn:
@@ -67,6 +69,7 @@ def list_assets(room_id: int, limit: int = Query(100, ge=1, le=500), offset: int
 
 
 @router.get('/assets/{asset_id}/share')
+@traced('catalog.share', 'lookup_and_sign')
 def share_asset(asset_id: int) -> dict:
     rows = query('SELECT bucket,object_key FROM assets WHERE id=%s', (asset_id,))
     if not rows:

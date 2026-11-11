@@ -31,8 +31,8 @@ $BackendModules = @{
     api = @('main', 'room_api')
     'adapters/postgres' = @('database')
     'adapters/minio' = @('s3_io')
-    cli = @('import_rooms', 'check_catalog')
-    services = @('observability')
+    cli = @('import_rooms', 'check_catalog', 'log_timeline')
+    services = @('observability', 'request_logging')
 }
 $BackendFiles = @('backend/__init__.py', 'backend/paths.py', 'backend/adapters/__init__.py', 'backend/database/migrations/001_rooms.sql')
 foreach ($Group in $BackendModules.Keys) {
@@ -52,7 +52,7 @@ if ((Get-FileHash -LiteralPath (Join-Path $ProjectRoot 'backend/database/migrati
 # Canonical Room8 and Legacy engine packages.
 $EngineModules = @{
     blender = @('F8_prepare_room_asset', 'F8_room_demo', 'F8_room_animation', 'F8_room_fire_style', 'F8_room_helpers')
-    jobs = @('run_room_animation', 'room_animation_job')
+    jobs = @('run_room_animation', 'room_animation_job', 'operation_logging')
     effects = @('room_fire_config')
     propagation = @('room_demo_plan')
     geometry = @('room_source_io', 'room_source_inputs', 'room_clip_geometry', 'prepare_room_candidate', 'floorplan_alignment')

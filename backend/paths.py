@@ -12,6 +12,8 @@ MODULE_LOCATIONS = {
     'import_rooms': 'cli',
     'check_catalog': 'cli',
     'observability': 'services',
+    'request_logging': 'services',
+    'log_timeline': 'cli',
 }
 PACKAGE_FILES = (
     'backend/__init__.py', 'backend/paths.py',

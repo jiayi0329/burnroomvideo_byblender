@@ -22,6 +22,8 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from render_engine.paths import project_root, default_config, worker_script
+from render_engine.jobs.operation_logging import (JsonlSink, bind_context, child_environment,
+        cli_operation, emit, stage, traced)
 from render_engine.jobs.room_animation_job import (preflight, build_spec, create_job, check_resume, check_guards,
         read_json, write_json, digest, confined, requests, verified_record, summarize, estimate_full,
         encoding_command, verify_video, approval_template, verify_approval, historical_summary, verify_effective_cameras, verify_nvidia_renderer)
@@ -104,6 +106,7 @@ def monitor_gpu(stop: threading.Event, process: subprocess.Popen, path: Path, sa
         stop.wait(5)
 
 
+@traced('room.animation', 'encode_and_validate')
 def encode(job: Path, attempt_dir: Path, spec: dict) -> tuple[dict,float,float]:
     name='fire_short.mp4' if spec['animation']['stage']=='short' else 'fire_final.mp4'
     final=job/name; receipt=job/'video_receipt.json'
@@ -117,16 +120,20 @@ def encode(job: Path, attempt_dir: Path, spec: dict) -> tuple[dict,float,float]:
     temporary=attempt_dir/name; command=encoding_command(job,temporary,spec)
     before=time.perf_counter()
     with (attempt_dir/'encode.log').open('w',encoding='utf-8') as stream:
-        subprocess.run(command,stdout=stream,stderr=subprocess.STDOUT,check=True)
+        with stage('room.animation', 'video_encode'):
+            subprocess.run(command,stdout=stream,stderr=subprocess.STDOUT,check=True)
     encoding_seconds=time.perf_counter()-before
     before=time.perf_counter()
     probe_command=['ffprobe','-v','error','-count_frames','-show_streams','-show_format','-of','json',str(temporary)]
-    probe=json.loads(subprocess.run(probe_command,capture_output=True,text=True,check=True).stdout)
-    actual=verify_video(probe,spec); probe_seconds=time.perf_counter()-before
+    with stage('room.animation', 'video_probe'):
+        probe=json.loads(subprocess.run(probe_command,capture_output=True,text=True,check=True).stdout)
+        actual=verify_video(probe,spec)
+    probe_seconds=time.perf_counter()-before
     before=time.perf_counter()
     decode_command=['ffmpeg','-v','error','-xerror','-i',str(temporary),'-map','0:v:0','-f','null','-']
     with (attempt_dir/'decode.log').open('w',encoding='utf-8') as stream:
-        subprocess.run(decode_command,stdout=stream,stderr=subprocess.STDOUT,check=True)
+        with stage('room.animation', 'video_decode'):
+            subprocess.run(decode_command,stdout=stream,stderr=subprocess.STDOUT,check=True)
     decode_seconds=time.perf_counter()-before
     if final.exists():raise ValueError('Refusing to overwrite existing video')
     temporary.replace(final)
@@ -137,13 +144,15 @@ def encode(job: Path, attempt_dir: Path, spec: dict) -> tuple[dict,float,float]:
     return actual,encoding_seconds,probe_seconds
 
 
+@traced('room.animation', 'execute')
 def execute(args: argparse.Namespace) -> Path:
     started=time.perf_counter(); code_root=project_root()
     for tool in ('blender',) if args.stage=='camera_check' else ('blender','ffmpeg','ffprobe'):
         if not shutil.which(tool):raise RuntimeError('Required executable missing: '+tool)
     mode=getattr(args,'camera_mode','overview')
-    inputs=preflight(args.asset,args.points,args.config,code_root,
-                     reference_manifest=getattr(args,'reference_samples',None),require_reference=args.stage=='camera_check' and mode=='overview')
+    with stage('room.animation', 'preflight'):
+        inputs=preflight(args.asset,args.points,args.config,code_root,
+                         reference_manifest=getattr(args,'reference_samples',None),require_reference=args.stage=='camera_check' and mode=='overview')
     spec=build_spec(inputs,args.stage,args.preset,args.wall_height,args.drop_component,
                     camera_mode=mode,direct_final=getattr(args,'direct_final',False))
     root=args.asset.resolve().parent.parent/'render_jobs'; data_root=args.points.resolve().parent.parent
@@ -155,7 +164,8 @@ def execute(args: argparse.Namespace) -> Path:
         if args.approval is None:raise ValueError('Final rendering requires --approval from an explicitly reviewed short job')
         approval=verify_approval(args.approval,root,spec)
     with gpu_lock(data_root) as lock_fd:
-        busy=busy_processes()
+        with stage('room.animation', 'conflict_check'):
+            busy=busy_processes()
         if args.resume:
             job=args.resume.resolve()
             if job.parent!=root.resolve():raise ValueError('Resume directory must belong to this Room8 render_jobs')
@@ -164,85 +174,91 @@ def execute(args: argparse.Namespace) -> Path:
         attempt=datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')+'_'+uuid.uuid4().hex[:6]
         attempt_dir=confined(job,'attempts/'+attempt); attempt_dir.mkdir(exist_ok=False)
         if approval:write_json(attempt_dir/'approved_short_review.json',approval)
-        print(f'[room-animation] job={job} attempt={attempt} stage={args.stage}',flush=True)
-        write_json(job/'status.json',{'state':'preparing','attempt':attempt,'launcher_pid':os.getpid()})
-        write_json(job/'timing_report.json',{'measurement_status':'incomplete','attempt':attempt})
-        samples=[]; thermal={}; stop=threading.Event(); process=None; thread=None
-        preparation=time.perf_counter()-started
-        try:
-            launch_monotonic=time.monotonic()
-            command=['blender','--background','--factory-startup','--python-exit-code','1',
-                     '--python',str(worker_script(code_root)),'--','--job',str(job),
-                     '--attempt',attempt,'--launch-monotonic',str(launch_monotonic)]
-            env=dict(os.environ); env['ROOM_ANIMATION_LOCK_FD']=str(lock_fd)
-            write_json(attempt_dir/'launch.json',{'command':command,'gpu_conflict_checks':busy,'reservation':'all_visible_gpus'})
-            with (attempt_dir/'blender.log').open('w',encoding='utf-8') as log:
-                process=subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT,env=env,pass_fds=(lock_fd,),start_new_session=True)
-                thread=threading.Thread(target=monitor_gpu,args=(stop,process,job/'gpu_metrics.jsonl',samples,thermal),daemon=True)
-                thread.start(); code=process.wait()
-            process_seconds=time.monotonic()-launch_monotonic
-            stop.set(); thread.join(timeout=6)
-            if thermal.get('terminated'):raise RuntimeError('GPU >=90C: this job terminated; frames retained')
-            if code:raise RuntimeError(f'Blender exited {code}; see {attempt_dir}/blender.log')
-            manifest=read_json(job/'render_manifest.json')
-            if manifest.get('worker_complete') is not True:raise RuntimeError('Worker did not finish all requested outputs')
-            verify_effective_cameras(manifest['frames'],spec)
-            worker=read_json(attempt_dir/'worker_timing.json')
-            if spec['animation'].get('require_nvidia_graphics'):verify_nvidia_renderer(worker.get('renderer',{}))
-            if args.stage=='camera_check':
-                video=None; encoding_seconds=probe_seconds=0.0
-            else:
-                write_json(job/'status.json',{'state':'encoding','attempt':attempt})
-                video,encoding_seconds,probe_seconds=encode(job,attempt_dir,spec)
-            check_guards(inputs)
-            stats=summarize(manifest['frames'],spec)
-            prep=preparation+worker['blender_startup_and_import_seconds']+worker['worker_prepare_seconds']
-            original_encoding=video['encoding_seconds'] if video else 0.0
-            estimate=({'status':'not_requested','reason':'Final job records actual delivery timings; no performance pretest or estimate'}
-                      if args.stage=='final' else estimate_full(stats,spec,prep,original_encoding))
-            gpu_rows=[g for s in samples for g in s.get('gpus',[])]
-            costs={'preparation':prep,'png_rendering':stats['video_frames'].get('sum_seconds',0)+stats['extra_keyframes'].get('sum_seconds',0),
-                   'encoding':original_encoding}
-            current_records=[r for r in manifest['frames'] if r.get('attempt')==attempt]
-            current_render=sum(r['render_seconds'] for r in current_records)
-            report={'measurement_status':'measured_remote_run','attempt':attempt,
-                'launcher_preparation_seconds':preparation,'blender':worker,'blender_process_seconds':process_seconds,
-                'frames':stats,'encoding_seconds_this_attempt':encoding_seconds,'ffprobe_seconds_this_attempt':probe_seconds,
-                'state_update_seconds_this_attempt':sum(r.get('state_update_seconds',0) for r in current_records),
-                'worker_non_render_overhead_seconds':max(0,process_seconds-worker['blender_startup_and_import_seconds']-worker['worker_prepare_seconds']-current_render),
-                'encoding_seconds_original':original_encoding,'video':video,'camera_mode':spec['animation']['camera_mode'],
-                'total_seconds_this_attempt':time.perf_counter()-started,
-                'frame_timing_scope':'Frame records retain original timings when resumed; this-attempt total excludes historical attempts',
-                'gpu':{'available':bool(gpu_rows),'sample_count':len(samples),'renderer':worker.get('renderer',{'available':False}),
-                    'peak_memory_mb':max((g['memory_used_mb'] for g in gpu_rows),default=None),
-                    'peak_util_pct':max((g['util_pct'] for g in gpu_rows),default=None),
-                    'note':'Samples cover Blender, every ~5s; all visible GPU device totals, not exclusive per-process allocation'},
-                'full_video_estimate':estimate,'review_required':True,
-                'bottleneck_hint':max(costs,key=costs.get)}
-            write_json(attempt_dir/'timing_report.json',report); write_json(job/'timing_report.json',report)
-            manifest.update(technical_complete=True,video=video,guarded_files_unchanged=True,review_required=True,
-                            authorization=spec['animation'].get('authorization',{'mode':'short_review' if approval else 'preview'}))
-            write_json(job/'render_manifest.json',manifest)
-            write_json(job/'status.json',{'state':'awaiting_visual_review','attempt':attempt,'automatic_final_render':False})
-            if args.stage=='short':write_json(job/'approval_template.json',approval_template(job,spec))
-            if video:
-                print(f'[room-animation] done video={job/video["file"]} frames={video["frames"]} total_seconds={report["total_seconds_this_attempt"]:.3f} status=awaiting_visual_review',flush=True)
-            else:
-                print(f'[room-animation] camera_check={job/manifest["frames"][0]["path"]} total_seconds={report["total_seconds_this_attempt"]:.3f} status=awaiting_visual_review',flush=True)
-            return job
-        except BaseException as exc:
-            if process is not None:stop_child(process)
-            stop.set()
-            if thread is not None:thread.join(timeout=6)
-            failure={'state':'interrupted' if isinstance(exc,KeyboardInterrupt) else 'failed','attempt':attempt,
-                     'error':str(exc),'elapsed_seconds_this_attempt':time.perf_counter()-started,'frames_retained':True}
-            write_json(job/'status.json',failure); write_json(attempt_dir/'failure.json',failure)
-            write_json(job/'timing_report.json',{'measurement_status':'incomplete',**failure})
-            (attempt_dir/'failure.log').write_text(traceback.format_exc(),encoding='utf-8')
-            print(f'[room-animation] failed job={job} frames_retained=true error={exc}',flush=True)
-            raise
+        with bind_context(sink=JsonlSink(attempt_dir/'operations'), job_id=job.name,
+                          attempt_id=attempt, scene_code=args.points.parent.name,
+                          room_id=args.asset.parent.parent.name, asset_version=args.asset.parent.name), stage('room.animation', 'job_attempt'):
+            print(f'[room-animation] job={job} attempt={attempt} stage={args.stage}',flush=True)
+            write_json(job/'status.json',{'state':'preparing','attempt':attempt,'launcher_pid':os.getpid()})
+            write_json(job/'timing_report.json',{'measurement_status':'incomplete','attempt':attempt})
+            samples=[]; thermal={}; stop=threading.Event(); process=None; thread=None
+            preparation=time.perf_counter()-started
+            try:
+                launch_monotonic=time.monotonic()
+                command=['blender','--background','--factory-startup','--python-exit-code','1',
+                         '--python',str(worker_script(code_root)),'--','--job',str(job),
+                         '--attempt',attempt,'--launch-monotonic',str(launch_monotonic)]
+                env=dict(os.environ); env['ROOM_ANIMATION_LOCK_FD']=str(lock_fd)
+                env.update(child_environment())
+                write_json(attempt_dir/'launch.json',{'command':command,'gpu_conflict_checks':busy,'reservation':'all_visible_gpus'})
+                with (attempt_dir/'blender.log').open('w',encoding='utf-8') as log:
+                    process=subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT,env=env,pass_fds=(lock_fd,),start_new_session=True)
+                    emit('accepted', operation='room.animation', stage='blender_launch')
+                    thread=threading.Thread(target=monitor_gpu,args=(stop,process,job/'gpu_metrics.jsonl',samples,thermal),daemon=True)
+                    thread.start(); code=process.wait()
+                process_seconds=time.monotonic()-launch_monotonic
+                stop.set(); thread.join(timeout=6)
+                if thermal.get('terminated'):raise RuntimeError('GPU >=90C: this job terminated; frames retained')
+                if code:raise RuntimeError(f'Blender exited {code}; see {attempt_dir}/blender.log')
+                manifest=read_json(job/'render_manifest.json')
+                if manifest.get('worker_complete') is not True:raise RuntimeError('Worker did not finish all requested outputs')
+                verify_effective_cameras(manifest['frames'],spec)
+                worker=read_json(attempt_dir/'worker_timing.json')
+                if spec['animation'].get('require_nvidia_graphics'):verify_nvidia_renderer(worker.get('renderer',{}))
+                if args.stage=='camera_check':
+                    video=None; encoding_seconds=probe_seconds=0.0
+                else:
+                    write_json(job/'status.json',{'state':'encoding','attempt':attempt})
+                    video,encoding_seconds,probe_seconds=encode(job,attempt_dir,spec)
+                check_guards(inputs)
+                stats=summarize(manifest['frames'],spec)
+                prep=preparation+worker['blender_startup_and_import_seconds']+worker['worker_prepare_seconds']
+                original_encoding=video['encoding_seconds'] if video else 0.0
+                estimate=({'status':'not_requested','reason':'Final job records actual delivery timings; no performance pretest or estimate'}
+                          if args.stage=='final' else estimate_full(stats,spec,prep,original_encoding))
+                gpu_rows=[g for s in samples for g in s.get('gpus',[])]
+                costs={'preparation':prep,'png_rendering':stats['video_frames'].get('sum_seconds',0)+stats['extra_keyframes'].get('sum_seconds',0),
+                       'encoding':original_encoding}
+                current_records=[r for r in manifest['frames'] if r.get('attempt')==attempt]
+                current_render=sum(r['render_seconds'] for r in current_records)
+                report={'measurement_status':'measured_remote_run','attempt':attempt,
+                    'launcher_preparation_seconds':preparation,'blender':worker,'blender_process_seconds':process_seconds,
+                    'frames':stats,'encoding_seconds_this_attempt':encoding_seconds,'ffprobe_seconds_this_attempt':probe_seconds,
+                    'state_update_seconds_this_attempt':sum(r.get('state_update_seconds',0) for r in current_records),
+                    'worker_non_render_overhead_seconds':max(0,process_seconds-worker['blender_startup_and_import_seconds']-worker['worker_prepare_seconds']-current_render),
+                    'encoding_seconds_original':original_encoding,'video':video,'camera_mode':spec['animation']['camera_mode'],
+                    'total_seconds_this_attempt':time.perf_counter()-started,
+                    'frame_timing_scope':'Frame records retain original timings when resumed; this-attempt total excludes historical attempts',
+                    'gpu':{'available':bool(gpu_rows),'sample_count':len(samples),'renderer':worker.get('renderer',{'available':False}),
+                        'peak_memory_mb':max((g['memory_used_mb'] for g in gpu_rows),default=None),
+                        'peak_util_pct':max((g['util_pct'] for g in gpu_rows),default=None),
+                        'note':'Samples cover Blender, every ~5s; all visible GPU device totals, not exclusive per-process allocation'},
+                    'full_video_estimate':estimate,'review_required':True,
+                    'bottleneck_hint':max(costs,key=costs.get)}
+                write_json(attempt_dir/'timing_report.json',report); write_json(job/'timing_report.json',report)
+                manifest.update(technical_complete=True,video=video,guarded_files_unchanged=True,review_required=True,
+                                authorization=spec['animation'].get('authorization',{'mode':'short_review' if approval else 'preview'}))
+                write_json(job/'render_manifest.json',manifest)
+                write_json(job/'status.json',{'state':'awaiting_visual_review','attempt':attempt,'automatic_final_render':False})
+                if args.stage=='short':write_json(job/'approval_template.json',approval_template(job,spec))
+                if video:
+                    print(f'[room-animation] done video={job/video["file"]} frames={video["frames"]} total_seconds={report["total_seconds_this_attempt"]:.3f} status=awaiting_visual_review',flush=True)
+                else:
+                    print(f'[room-animation] camera_check={job/manifest["frames"][0]["path"]} total_seconds={report["total_seconds_this_attempt"]:.3f} status=awaiting_visual_review',flush=True)
+                return job
+            except BaseException as exc:
+                if process is not None:stop_child(process)
+                stop.set()
+                if thread is not None:thread.join(timeout=6)
+                failure={'state':'interrupted' if isinstance(exc,KeyboardInterrupt) else 'failed','attempt':attempt,
+                         'error':str(exc),'elapsed_seconds_this_attempt':time.perf_counter()-started,'frames_retained':True}
+                write_json(job/'status.json',failure); write_json(attempt_dir/'failure.json',failure)
+                write_json(job/'timing_report.json',{'measurement_status':'incomplete',**failure})
+                (attempt_dir/'failure.log').write_text(traceback.format_exc(),encoding='utf-8')
+                print(f'[room-animation] failed job={job} frames_retained=true error={exc}',flush=True)
+                raise
 
 
+@cli_operation('room.animation')
 def main() -> None:
     parser=argparse.ArgumentParser(description='A-stage isolated Room8 animation, no legacy API')
     parser.add_argument('--asset',type=Path); parser.add_argument('--points',type=Path)

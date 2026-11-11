@@ -15,7 +15,7 @@
 | ID/版本/文件/数据库/MinIO关系 | [数据规范](docs/DATA_ASSET_SPEC.md) |
 | 房间资产 / R3样式 / 动画运行 | [资产](docs/rendering/room_assets.md) · [R3](docs/rendering/style.md) · [动画](docs/rendering/animation.md) |
 | 真实数据库导入 | [PostgreSQL计划](docs/database.md) |
-| 老师要求的按钮/API/任务执行日志 | [日志契约，尚待实现](docs/OBSERVABILITY.md) |
+| 老师要求的按钮/API/任务执行日志 | [日志实现与验收边界](docs/OBSERVABILITY.md) |
 | 后续开发必须遵守的约束 | [AGENTS](AGENTS.md) · [CLAUDE](CLAUDE.md) |
 | 旧实验与迁移过程 | [主题归档](docs/archive/20261111_process/README.md) |
 
@@ -24,7 +24,7 @@
 - Room8：独立裁切/UV材质贴图保留、13内部点BFS、R3火烟、独立overview、NVIDIA GPU动画、MP4与回执已远端跑通。正式视频24秒/1280×720/24fps/576帧；当次约6分钟，证据和限制见发布基线。
 - XY人工核验为6条房间记录、22个点位，不是6个有效渲染房间；22客厅、32门口、42户型外、Room11无效。仅Room8有完整资产/视频验收。
 - PostgreSQL服务/八表/CLI/API已有，真实数据导入未完成；Legacy MinIO链路已有，新版Room8资产/视频未完整登记。
-- 前端、新版Room8任务API、完整操作监控、权限及东莞公网展示尚未实施；不创建空目录冒充完成。
+- 公共HTTP/主要CLI/Room8关联日志已本地实现；前端、新版Room8任务API、远端日志验收、权限及东莞公网展示尚未完成。
 - floor_z=-1.35m是平层工程近似；火焰生命周期偏短、后段烟为主，Hybrid、复杂积顶、火烟按墙裁切及灾前重建仍待解决。V1保留，不为文档整理重渲染。
 
 ## 分类标准和实际调用链
@@ -39,7 +39,7 @@ Room8视频：jobs安全启动器 → Blender F8-E + R3/内部BFS → PNG → �
 
 F8-A是原OBJ导入检查，B是独立资产，C是旧视频，D是静帧，E是动画worker。业务Python不得import bpy；只在Blender进程运行专用脚本，任务从jobs启动器创建。旧POST /api/render会处理场景根旧视频，不能替代Room8入口。
 
-源码指纹现在是25份引擎Python和3份公共预设，共28份；没有旧兼容脚本/配置副本。旧40文件或V1原任务不能用新代码改签续跑。R1/R2/R3是三个不同版本，仍各保留一份，默认R3。
+源码指纹现在是26份引擎Python和3份公共预设，共29份；没有旧兼容脚本/配置副本。旧28/40文件或V1原任务不能用新代码改签续跑。R1/R2/R3是三个不同版本，仍各保留一份，默认R3。
 
 ## 常用操作与执行位置
 
@@ -54,7 +54,7 @@ python -m backend.cli.import_rooms --help
 .\deploy\scripts\build.ps1
 ```
 
-本机已有隔离解释器可用`release/out/backend-test-env/Scripts/python.exe`代替python。最近代码回归303项：301通过、2项跳过；另9项F6/F7合成逻辑通过。本轮只改文档、核对清单/链接/指纹，不宣称重新执行代码或远端验收。默认回归不运行真实timeline写入、真实数据库或手工API，跳过不算通过。
+本机已有隔离解释器可用`release/out/backend-test-env/Scripts/python.exe`代替python。操作日志实现已纳入离线回归；结果见tests/README.md。先前基线303项（301通过、2跳过）及9项F6/F7合成逻辑为历史证据，不代替远端验收。默认回归不运行真实timeline写入、真实数据库或手工API，跳过不算通过。
 
 WinSCP负责上传明确版本安装包/核验输入、下载产物；不在远端编辑代码。远程SSH进入已有Compose目录，按当前指南执行原环境核验、资产/渲染或数据库操作。deploy.ps1会连接SSH/SCP、备份并解压；构建/重建、导入和渲染须分别安排，本页不自动执行。禁止本地启动Docker/服务器。
 
@@ -77,7 +77,7 @@ WinSCP负责上传明确版本安装包/核验输入、下载产物；不在远�
 
 ## 下一步
 
-文档审阅提交后，先实现公共请求/操作/CLI日志，再做远端原环境验收和真实数据库导入（6房间、22点及人工关联），之后建设Room8/R3网页闭环和新版MinIO登记。日志规则已写AGENTS，具体组件、前端上报与监控仍待实现。第二房间、生命周期/Hybrid、权限与东莞展示各自排期。
+公共请求/操作/主要CLI及Room8日志已本地实现；接下来审阅提交、远端原环境验收和真实数据库导入（6房间、22点及人工关联），之后建设Room8/R3网页闭环和新版MinIO登记。前端上报与监控网页待实施，日志规则继续由AGENTS约束。第二房间、生命周期/Hybrid、权限与东莞展示各自排期。
 
 main合并、标签、部署和真实数据写入不自动执行。当前源码提交号不冒充V1原远端checkout；完整交付与缺失附件以RELEASES为准。
 
@@ -85,7 +85,7 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 
 下面逐项列出本次整理后可提交的文件（含待提交文档），不包含Git内部目录、被忽略数据/缓存和本地工具环境。后续新增/删除文件应同步本表；归档原文只供追溯。目录README只维护专项边界，不重复本总表。
 
-清单共 **148** 个文件。
+清单共 **153** 个文件。
 
 <details>
 <summary>根目录（10份）</summary>
@@ -106,7 +106,7 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 </details>
 
 <details>
-<summary>backend：后端实现（17份）</summary>
+<summary>backend：后端实现（19份）</summary>
 
 | 文件路径 | 用途 | 属性/运行环境 |
 | --- | --- | --- |
@@ -123,15 +123,17 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 | [backend/cli/__init__.py](backend/cli/__init__.py) | Python包初始化/职责边界；不自动启动服务、连库或渲染 | 包/测试组登记 |
 | [backend/cli/check_catalog.py](backend/cli/check_catalog.py) | 应用账号权限与已导入场景目录的只读核验 | 普通Python |
 | [backend/cli/import_rooms.py](backend/cli/import_rooms.py) | 核验输入构造关系计划；默认preview，--apply写库，上传另行明确 | 普通Python |
+| [backend/cli/log_timeline.py](backend/cli/log_timeline.py) | 只读JSONL时间线、HTTP子集统计及独立Markdown输出 | 普通Python/本地或远端CLI |
 | [backend/database/migrations/001_rooms.sql](backend/database/migrations/001_rooms.sql) | scenes等八张业务表的唯一初始迁移；文件名/内容保持不变 | 数据库迁移 |
 | [backend/paths.py](backend/paths.py) | 安装根、Legacy worker和SQL定位；不可变迁移指纹校验 | 普通Python |
 | [backend/services/__init__.py](backend/services/__init__.py) | Python包初始化/职责边界；不自动启动服务、连库或渲染 | 包/测试组登记 |
 | [backend/services/observability.py](backend/services/observability.py) | 已有Legacy生命周期/失败/状态/GPU监控；不是完整请求追踪 | 普通Python |
+| [backend/services/request_logging.py](backend/services/request_logging.py) | 纯ASGI请求/异常/取消追踪、响应ID及后台耗时区分 | Backend/ASGI中间件 |
 
 </details>
 
 <details>
-<summary>render_engine：渲染引擎（26份）</summary>
+<summary>render_engine：渲染引擎（27份）</summary>
 
 | 文件路径 | 用途 | 属性/运行环境 |
 | --- | --- | --- |
@@ -153,12 +155,13 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 | [render_engine/geometry/room_source_io.py](render_engine/geometry/room_source_io.py) | 只读OBJ/MTL、顶点/面/逐角UV/材质、坐标逆变换、路径和SHA | 普通Python |
 | [render_engine/jobs/__init__.py](render_engine/jobs/__init__.py) | Python包初始化/职责边界；不自动启动服务、连库或渲染 | 包/测试组登记 |
 | [render_engine/jobs/room_animation_job.py](render_engine/jobs/room_animation_job.py) | 配置快照/来源保护、续跑、绝对状态、帧/视频验证、耗时与审批契约 | 普通Python |
+| [render_engine/jobs/operation_logging.py](render_engine/jobs/operation_logging.py) | 标准库JSONL分片、脱敏、上下文/span及CLI/子进程关联 | 共享普通Python/Blender Python |
 | [render_engine/jobs/run_room_animation.py](render_engine/jobs/run_room_animation.py) | 普通Python任务启动器：预检/锁/冲突、Blender、GPU、编码和失败保留 | 普通Python |
 | [render_engine/legacy/F6_detect.py](render_engine/legacy/F6_detect.py) | 原F6烧损图像评分与起火点识别，旧HTTP仍使用 | 普通Python |
 | [render_engine/legacy/F7_spread.py](render_engine/legacy/F7_spread.py) | 原F7拓扑BFS与旧timeline，不与Room8内部BFS混写 | 普通Python |
 | [render_engine/legacy/F8_blender_render.py](render_engine/legacy/F8_blender_render.py) | F8-C旧全场景worker，操作场景根output.mp4；不能替代Room8新入口 | 仅Blender |
 | [render_engine/legacy/__init__.py](render_engine/legacy/__init__.py) | Python包初始化/职责边界；不自动启动服务、连库或渲染 | 包/测试组登记 |
-| [render_engine/paths.py](render_engine/paths.py) | 安装根、R3/worker定位及28份正式源码/预设指纹清单 | 普通Python |
+| [render_engine/paths.py](render_engine/paths.py) | 安装根、R3/worker定位及29份正式源码/预设指纹清单 | 普通Python |
 | [render_engine/propagation/__init__.py](render_engine/propagation/__init__.py) | Python包初始化/职责边界；不自动启动服务、连库或渲染 | 包/测试组登记 |
 | [render_engine/propagation/room_demo_plan.py](render_engine/propagation/room_demo_plan.py) | 展示连接分量、房间内部诱导子图BFS及渐变包络，无Hybrid | 普通Python |
 
@@ -198,7 +201,7 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 </details>
 
 <details>
-<summary>tests：测试（45份）</summary>
+<summary>tests：测试（47份）</summary>
 
 | 文件路径 | 用途 | 属性/运行环境 |
 | --- | --- | --- |
@@ -208,10 +211,11 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 | [tests/backend/test_backend_migration.py](tests/backend/test_backend_migration.py) | 后端正式路径、启动隔离、SQL/账号/旧worker、完整包与API保持 | 离线测试/替身 |
 | [tests/backend/test_catalog_deployment.py](tests/backend/test_catalog_deployment.py) | 目录与旧下载隔离、应用账号、部署及旧功能可用性 | 离线测试/替身 |
 | [tests/backend/test_room_api.py](tests/backend/test_room_api.py) | catalog房间/点位/资产接口、分页和错误处理 | 离线测试/替身 |
+| [tests/backend/test_operation_logging.py](tests/backend/test_operation_logging.py) | API/CLI追踪、失败/脱敏、并发/轮转及时间线离线回归 | 离线测试/替身 |
 | [tests/backend/test_room_database.py](tests/backend/test_room_database.py) | 合成导入/人工结论保护及显式真实PostgreSQL事务集成 | 离线测试/替身 |
 | [tests/backend/test_v6_share.py](tests/backend/test_v6_share.py) | 预签名/已有产物、旧分享API、缓存及GPU温度保护 | 离线测试/替身 |
 | [tests/deploy/__init__.py](tests/deploy/__init__.py) | 登记该职责组的离线模块清单，供tests/suites.py汇总 | 包/测试组登记 |
-| [tests/deploy/test_canonical_layout.py](tests/deploy/test_canonical_layout.py) | 唯一正式路径、SQL/R3、28文件指纹及旧40文件任务拒绝 | 离线测试/替身 |
+| [tests/deploy/test_canonical_layout.py](tests/deploy/test_canonical_layout.py) | 唯一正式路径、SQL/R3、29文件指纹及旧40文件任务拒绝 | 离线测试/替身 |
 | [tests/deploy/test_migration_cleanup.py](tests/deploy/test_migration_cleanup.py) | 离线注册/报告及部署状态保护、必需模板/入口和产物隔离 | 离线测试/替身 |
 | [tests/deploy/test_release_safety.py](tests/deploy/test_release_safety.py) | 临时PowerShell/tar打包、秘密排除、外部命令失败阻断 | 离线测试/替身 |
 | [tests/engine/__init__.py](tests/engine/__init__.py) | 登记该职责组的离线模块清单，供tests/suites.py汇总 | 包/测试组登记 |
@@ -219,6 +223,7 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 | [tests/engine/test_engine_migration.py](tests/engine/test_engine_migration.py) | 正式引擎CLI/导入、完整源码清单、安装包及旧任务拒绝 | 离线测试/替身 |
 | [tests/engine/test_prepare_room_asset.py](tests/engine/test_prepare_room_asset.py) | 基础保存/重载、点位对应、剖面及检查图逻辑 | 离线测试/替身 |
 | [tests/engine/test_room_animation.py](tests/engine/test_room_animation.py) | 任务隔离/锁、绝对时间、帧/编码/报告/续跑与失败保留 | 离线测试/替身 |
+| [tests/engine/test_room_operation_logging.py](tests/engine/test_room_operation_logging.py) | Room8任务/worker关联、失败保留、日志故障及输出隔离 | 离线测试/替身 |
 | [tests/engine/test_room_animation_camera.py](tests/engine/test_room_animation_camera.py) | overview/closeup独立相机、构图、有效机位证据及只读旧报告 | 离线测试/替身 |
 | [tests/engine/test_room_animation_final.py](tests/engine/test_room_animation_final.py) | 直接正式出片门禁、576帧/总览/冻结风格及完整解码保护 | 离线测试/替身 |
 | [tests/engine/test_room_candidate.py](tests/engine/test_room_candidate.py) | 凹多边形裁切、UV/Z、工程近似、版本隔离与源文件保护 | 离线测试/替身 |
@@ -272,7 +277,7 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 | --- | --- | --- |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 当前三条链路、组件/数据/进程边界与尚未实现的目标架构 | 文档/约束 |
 | [docs/DATA_ASSET_SPEC.md](docs/DATA_ASSET_SPEC.md) | 场景/房间/版本/任务ID、存储位置、指纹、上传登记及恢复规则 | 文档/约束 |
-| [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) | 待实现的按钮/API/CLI/任务关联日志、时间线、耗时、脱敏和监控验收 | 文档/约束 |
+| [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) | 公共HTTP/主要CLI/Room8关联日志、时间线、耗时、脱敏及待远端/前端验收边界 | 文档/约束 |
 | [docs/PRD.md](docs/PRD.md) | 产品目标、MVP、验收及日志/真实导入/网页的实施优先级 | 文档/约束 |
 | [docs/PROJECT_ORGANIZATION.md](docs/PROJECT_ORGANIZATION.md) | 职责/用途分类和依赖方向；逐文件表只在根README维护 | 文档/约束 |
 | [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) | 已完成/部分完成/待实施、限制及后续门禁，不追加每轮代码流水账 | 文档/约束 |

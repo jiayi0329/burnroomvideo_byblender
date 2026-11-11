@@ -73,7 +73,7 @@ class CanonicalLayout(unittest.TestCase):
         sources = engine.source_paths(ROOT)
         actual = {p.relative_to(ROOT).as_posix() for p in (ROOT/'render_engine').rglob('*.py')}
         self.assertEqual(actual, {k for k in sources if k.startswith('render_engine/')})
-        self.assertEqual(len(sources), 28)
+        self.assertEqual(len(sources), 29)
         self.assertFalse(any(k.startswith(('app/', 'release/', 'test/')) for k in sources))
 
     def test_previous_40_file_task_cannot_resume_or_have_snapshot_rewritten(self) -> None:

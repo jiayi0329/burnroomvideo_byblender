@@ -11,11 +11,13 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from backend.adapters.postgres.database import connect
+from render_engine.jobs.operation_logging import cli_operation, traced
 
 TABLES = ('scenes', 'layout_versions', 'rooms', 'points', 'point_room_memberships',
           'assets', 'render_jobs', 'render_job_assets')
 
 
+@traced('catalog.check', 'database_read')
 def check_catalog(scene_code: str | None = None) -> dict[str, Any]:
     with connect() as conn:
         role = conn.execute('SELECT current_user AS name, rolsuper, rolcreatedb, rolcreaterole FROM pg_roles WHERE rolname=current_user').fetchone()
@@ -37,6 +39,7 @@ def check_catalog(scene_code: str | None = None) -> dict[str, Any]:
     return summary
 
 
+@cli_operation('catalog.check')
 def main() -> int:
     parser = argparse.ArgumentParser(description='Check catalog using application credentials, without changing data')
     parser.add_argument('--scene')
