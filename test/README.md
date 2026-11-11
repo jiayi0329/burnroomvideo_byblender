@@ -1,5 +1,15 @@
 # 测试规范与需求追溯
 
+## 2026-11-10 第7批：分组入口与发布收尾
+
+统一入口为`python -B -m tests.run_regression`，四组由tests/{backend,engine,tools,deploy}明确注册，原test用例实体与模块命令继续保留。`--list`只列模块，`--group`可重复选择但不重复执行；`--report`仅新建报告，不覆盖旧报告。新增`tests/deploy/test_migration_cleanup.py`，追溯[PRD工程要求](../docs/PRD.md)、[架构2.4](../docs/ARCHITECTURE.md)和[第7批收尾](../docs/migration_closeout.md)。覆盖离线清单/真实集成环境拒绝、报告失败统计与防覆盖、跨工作目录、模板与shell镜像、旧/新发布命令、临时安装包/私有测试产物排除、必需文件缺失拒绝及Legacy/Room任务活动状态部署保护。
+
+旧`test_api.py`会写真实timeline，现须ROOM_TIMELINE_INTEGRATION=1，仍不进入离线清单。PostgreSQL集成仍须单独授权；离线入口拒绝继承的ROOM_DB_INTEGRATION=1和ROOM_TIMELINE_INTEGRATION=1，不静默运行真实集成。旧F6/F7私有场景回归未纳入此清单，保留原代码，不冒充通过。
+
+本地PowerShell完整项目中使用`release/out/backend-test-env/Scripts/python.exe -B -m tests.run_regression`。生产Python/依赖不变，真实远端、Docker、数据库和GPU未运行。发布测试仅在临时合成目录执行PowerShell/tar，SSH/SCP均为替身；模拟视频日志不是新成片。详细命令见[tests/README](../tests/README.md)。
+
+最终相关回归295项：293通过、2项跳过（未启用真实PostgreSQL、未安装可选Matplotlib）；本批新增16项全部通过。收紧Docker测试目录白名单后另复核3项部署契约，全部通过。40份引擎源码/预设、91份受保护源码/模板/历史文档及24份V1备份SHA不变，原timeline测试方法AST不变，仅增加显式开关。4份新旧PowerShell脚本语法、BOM及远端shell LF检查通过。完整报告位于忽略目录`release/out/cleanup-migration/20261110T114905Z_1e6672b7/regression_final.json`，另有`verification.json`；测试环境仍为Python3.13/Pydantic2.10.6，不替代远端原环境验收。
+
 ## 2026-11-10 第6批：诊断与手工集成工具迁移
 
 新增`test_tools_migration.py`（16项），对应[PRD工程要求](../docs/PRD.md)、[架构工具边界](../docs/ARCHITECTURE.md)及[目录规范第6批](../docs/PROJECT_ORGANIZATION.md)。验证4份新旧模块同一性、公共函数导出及旧CLI替换兼容、12条普通CLI帮助路径、Blender帮助替身、导入无网络/连库/写入、共享核心只读且不反向依赖Backend/tools、合成对齐/高度结果与输入保护、40文件指纹变更拒绝、手工API显式开关/凭证缺失/假响应脱敏，以及完整临时安装包和缺少必需工具/核心时阻断。旧包装测试更新实际文件清单，保留原断言。

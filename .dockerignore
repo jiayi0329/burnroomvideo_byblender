@@ -30,7 +30,11 @@ render_engine/**/*.png
 render_engine/**/*.jpg
 render_engine/**/*.mp4
 !test/
-!test/**
+!test/**/
+!test/**/*.py
+!tests/
+!tests/**/
+!tests/**/*.py
 !tools/
 !tools/__init__.py
 !tools/diagnostics/

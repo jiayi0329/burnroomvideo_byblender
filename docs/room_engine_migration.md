@@ -1,5 +1,7 @@
 # 第4批：新版Room8引擎与预设迁移
 
+第7批后发布实现位于deploy/scripts，release/scripts旧命令继续转调；安装包仍输出release/out。本轮不改引擎40文件指纹。离线回归统一入口为`python -B -m tests.run_regression`，原test模块命令保留；完整仓库执行发布回归，不把Linux运行镜像等同于完整开发环境。见[发布边界](../deploy/README.md)及[收尾说明](migration_closeout.md)。
+
 第5批后完整安装包还包含Backend源码及原样SQL，app旧入口依赖这些包；只传app文件仍不可用。Room8引擎及39文件指纹未变，数据库迁移/导入不会随打包、解压或普通引擎启动自动执行。具体边界见[Backend说明](../backend/README.md)。
 
 2026-11-10第6批：共用对齐分析Core已独立，诊断源码迁入tools，Backend不导入诊断CLI。清单扩为40份，下面为当前完整包边界；不得用它续跑39文件清单的旧任务。算法/R3不改，工具见[tools/README](../tools/README.md)。

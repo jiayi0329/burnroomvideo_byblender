@@ -13,6 +13,7 @@ import unittest
 from render_engine.paths import CODE_FILES
 from backend.paths import PACKAGE_FILES
 from test.tool_paths import DIAGNOSTIC_FILES
+from tests.suites import PACKAGE_FILES as TEST_ENTRY_FILES
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -27,6 +28,9 @@ class ReleaseSafety(unittest.TestCase):
         scripts.mkdir(parents=True)
         for name in ('build.ps1', 'deploy.ps1', 'prepare_deploy.sh'):
             shutil.copyfile(ROOT / 'release/scripts' / name, scripts / name)
+            target = self.root / 'deploy/scripts' / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(ROOT / 'deploy/scripts' / name, target)
         for name, content in {
             'app/source.py': 'print("synthetic")', 'app/db/001.sql': 'SELECT 1;',
             'render_engine/blender/F8_room_helpers.py': '# synthetic Blender shared helper',
@@ -35,6 +39,9 @@ class ReleaseSafety(unittest.TestCase):
             'tools/__init__.py': '', 'tools/diagnostics/__init__.py': '',
             'tools/diagnostics/diagnose_room_sections.py': '# synthetic diagnostic entry',
             'release/docker-compose.prod.yml': 'services: {}', 'release/prod.env.example': 'PLACEHOLDER=1',
+            'release/docker-compose.gpu.yml': 'services: {}',
+            'deploy/docker-compose.prod.yml': 'services: {}', 'deploy/prod.env.example': 'PLACEHOLDER=1',
+            'deploy/docker-compose.gpu.yml': 'services: {}',
             '.env': 'SYNTHETIC_SECRET=not-production', 'prod.env': 'SYNTHETIC_SECRET=not-production',
             'app/.env': 'SYNTHETIC_SECRET=not-production', 'test/prod.env': 'SYNTHETIC_SECRET=not-production',
         }.items():
@@ -55,6 +62,10 @@ class ReleaseSafety(unittest.TestCase):
             path = self.root / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text('# synthetic diagnostic fixture', encoding='utf-8')
+        for relative in TEST_ENTRY_FILES:
+            path = self.root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(ROOT / relative, path)
         shutil.copyfile(ROOT / '.dockerignore', self.root / '.dockerignore')
 
     def run_ps(self, command: str) -> subprocess.CompletedProcess:

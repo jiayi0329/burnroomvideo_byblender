@@ -1,6 +1,6 @@
 # 项目职责目录与渐进迁移规范
 
-更新：2026-11-10。**第1–6批已完成本地整理；第7批测试/部署收尾仍为计划。** app旧入口、test、release继续保留，不创建前端骨架或删除Legacy源码。架构依据见[ARCHITECTURE](ARCHITECTURE.md)。
+更新：2026-11-10。**第1–7批已完成本地目录整理；远端复验与main合并仍待单独审阅。** app旧入口、test用例实体、release兼容入口继续保留，不创建前端骨架或删除Legacy源码。架构依据见[ARCHITECTURE](ARCHITECTURE.md)。
 
 ## 1. 两个分类维度
 
@@ -38,14 +38,14 @@ render_engine/
 tools/
   diagnostics/                 # 非正式流程检查、断面图与API探测
   integration/                 # 需明确环境的手工集成检查
-tests/{backend,engine,tools,deploy}/
+tests/{backend,engine,tools,deploy}/ # 分组入口已落地，旧test用例实体继续复用
 configs/{render,schemas}/       # 公共预设；数据契约模式待落地
 docs/                          # 当前需求、架构、状态、运行手册
   archive/                     # 不可当成当前操作指南
-deploy/                        # Docker、Compose、发布脚本、模板
+deploy/                        # 发布脚本/生产模板已落地；根Dockerfile/开发Compose保留
 app/                           # 过渡保留，含新版及Legacy入口
-test/                          # 当前测试，暂不改成 tests/
-release/                       # 当前发布入口，暂不改成 deploy/
+test/                          # 原用例/替身及旧unittest模块路径
+release/                       # 兼容入口/模板副本及原out目录
 ```
 
 `configs/schemas/` 为以后实现请求校验的目标位置，本轮 Markdown 示例不等于已实现 JSON Schema。职责拆分不承诺同时拆镜像、服务或引入任务队列。
@@ -77,9 +77,9 @@ release/                       # 当前发布入口，暂不改成 deploy/
 | app/probe_floorplan.py | 上游API探测兼容入口 | 实现已迁tools/diagnostics；实际源文件可独立使用，不提交真实返回包或appkey |
 | app/F8_blender_render.py（F8-C） | 旧 main 绑定的 Legacy worker | 保留原入口；之后可迁至独立 legacy 区并保留兼容启动路径 |
 | configs/render/room_fire_round1/2/3.json、旧app副本 | 默认预设与兼容副本 | 第4批原样复制，默认寻址已迁移；打包拒绝新旧副本不一致 |
-| test/*.py、test/__init__.py | 当前单元/替身/部分集成测试 | 后续逐组迁至 tests/，保留现有模块命令直至引用更新 |
+| test/*.py、test/__init__.py | 当前用例/替身及显式集成测试，实体保留 | 第7批tests分组入口复用原模块；旧命令保留，不复制第二套测试类；新增收尾用例在tests/deploy |
 | test_4dkankan.py | 根目录手工API兼容入口，不自动执行 | 实现已迁tools/integration/probe_scene_api.py；不再自动加载.env，必须显式--allow-network，输出脱敏；不随生产包发布 |
-| release/scripts/*、release/*.yml、release/prod.env.example、Dockerfile、docker-compose.yml | 当前部署与开发配置 | deploy/ 目录本身最后迁移；代码每次跨目录移动时，原位置打包规则必须同步适配，不能留到最后 |
+| release/scripts/*、release/*.yml、release/prod.env.example、Dockerfile、docker-compose.yml | 发布兼容入口与开发配置 | 第7批发布实现迁deploy/scripts，模板迁deploy；release保留PS转调/受校验副本，输出仍release/out；根Dockerfile/开发Compose不移动 |
 | requirements*.txt、.gitignore、.dockerignore | 构建与依赖边界 | 根目录先保留；诊断绘图库继续与生产依赖分开 |
 | docs/room_*.md、docs/database.md | 操作依据与部分历史实验 | 建索引标明适用版本；核对引用后再逐篇归档，不能全量移走 |
 | PRD_V1.1.md、architecture.md | 原始累积文档 | 原样快照在 archive；根文件保留兼容链接，新有效规范在 docs/ |
@@ -115,7 +115,7 @@ release/                       # 当前发布入口，暂不改成 deploy/
 | 4 | 新版Room8引擎及配置迁入render_engine/configs | 本地实现；13个app兼容模块、默认R3、worker、打包/镜像上下文与完整指纹已适配；未远端部署/渲染 |
 | 5 | Backend API、数据库工具和MinIO适配分组整理 | 本地实现；7份兼容模块、原样SQL、完整打包与API回归；未导入数据或远端部署 |
 | 6 | 其余诊断/集成工具逐组迁移 | 本地完成；4份app兼容入口、只读分析核心、手工API显式开关及10份诊断打包；历史Z轴工具保留，未真实联网/诊断 |
-| 7 | 测试/部署目录收尾及稳定性审阅 | 待执行；旧发布入口兼容，全量相关回归后审阅main合并 |
+| 7 | 测试/部署目录收尾及稳定性审阅 | 本地完成；tests分组/离线报告、deploy实现/release兼容、房间任务部署保护；原测试实体保留；不自动合并main |
 
 每批结束均回看diff、调用链与对应测试。新源码使用新任务；复现V1从原基线归档恢复，不能把旧任务改签名后续跑。跨目录迁移时立即更新部署引用，不能等第7批才修打包。
 
@@ -138,3 +138,5 @@ release/                       # 当前发布入口，暂不改成 deploy/
 第5批已迁移7个Backend实现，保留app入口和原SQL副本；15份后端Python及1份SQL纳入打包，SQL内容不变，增加缺失/副本不一致阻断。ASGI入口仍app.main:app，仅增加backend热重载路径。251项相关回归249通过、2项跳过，真实数据库/远端部署未执行。Room8引擎及其源码指纹完全不改。剩余第6–7批继续分批审核，不删除Z轴工具或混入新网页功能。
 
 2026-11-10第6批完成4个诊断实现及1个手工集成实现迁移。18个共享函数独立进入引擎只读层，Backend不再导入诊断CLI；旧函数与CLI保留。279项相关回归277通过、2项跳过，新增16项全部通过。原火烟、传播、裁切及R3字节不变；完整源码清单新增分析核心为40份，旧任务不能重签续跑。第7批仅继续测试/部署收尾与稳定性审阅，不自动合并main。
+
+第7批完成发布实现/生产模板归位与分组离线回归入口。原test实体和根Dockerfile/开发Compose明确保留，避免批量路径变化；release命令不变。模板/独立shell新旧副本一致才打包；准备/渲染/编码中的房间任务阻断部署，真实timeline测试显式启用。实际测试、尚未远端验证项及合并边界见[收尾说明](migration_closeout.md)与[test/README](../test/README.md)。没有数据库操作、Docker运行、渲染、提交或main合并。

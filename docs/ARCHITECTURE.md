@@ -103,7 +103,9 @@ Linux 锁使协作的新版任务串行，不能原子阻止其他用户或旧 A
 | PostgreSQL | 关系目录与查询摘要，尚未导入真实场景 |
 | MinIO | 已上传对象；新版本地文件存在不等于已经上传 |
 
-生产挂载关系、各层编号和防覆盖规则见数据规范。部署继续本地 build/deploy、远端构建/重建；本轮仅文档，不执行这些动作。
+生产挂载关系、各层编号和防覆盖规则见数据规范。第7批发布实现归deploy/scripts，生产模板归deploy；release旧PowerShell命令转调，模板及独立prepare_deploy.sh保留SHA校验副本，输出仍release/out。prepare_deploy同时只读检查Legacy与房间活动任务，状态异常/损坏时停止；维护期仍需冻结新任务，不构成原子调度锁。根Dockerfile/开发Compose、端口与挂载不变。本轮不执行部署或Docker。
+
+离线测试使用tests四组明确清单复用原test模块，禁止默认发现真实timeline集成与手工API探测；若继承真实DB/timeline启用变量则拒绝运行。报告新建不覆盖，跳过与失败分别记录。原测试实体继续保留，Windows离线通过不等于远端原Python/NVIDIA/视觉验收。操作边界见[tests](../tests/README.md)、[deploy](../deploy/README.md)及[收尾说明](migration_closeout.md)。
 
 ## 3. Target：最小网页闭环（尚未实现）
 

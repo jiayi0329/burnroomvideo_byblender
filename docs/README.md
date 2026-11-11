@@ -12,6 +12,9 @@
 | 第4批引擎目录、完整代码包与兼容边界 | [room_engine_migration](room_engine_migration.md) |
 | 第5批Backend实际目录、API/CLI与SQL兼容边界 | [backend/README](../backend/README.md) |
 | 第6批诊断/集成工具、兼容入口与联网边界 | [tools/README](../tools/README.md) |
+| 第7批分组离线回归与旧测试兼容 | [tests/README](../tests/README.md) |
+| 第7批发布实现、旧命令与模板边界 | [deploy/README](../deploy/README.md) |
+| 七批收尾与main合并前审阅 | [migration_closeout](migration_closeout.md) |
 | 编号、路径、数据库/MinIO对应关系 | [DATA_ASSET_SPEC](DATA_ASSET_SPEC.md) |
 
 ## 操作资料与适用范围

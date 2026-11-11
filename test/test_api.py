@@ -4,6 +4,7 @@
     docker exec burnroomvideo_byblender-app-server-1 python3 -m unittest test.test_api -v
 """
 import sys
+import os
 import unittest
 from pathlib import Path
 
@@ -18,6 +19,8 @@ SCENE_CODE = "KK-EEz16cmU14"
 TIMELINE_PATH = PROJECT_ROOT / "data" / SCENE_CODE / "timeline.json"
 
 
+@unittest.skipUnless(os.getenv('ROOM_TIMELINE_INTEGRATION') == '1',
+                     'Explicit real timeline integration opt-in required; writes scene timeline.json')
 class TestGenerateTimeline(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:

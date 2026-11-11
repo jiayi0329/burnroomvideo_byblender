@@ -11,9 +11,15 @@ cd "$current"
 python3 - <<'PY'
 import json
 from pathlib import Path
-for path in Path('/data/zhaojy/burnroom-data/app-data').glob('*/render_status.json'):
+data_root = Path('/data/zhaojy/burnroom-data/app-data')
+for path in data_root.glob('*/render_status.json'):
     if json.loads(path.read_text(encoding='utf-8')).get('status') == 'running':
-        raise SystemExit('Render marked running; verify completion before deployment')
+        raise SystemExit('Legacy render marked running; verify completion before deployment')
+for path in data_root.glob('*/rooms/*/render_jobs/*/status.json'):
+    if json.loads(path.read_text(encoding='utf-8')).get('state') in {
+        'created', 'preparing', 'rendering', 'encoding'
+    }:
+        raise SystemExit('Room render marked active; verify completion before deployment')
 PY
 
 stamp=$(date -u +%Y%m%dT%H%M%SZ)-$$
