@@ -1,5 +1,7 @@
 # 发布实现与兼容入口
 
+> 2026-11-11：结束兼容期，release受跟踪脚本/模板已删除。只使用deploy/scripts/build.ps1、deploy.ps1和本目录模板；输出仍在忽略的release/out，原备份不删除。下文第7批双副本约定已被替代。构建只读取backend/database SQL及configs/render预设，固定指纹保护不依赖旧副本。当前见[正式路径](../docs/canonical_paths.md)。
+
 2026-11-10第7批。正式实现位于`deploy/scripts/{build.ps1,deploy.ps1,prepare_deploy.sh}`；生产/GPU模板及无密钥示例位于本目录。根Dockerfile和开发docker-compose.yml仍为有效入口，不移动、不改部署拓扑。
 
 旧的`release/scripts/build.ps1`和`deploy.ps1`只转调新实现，原命令继续可用；输出仍在被Git忽略的`release/out/`。`release/`下三个模板及prepare_deploy.sh保留兼容副本，打包比较字节SHA，不一致或缺失即停止。修改模板/保护脚本时须同步副本；真实prod.env仍仅存在于服务器，不用本地模板覆盖。

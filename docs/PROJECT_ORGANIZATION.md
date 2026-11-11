@@ -1,5 +1,7 @@
 # 项目职责目录与渐进迁移规范
 
+2026-11-11后续用户决定：结束以下七批的兼容保留阶段。正式源码只使用backend/render_engine/tools/deploy/tests，移除app/release源码及test旧包，SQL改为backend/database。下面映射表中的“保留旧入口/副本”记录分批迁移过程，不再是当前执行约束。最新路径和边界见[正式说明](canonical_paths.md)。
+
 更新：2026-11-10。**第1–7批已完成本地目录整理；远端复验与main合并仍待单独审阅。** app旧入口、test用例实体、release兼容入口继续保留，不创建前端骨架或删除Legacy源码。架构依据见[ARCHITECTURE](ARCHITECTURE.md)。
 
 ## 1. 两个分类维度
@@ -139,4 +141,4 @@ release/                       # 兼容入口/模板副本及原out目录
 
 2026-11-10第6批完成4个诊断实现及1个手工集成实现迁移。18个共享函数独立进入引擎只读层，Backend不再导入诊断CLI；旧函数与CLI保留。279项相关回归277通过、2项跳过，新增16项全部通过。原火烟、传播、裁切及R3字节不变；完整源码清单新增分析核心为40份，旧任务不能重签续跑。第7批仅继续测试/部署收尾与稳定性审阅，不自动合并main。
 
-第7批完成发布实现/生产模板归位与分组离线回归入口。原test实体和根Dockerfile/开发Compose明确保留，避免批量路径变化；release命令不变。模板/独立shell新旧副本一致才打包；准备/渲染/编码中的房间任务阻断部署，真实timeline测试显式启用。实际测试、尚未远端验证项及合并边界见[收尾说明](migration_closeout.md)与[test/README](../test/README.md)。没有数据库操作、Docker运行、渲染、提交或main合并。
+第7批完成发布实现/生产模板归位与分组离线回归入口。原test实体和根Dockerfile/开发Compose明确保留，避免批量路径变化；release命令不变。模板/独立shell新旧副本一致才打包；准备/渲染/编码中的房间任务阻断部署，真实timeline测试显式启用。实际测试、尚未远端验证项及合并边界见[收尾说明](migration_closeout.md)与[test/README](../tests/README.md)。没有数据库操作、Docker运行、渲染、提交或main合并。

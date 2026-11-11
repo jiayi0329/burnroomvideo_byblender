@@ -1,16 +1,13 @@
 ﻿[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-# deploy/scripts/build.ps1 (release/scripts/build.ps1 remains a compatibility entry)
+# deploy/scripts/build.ps1: canonical release implementation
 $ErrorActionPreference = "Stop"
 
 # 获取项目根目录
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $ProjectRoot = (Get-Item $ScriptDir).Parent.Parent.FullName
-# Templates and standalone shell helper retain byte-identical release mirrors.
+# Require canonical production templates and standalone helper.
 foreach ($Relative in @('docker-compose.prod.yml', 'docker-compose.gpu.yml', 'prod.env.example', 'scripts/prepare_deploy.sh')) {
-    $Canonical = Join-Path $ProjectRoot "deploy/$Relative"
-    $Mirror = Join-Path $ProjectRoot "release/$Relative"
-    if (-not (Test-Path -LiteralPath $Canonical -PathType Leaf) -or -not (Test-Path -LiteralPath $Mirror -PathType Leaf)) { throw "Required deployment template/helper missing: $Relative" }
-    if ((Get-FileHash -LiteralPath $Canonical -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath $Mirror -Algorithm SHA256).Hash) { throw "Deployment compatibility mirror differs: $Relative" }
+    if (-not (Test-Path -LiteralPath (Join-Path $ProjectRoot "deploy/$Relative") -PathType Leaf)) { throw "Required deployment template/helper missing: $Relative" }
 }
 $OutDir = Join-Path $ProjectRoot "release\out"
 $BuildId = (Get-Date -Format "yyyyMMdd-HHmmssfff") + "-" + [guid]::NewGuid().ToString("N").Substring(0, 8)
@@ -26,11 +23,9 @@ $PartialPackagePath = "$PackagePath.part"
 
 Write-Host "===> [1/4] 初始化打包环境..." -ForegroundColor Cyan
 New-Item -ItemType Directory -Path $StagingDir -Force | Out-Null
-New-Item -ItemType Directory -Path "$StagingDir/scripts" | Out-Null
 
 Write-Host "===> [2/4] 组装核心代码与依赖..." -ForegroundColor Cyan
 # 拷贝纯净代码，自动剔除本地缓存
-Copy-Item -Path "$ProjectRoot\app" -Destination $StagingDir -Recurse
 # Backend implementations and unchanged baseline SQL accompany all app shims.
 $BackendModules = @{
     api = @('main', 'room_api')
@@ -39,7 +34,7 @@ $BackendModules = @{
     cli = @('import_rooms', 'check_catalog')
     services = @('observability')
 }
-$BackendFiles = @('backend/__init__.py', 'backend/paths.py', 'backend/adapters/__init__.py', 'backend/db/migrations/001_rooms.sql')
+$BackendFiles = @('backend/__init__.py', 'backend/paths.py', 'backend/adapters/__init__.py', 'backend/database/migrations/001_rooms.sql')
 foreach ($Group in $BackendModules.Keys) {
     $BackendFiles += "backend/$Group/__init__.py"
     foreach ($Module in $BackendModules[$Group]) { $BackendFiles += "backend/$Group/$Module.py" }
@@ -51,16 +46,17 @@ foreach ($Relative in $BackendFiles) {
     New-Item -ItemType Directory -Path (Split-Path -Parent $Destination) -Force | Out-Null
     Copy-Item -LiteralPath $Source -Destination $Destination
 }
-if ((Get-FileHash -LiteralPath (Join-Path $ProjectRoot 'backend/db/migrations/001_rooms.sql') -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath (Join-Path $ProjectRoot 'app/db/001_rooms.sql') -Algorithm SHA256).Hash) {
-    throw 'Baseline migration differs from compatibility SQL; do not change applied migrations'
+if ((Get-FileHash -LiteralPath (Join-Path $ProjectRoot 'backend/database/migrations/001_rooms.sql') -Algorithm SHA256).Hash -ne 'F87B9E6D1C6513FA7F8FE00C0FA2D3674796CD136CDC5B4C9080967FE97E5668') {
+    throw 'Baseline migration changed; do not edit applied migrations'
 }
-# Room8 engine is an installed package; never ship only the app shims.
+# Canonical Room8 and Legacy engine packages.
 $EngineModules = @{
     blender = @('F8_prepare_room_asset', 'F8_room_demo', 'F8_room_animation', 'F8_room_fire_style', 'F8_room_helpers')
     jobs = @('run_room_animation', 'room_animation_job')
     effects = @('room_fire_config')
     propagation = @('room_demo_plan')
     geometry = @('room_source_io', 'room_source_inputs', 'room_clip_geometry', 'prepare_room_candidate', 'floorplan_alignment')
+    legacy = @('F6_detect', 'F7_spread', 'F8_blender_render')
 }
 $EngineFiles = @('render_engine/__init__.py', 'render_engine/paths.py')
 foreach ($Group in $EngineModules.Keys) {
@@ -74,13 +70,16 @@ foreach ($Relative in $EngineFiles) {
     New-Item -ItemType Directory -Path (Split-Path -Parent $Destination) -Force | Out-Null
     Copy-Item -LiteralPath $Source -Destination $Destination
 }
+$ApprovedPresetHashes = @{
+    1 = 'F1F6A552746C999C416BC7DA5B36A4FF0F515F596140D6C0D6588F774B41A815'
+    2 = '6E99A2327305A668458BEA516D9DE87285164EC4C7BA67B0C21F41D5B59CE375'
+    3 = 'AF9854A21F47E840C837B9299584D4D7D9FD74DFA4FAC19251E91873369D4202'
+}
 foreach ($Revision in 1, 2, 3) {
     $Relative = "configs/render/room_fire_round$Revision.json"
     $Source = Join-Path $ProjectRoot $Relative
     if (-not (Test-Path -LiteralPath $Source -PathType Leaf)) { throw "Required render preset missing: $Relative" }
-    if ((Get-FileHash -LiteralPath $Source -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath (Join-Path $ProjectRoot "app/room_fire_round$Revision.json") -Algorithm SHA256).Hash) {
-        throw "Compatibility preset differs: $Relative"
-    }
+    if ((Get-FileHash -LiteralPath $Source -Algorithm SHA256).Hash -ne $ApprovedPresetHashes[$Revision]) { throw "Approved render preset changed: $Relative" }
     $Destination = Join-Path $StagingDir $Relative
     New-Item -ItemType Directory -Path (Split-Path -Parent $Destination) -Force | Out-Null
     Copy-Item -LiteralPath $Source -Destination $Destination
@@ -101,26 +100,21 @@ foreach ($Relative in $DiagnosticFiles) {
     New-Item -ItemType Directory -Path (Split-Path -Parent $Destination) -Force | Out-Null
     Copy-Item -LiteralPath $Source -Destination $Destination
 }
-if (Test-Path "$StagingDir\app\__pycache__") {
-    $CachePath = (Resolve-Path -LiteralPath "$StagingDir\app\__pycache__").Path
-    if ($CachePath -ne [IO.Path]::GetFullPath("$StagingDir\app\__pycache__")) { throw "非预期缓存目录" }
-    Remove-Item -LiteralPath $CachePath -Recurse -Force
-}
 Copy-Item -Path "$ProjectRoot\Dockerfile" -Destination $StagingDir
 Copy-Item -LiteralPath "$ProjectRoot\.dockerignore" -Destination $StagingDir
 Copy-Item -Path "$ProjectRoot\requirements.txt" -Destination $StagingDir
 Copy-Item -Path "$ProjectRoot\docs" -Destination $StagingDir -Recurse
-# Keep old test.* commands, but copy source files only, not local test artifacts.
+# Canonical test sources only, never generated test artifacts.
 $TestEntries = @(
     'tests/__init__.py', 'tests/suites.py', 'tests/run_regression.py',
     'tests/backend/__init__.py', 'tests/engine/__init__.py',
     'tests/tools/__init__.py', 'tests/deploy/__init__.py',
-    'tests/deploy/test_migration_cleanup.py'
+    'tests/deploy/test_migration_cleanup.py', 'tests/deploy/test_canonical_layout.py'
 )
 foreach ($Relative in $TestEntries) {
     if (-not (Test-Path -LiteralPath (Join-Path $ProjectRoot $Relative) -PathType Leaf)) { throw "Required test entry missing: $Relative" }
 }
-foreach ($Folder in @('test', 'tests')) {
+foreach ($Folder in @('tests')) {
     $SourceRoot = Join-Path $ProjectRoot $Folder
     if (-not (Test-Path -LiteralPath $SourceRoot -PathType Container)) { throw "Required test package missing: $Folder" }
     Get-ChildItem -LiteralPath $SourceRoot -Recurse -File | Where-Object {

@@ -2,7 +2,7 @@
 
 2026-11-09第4批：B实现已迁入render_engine/blender，旧app入口需完整引擎包。以后重新生成资产时，先按[迁移说明](room_engine_migration.md)安装并设置`engine_root`；不能再单独上传B/helper。本轮不执行资产生成。
 
-**本次只运行 F8-B：app/F8_prepare_room_asset.py。** F8-A（F8_inspect_room_import.py）是已完成的原模型导入检查；F8-C（F8_blender_render.py）是旧完整视频入口，本轮不运行。各脚本头部已有标记，完整索引见 [app/README.md](../app/README.md)。
+**本次只运行 F8-B：app/F8_prepare_room_asset.py。** F8-A（F8_inspect_room_import.py）是已完成的原模型导入检查；F8-C（F8_blender_render.py）是旧完整视频入口，本轮不运行。各脚本头部已有标记，完整索引见 [app/README.md](../render_engine/README.md)。
 
 2026-11-02 用户确认：Room8 采用平层地板近似，参考地板 -1.35m（主导下包络候选）。不再等待地板、平台、吊顶、墙厚的真实建筑语义确认。旧诊断及 review.json 不改，历史 ready_for_cut=false 不作回填；新 candidate 单独记录工程放行依据，physical_semantics_verified=false。该策略优先于 room_asset_checks.md / room_section_diagnostics.md 的旧物理确认门槛。
 

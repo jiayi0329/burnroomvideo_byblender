@@ -1,5 +1,7 @@
 # 诊断与手工集成工具
 
+> 2026-11-11：app及根test_4dkankan兼容入口已移除，诊断直接使用tools正式路径；手工API仅使用tools.integration.probe_scene_api并显式允许联网。历史Z轴工具不删。下文兼容过程为历史说明；当前边界见[正式路径](../docs/canonical_paths.md)。
+
 2026-11-10第6批迁移。所有历史Z轴、高度采样、墙体/断面依据保留；不重新运行真实诊断，不改变Room8平层近似或渲染参数。
 
 | 实际位置 | 职责与边界 |
@@ -33,4 +35,4 @@ python -m tools.diagnostics.probe_floorplan --help
 
 发布包仅包含明确列出的10份tools诊断Python源码；额外脚本、integration、私有JSON、模型和图片不随它进入生产包。缺少任一必需工具源码会停止打包。共用分析Core另列入引擎清单，完整指纹从39扩为40；不允许重签旧任务续跑。R3、火烟、传播、裁切算法和真实资产不变。
 
-历史487点高度采样、floor_z=-1.35m决策及人工review继续保留在原私有data或历史文档；本轮不回填旧ready_for_cut，也不把精确建筑语义重新设为出片前置。验收口径见[test/README](../test/README.md)，后续第7批再处理测试/部署收尾和主线审阅。
+历史487点高度采样、floor_z=-1.35m决策及人工review继续保留在原私有data或历史文档；本轮不回填旧ready_for_cut，也不把精确建筑语义重新设为出片前置。验收口径见[test/README](../tests/README.md)，后续第7批再处理测试/部署收尾和主线审阅。

@@ -1,7 +1,7 @@
 """Installed engine paths and complete source guards; stdlib, no Blender import.
 
 All keys are relative to the package root, never to a caller's working directory.
-The app shims and preset mirrors remain guarded during the migration period.
+Only canonical implementations and named presets are guarded.
 """
 from pathlib import Path
 
@@ -20,16 +20,17 @@ MODULE_LOCATIONS = {
     'room_source_inputs': 'geometry',
     'room_clip_geometry': 'geometry',
     'prepare_room_candidate': 'geometry',
+    'F6_detect': 'legacy',
+    'F7_spread': 'legacy',
+    'F8_blender_render': 'legacy',
 }
 CODE_FILES = (
     'render_engine/__init__.py', 'render_engine/paths.py',
     'render_engine/geometry/floorplan_alignment.py',
     *(f'render_engine/{group}/__init__.py' for group in
-      ('blender', 'jobs', 'effects', 'propagation', 'geometry')),
+      ('blender', 'jobs', 'effects', 'propagation', 'geometry', 'legacy')),
     *(f'render_engine/{group}/{name}.py' for name, group in MODULE_LOCATIONS.items()),
-    *(f'app/{name}.py' for name in MODULE_LOCATIONS),
-    *(f'{folder}/room_fire_round{revision}.json' for folder in ('configs/render', 'app')
-      for revision in (1, 2, 3)),
+    *(f'configs/render/room_fire_round{revision}.json' for revision in (1, 2, 3)),
 )
 
 
@@ -38,9 +39,8 @@ def project_root() -> Path:
 
 
 def code_root(path: Path) -> Path:
-    """Accept the legacy app directory as well as the installed package root."""
-    resolved = path.resolve()
-    return resolved.parent if resolved.name == 'app' else resolved
+    """Use the explicit installation root; no old-directory aliases."""
+    return path.resolve()
 
 
 def default_config() -> Path:

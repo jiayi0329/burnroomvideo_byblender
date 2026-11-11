@@ -1,5 +1,7 @@
 # 后端目录与兼容边界
 
+> 2026-11-11当前状态：app兼容源码已删除，正式入口为backend.api.main:app；F6/F7/F8-C移入render_engine/legacy。SQL唯一位置为backend/database/migrations，按固定SHA及原schema_migrations记录校验，未改表结构或导入数据。以下第5批兼容表为历史过程；当前使用[正式路径](../docs/canonical_paths.md)。
+
 2026-11-09第5批迁移。仅整理已有实现，不新增Room8任务API、文件fallback、用户权限或资产登记流程，不导入真实数据。
 
 | 旧路径（继续保留） | 实际实现 | 职责 |

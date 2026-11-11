@@ -1,5 +1,7 @@
 # 系统架构：当前实现与目标边界
 
+2026-11-11正式路径去重：后端直接从backend.api.main启动，Legacy F6/F7/F8-C在render_engine/legacy；SQL唯一位置backend/database/migrations，公共预设只在configs/render；app/release源码副本及test包已移除，测试实体归入tests。源码指纹28份，不给旧任务改签名续跑。本文先前分批兼容叙述为历史过程，当前路径及执行边界以[正式说明](canonical_paths.md)为准；功能、R3、真实数据和部署拓扑不变。
+
 更新：2026-11-09。需求依据：[PRD](PRD.md)。当前结构见代码映射；目标结构与接口均标为待实现。目录规范见 [PROJECT_ORGANIZATION](PROJECT_ORGANIZATION.md)，字段/路径规范见 [DATA_ASSET_SPEC](DATA_ASSET_SPEC.md)。
 
 ## 1. 系统目的与执行边界
@@ -145,6 +147,6 @@ flowchart TD
 
 先审阅目录/数据约定，再分批提取被诊断入口与裁切共同使用的纯函数，之后才移动文件。旧API、Blender同目录导入、测试AST提取、打包脚本及远端/tmp上传清单必须一起回归；不得按文件名删除“旧F8”或“诊断”。详见目录规范中的七批迁移。
 
-后续源码变更按 [测试约定](../test/README.md) 新建追溯测试。离线单元/API 替身、远端 PostgreSQL/MinIO 集成、Blender/GPU 与人工画面验收分别记录。单次 Room8 已出片不代表其他房间、网页、数据库导入或公网交付完成。
+后续源码变更按 [测试约定](../tests/README.md) 新建追溯测试。离线单元/API 替身、远端 PostgreSQL/MinIO 集成、Blender/GPU 与人工画面验收分别记录。单次 Room8 已出片不代表其他房间、网页、数据库导入或公网交付完成。
 
 原架构和过期实施过程见 [历史快照](archive/20261107_pre_baseline/architecture.md)。

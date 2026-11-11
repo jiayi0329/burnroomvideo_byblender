@@ -33,4 +33,4 @@ RUN pip3 install --no-cache-dir -r requirements.txt -i https://mirrors.aliyun.co
 COPY . .
 
 # 启动 FastAPI 后端
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "/app/app", "--reload-dir", "/app/backend"]
+CMD ["uvicorn", "backend.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "/app/backend", "--reload-dir", "/app/render_engine"]

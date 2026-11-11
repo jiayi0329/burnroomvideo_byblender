@@ -1,5 +1,7 @@
 # 第4批：新版Room8引擎与预设迁移
 
+> 2026-11-11后续决定覆盖本文旧兼容约定：app/release源码与test旧包已移除，只使用新路径；SQL改为backend/database。当前操作见[正式路径说明](canonical_paths.md)，下文七批兼容过程仅作历史依据。本次不运行部署或渲染。
+
 第7批后发布实现位于deploy/scripts，release/scripts旧命令继续转调；安装包仍输出release/out。本轮不改引擎40文件指纹。离线回归统一入口为`python -B -m tests.run_regression`，原test模块命令保留；完整仓库执行发布回归，不把Linux运行镜像等同于完整开发环境。见[发布边界](../deploy/README.md)及[收尾说明](migration_closeout.md)。
 
 第5批后完整安装包还包含Backend源码及原样SQL，app旧入口依赖这些包；只传app文件仍不可用。Room8引擎及39文件指纹未变，数据库迁移/导入不会随打包、解压或普通引擎启动自动执行。具体边界见[Backend说明](../backend/README.md)。
@@ -54,4 +56,4 @@ printf 'Engine root: %s\n' "$engine_root"
 
 新增`test/test_engine_migration.py`，覆盖新旧导入同一性、旧接口替换、跨工作目录CLI、Blender入口导入替身、默认R3、全部源码指纹、旧任务拒绝、安装包完整性/私有文件排除、解压后独立导入、缺文件/配置分叉时打包中止及BOM。
 
-原AST测试改为读取实际实现，不删除原相机、UV、时序、编码、失败保留断言。测试中的出片日志来自合成进程；没有执行真实Blender、数据库、SSH或Docker。当前测试数量和未验证项见[test/README](../test/README.md)。
+原AST测试改为读取实际实现，不删除原相机、UV、时序、编码、失败保留断言。测试中的出片日志来自合成进程；没有执行真实Blender、数据库、SSH或Docker。当前测试数量和未验证项见[test/README](../tests/README.md)。

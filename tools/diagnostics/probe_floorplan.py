@@ -1,6 +1,6 @@
 """只读探测户型 API；仅写 diagnostics，不导入 bpy、不启动渲染。
 
-服务器现有容器：python3 -m app.probe_floorplan --scene KK-EEz16cmU14
+服务器现有容器：python3 -m tools.diagnostics.probe_floorplan --scene KK-EEz16cmU14
 本地资产分析：python app/probe_floorplan.py --scene KK-EEz16cmU14 --data-root data --offline
 """
 from __future__ import annotations

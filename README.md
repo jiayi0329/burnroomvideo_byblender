@@ -1,4 +1,5 @@
 > **当前入口：[docs/README.md](docs/README.md)。** Room8 V1 已完成阶段性出片，当前进行工程整理，不重新渲染。
+> **2026-11-11正式路径去重：** 旧app/release源码入口已移除；后端为`backend.api.main:app`，本地打包使用`deploy/scripts/build.ps1`，测试使用`python -B -m tests.run_regression`，SQL位于`backend/database/migrations/`。当前操作以[正式路径说明](docs/canonical_paths.md)为准；下方旧步骤等待下一项README整理，不应直接照旧执行。
 > 下文冷启动、Docker与 `/api/render` 示例是保留的 Legacy 操作资料；旧接口会处理场景根视频，不能用来启动新版Room8任务。
 > 当前需求见 [PRD](docs/PRD.md)，架构见 [ARCHITECTURE](docs/ARCHITECTURE.md)，基线与性能见 [RELEASES](docs/RELEASES.md)。原README已按字节 [归档](docs/archive/20261107_pre_baseline/README.md)。
 

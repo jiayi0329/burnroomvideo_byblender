@@ -13,7 +13,7 @@
 
 本批没有改引擎40份源码/预设清单、Backend业务、房间几何、SQL、端口、卷挂载或GPU风格。打包读取deploy生产模板，但其字节与原release一致；root Dockerfile/开发Compose继续作为入口。完整本地测试报告位于忽略目录release/out，不上传私有诊断/模型/视频。
 
-最终离线回归295项：293通过、2项跳过，新增16项全部通过；镜像测试目录白名单调整后另有3项契约复核通过。40份引擎/预设和24份V1备份SHA不变；4份PowerShell语法与BOM、shell LF、Python3.11语法及文档链接检查通过。实际解释器为本地Python3.13/Pydantic2.10.6；两项跳过为真实PostgreSQL与可选Matplotlib。报告路径见[test/README](../test/README.md)。
+最终离线回归295项：293通过、2项跳过，新增16项全部通过；镜像测试目录白名单调整后另有3项契约复核通过。40份引擎/预设和24份V1备份SHA不变；4份PowerShell语法与BOM、shell LF、Python3.11语法及文档链接检查通过。实际解释器为本地Python3.13/Pydantic2.10.6；两项跳过为真实PostgreSQL与可选Matplotlib。报告路径见[test/README](../tests/README.md)。
 
 ## 本批之后的必要动作
 

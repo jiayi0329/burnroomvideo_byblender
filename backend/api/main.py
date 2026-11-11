@@ -7,10 +7,10 @@ import subprocess
 import threading
 import traceback
 from pathlib import Path
-from backend.paths import legacy_render_script
+from backend.paths import legacy_render_script, project_root
 
-from app.F6_detect import find_ignition_point
-from app.F7_spread import SpreadTimeline, bfs_spread, load_adjacency
+from render_engine.legacy.F6_detect import find_ignition_point
+from render_engine.legacy.F7_spread import SpreadTimeline, bfs_spread, load_adjacency
 from backend.api.room_api import router as room_router
 from backend.services.observability import (
     append_log,
@@ -229,7 +229,7 @@ def start_render(scene_code: str, quality: str = "preview") -> dict:
     log_file = (scene_dir / "render.log").open("w", encoding="utf-8")
     proc = subprocess.Popen(
         cmd,
-        cwd=str(RENDER_SCRIPT_PATH.parent.parent),
+        cwd=str(project_root()),
         stdout=log_file,
         stderr=subprocess.STDOUT,
     )

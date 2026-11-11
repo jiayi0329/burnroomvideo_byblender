@@ -12,8 +12,7 @@ $RemoteDir = "/home/zhaojy/burnroom-prod"  # 代码与脚本的存放地址
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $ProjectRoot = (Get-Item $ScriptDir).Parent.Parent.FullName
-$CompatibilityHelper = Join-Path $ProjectRoot "release/scripts/prepare_deploy.sh"
-if ((Get-FileHash -LiteralPath "$ScriptDir/prepare_deploy.sh" -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath $CompatibilityHelper -Algorithm SHA256).Hash) { throw "Deployment helper compatibility mirror differs; no SSH/SCP executed" }
+if (-not (Test-Path -LiteralPath "$ScriptDir/prepare_deploy.sh" -PathType Leaf)) { throw "Required deployment helper missing; no SSH/SCP executed" }
 $OutDir = Join-Path $ProjectRoot "release\out"
 
 # 自动寻找 release/out/ 目录下最新生成的一个压缩包

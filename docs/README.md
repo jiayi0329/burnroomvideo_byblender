@@ -1,5 +1,7 @@
 # 当前文档入口
 
+2026-11-11用户确认结束兼容期：当前源码以[正式路径去重说明](canonical_paths.md)为准，旧app/release/test源码路径已移除。以下迁移历史保留过程含义；README完整清单与过程资料合并下一项单独进行。
+
 更新：2026-11-07。本轮是工程基线整理；Room8 V1 暂不重新渲染。
 
 | 要了解的内容 | 当前文档 |
@@ -24,7 +26,7 @@
 - [候选与独立资产](room_candidate.md)、[展示派生](room_display.md)：仅在另行授权生成资产时使用；当前基础房间已存在。
 - [旧资产核验](room_asset_checks.md)、[断面诊断](room_section_diagnostics.md)、[最初动画测试](room_animation.md)：保留历史过程；等待物理地板完全确认、必须再跑短片等旧阶段要求不阻塞当前工程整理。
 - [数据库操作](database.md)：已有部署/迁移/导入说明；真实导入尚未完成，本轮不执行。
-- [脚本职责索引](../app/README.md)、[测试约定](../test/README.md)：保留现有路径与追溯引用；具体完成度以PROJECT_STATUS为准。
+- [脚本职责索引](../render_engine/README.md)、[测试约定](../tests/README.md)：保留现有路径与追溯引用；具体完成度以PROJECT_STATUS为准。
 
 旧F8根场景API与新版Room8任务不互通。查看文档不表示授权触发旧API、重建容器、重渲染或导入数据库。
 

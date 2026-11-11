@@ -13,8 +13,8 @@ from pathlib import Path
 from statistics import median
 import uuid
 
-from app.room_source_io import confined, inverse_xy, materials, read_obj, sha256
-from app.room_source_inputs import REQUIRED_CHECKS, load_inputs
+from render_engine.geometry.room_source_io import confined, inverse_xy, materials, read_obj, sha256
+from render_engine.geometry.room_source_inputs import REQUIRED_CHECKS, load_inputs
 from tools.diagnostics.room_section_geometry import (continuity, quantile, section_geometry, select_sections,
                                        surface_role, triangles, wall_evidence)
 

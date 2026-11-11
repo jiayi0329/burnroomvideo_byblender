@@ -10,6 +10,7 @@ PACKAGE_FILES = (
     'tests/backend/__init__.py', 'tests/engine/__init__.py',
     'tests/tools/__init__.py', 'tests/deploy/__init__.py',
     'tests/deploy/test_migration_cleanup.py',
+    'tests/deploy/test_canonical_layout.py',
 )
 
 
