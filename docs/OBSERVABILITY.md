@@ -1,6 +1,6 @@
 # 操作日志与执行追踪
 
-更新：2026-11-11。公共组件、API中间件、主要CLI及Room8任务接入已本地实现并离线验证，未部署。前端尚未存在，不能宣称已实现真实按钮上报或监控网页。
+更新：2026-11-12。公共组件、API中间件、主要CLI及Room8任务接入已实现并离线验证；3be7124完成远端HTTP与Room8单帧GPU关联日志的最小验收，证据见[发布记录](RELEASES.md)。前端尚未存在，不能宣称已实现真实按钮上报或监控网页。
 
 ## 已实现的范围
 
@@ -10,7 +10,7 @@
 | 主要后台阶段 | catalog读取/分享，Legacy下载、时序、启动、后台守护及发布 | 旧文本/Blender第三方日志不是本组件输出；没有改写历史记录 |
 | catalog CLI | import_rooms的输入核验/显式apply、check_catalog、database显式迁移；包含参数拒绝、返回非零和异常 | 不自动执行导入/迁移；--help不写日志；诊断tools未全部接入 |
 | Room8启动器 | CLI、预检、冲突检查、job/attempt、Blender启动、编码、ffprobe、完整解码及失败 | 复用原状态、逐帧manifest、timing/GPU文件，不另建状态机 |
-| Blender动画worker | 继承关联上下文、准备阶段、worker总耗时、每24个输出的轻量进度事件 | 不复制完整逐帧记录；真实GPU落盘尚待远端验收；静帧/裁切入口未统一接入 |
+| Blender动画worker | 继承关联上下文、准备阶段、worker总耗时、每24个输出的轻量进度事件 | 不复制完整逐帧记录；真实GPU单帧及准备/worker/attempt关联已验收；静帧/裁切入口未统一接入 |
 | 时间线CLI | 从JSONL生成单trace/job的JSON摘要及可选Markdown文档 | 本地/维护工具，不是公开日志API；无前端、鉴权、告警或集中监控集群 |
 
 业务Python不import bpy；公共标准库组件位于render_engine/jobs/operation_logging.py，Backend依赖它，不让Engine反向依赖Backend。导入模块不创建日志目录或连接服务。
@@ -63,7 +63,7 @@ python -m backend.cli.log_timeline --help
 python -m backend.cli.log_timeline --logs .\data\logs\operations --trace-id TRACE_ID --output .\release\out\operation-timeline.md
 ```
 
-远程SSH、现有Compose目录中，后续部署本次代码后查看已存在的任务（不启动新任务）：
+远程SSH、现有Compose目录中，已部署新代码可查看已存在的任务（不启动新任务）：
 
 ```bash
 docker compose exec -T app-server python3 -m backend.cli.log_timeline --logs /app/data/SCENE/rooms/Room8/render_jobs/JOB/attempts/ATTEMPT/operations --job-id JOB
@@ -77,4 +77,4 @@ SCENE/JOB/ATTEMPT均需替换为实际值；历史任务没有operations文件�
 
 本地离线测试使用临时JSONL、进程/Blender替身和进程内TestClient，不启动服务器或调用真实外部API。新增tests/backend/test_operation_logging.py及tests/engine/test_room_operation_logging.py，覆盖脱敏、ID校验、父子span、线程/进程隔离、轮转、HTTP成功/拒绝/异常/取消/流式响应、响应后任务、CLI退出、日志失败、Room8输出隔离及子进程传递。
 
-前端下一阶段再实现按钮动作的关联ID、请求、后台阶段及结果/播放上报；前端输入视为不可信。真实GPU运行、部署目录权限、磁盘保留和真实数据库导入仍需远端验收。日志不是鉴权、数据库审计或共享服务器全局调度器。
+前端下一阶段再实现按钮动作的关联ID、请求、后台阶段及结果/播放上报；前端输入视为不可信。远端最小验收已证明HTTP和单帧GPU任务能写入并关联日志；完整动画编码、失败恢复等本次没有重新实测，不能扩大验收范围。磁盘保留、真实数据库导入及真实前端仍待验收。日志不是鉴权、数据库审计或共享服务器全局调度器。

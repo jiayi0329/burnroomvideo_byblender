@@ -74,3 +74,71 @@ c339c91d12709797b43989c680474286e5b2641a64de160d3fde7902267404dd
 火焰生命周期偏短、后段烟雾主导；Hybrid未实现；火烟体积没有墙面几何遮罩；平层地板是工程近似；灾前重建未实现；其他房间未验证。此处登记问题，不触发V1重渲染。
 
 下一次修改样式、时序、相机、裁切或源码应创建新任务并记录新指纹。后续main合并与tag不改变已交付资产/任务ID，也不宣称既有V1来自更新后的源码。
+
+## 2026-11-12 工程基线服务器验收
+
+证据来源为用户在远程SSH执行并回传的输出。本次验证目录迁移、操作日志及现有服务兼容性，不重新生成Room8 V1完整视频，不改写上面的原始发布证据。
+
+### 代码与安装包
+
+| 项目 | 核验结果 |
+| --- | --- |
+| 源码 | chore/room8-v1-baseline，3be7124e039cc64ad577cb6e3975253729fe26a4 |
+| 包名 | burnroom-deploy-package-v1.0.0-20261112-150934814-ba781485.tar.gz |
+| 包大小 / SHA256 | 327443字节；dec4aed391de55b9267b5d212324d103c4264e2de5e2eae396b95b36006d8c96；服务器sha256sum检查OK |
+| 验收镜像 | burnroom-app:acceptance-3be7124，OCI revision与上述源码一致 |
+| 应用入口 | uvicorn backend.api.main:app；使用新路径backend及render_engine |
+| 本地回归 | 329项：327通过、2跳过，runner总耗时171.003秒；真实PG集成与可选Matplotlib跳过 |
+| 安装包复核 | 136个文件，其中103份源码与工作区字节一致；安装包日志回归26项通过 |
+
+### 远端结果与范围
+
+| 检查 | 实际结果 | 不能据此宣称 |
+| --- | --- | --- |
+| 后端与配置 | GET / 返回200、Backend is running、appkey_loaded=true | 所有业务API均已实测 |
+| HTTP操作日志 | trace=acceptance-3be7124-http；start/success落盘，耗时7.936ms，无损坏行 | 真实前端按钮链路已完成 |
+| 数据库应用账号 | check_catalog返回ok、role=burnroom_app、tables_checked=8 | 6房间/22点及人工关联已导入 |
+| Room8预检 | 固定基础资产、点位、R3参考及29份源码/配置保护通过 | 其他房间已通用验证 |
+| 新版Blender入口 | camera_check / test / overview，输出3.5秒单帧，总耗时56.260秒 | 新版代码已完成576帧复测，或该耗时代表稳态逐帧速度 |
+| 实际渲染器 | NVIDIA L20/PCIe/SSE2，NVIDIA Corporation，OpenGL 4.6.0，驱动580.178.04；software_rendering_suspected=false | 四卡并行或独占GPU |
+| 任务日志 | start 3、accepted 1、success 3、progress 1；prepare、worker、job_attempt均success，malformed_lines=0 | 完整视频编码/失败恢复已在本次远端重测 |
+| 旧视频分享 | 用户反馈Range读取返回206；测试经服务器localhost:9000并保留签名Host | 公网、校园网或浏览器连通性已重新验证；新版Room8已登记MinIO |
+
+单帧任务为`20261112T075439Z_b67eb9b7`，attempt为`20261112T075439Z_a346fc`。任务目录：
+
+```text
+/app/data/KK-EEz16cmU14/rooms/Room8/render_jobs/20261112T075439Z_b67eb9b7/
+```
+
+检查图为`keyframes/overview_3.5s.png`，状态保留`awaiting_visual_review`；尚无本次检查图的明确人工视觉通过反馈。任务日志trace为`b489b65c38114040b13dbc48f0ad65eb`，位于该attempt的`operations/`。服务操作日志位于`/app/data/logs/operations/`。
+
+基础资产仍为`20261102T025550Z-7f677509/asset`；配置为`/app/configs/render/room_fire_round3.json`。固定R3参考为该资产版本下`style_round3/20261104T020954Z_a023be3c/sample_manifest.json`。没有修改第三轮艺术参数、数据库数据、原始模型或历史视频。
+
+### 当前部署组合与回退
+
+只重建了app-server容器，PostgreSQL和MinIO保持原服务。Runtime为nvidia，NVIDIA EGL/GLX库可加载；数据挂载继续为`/data/zhaojy/burnroom-data/app-data -> /app/data`，原环境配置保留。
+
+验收代码解压位置：`/home/zhaojy/burnroom-prod/acceptance-3be7124-20261112T072559Z-2542924/burnroom-deploy-package`。
+
+**当前运行依赖三份Compose文件**：原`docker-compose.yml`、原`docker-compose.gpu.yml`，以及下列override；override仅替换应用镜像及新路径启动命令，不含凭证：
+
+```text
+/home/zhaojy/burnroom-prod/acceptance-3be7124-20261112T072559Z-2542924/app-image.override.yml
+```
+
+原Compose的latest镜像没有改标签。后续重建/更新app-server需保留三文件组合；仅运行原Compose的up可能切回旧镜像。以下命令仅供后续维护，**在远程SSH的原Compose目录执行**，不因阅读文档自动运行：
+
+```bash
+accept_override="/home/zhaojy/burnroom-prod/acceptance-3be7124-20261112T072559Z-2542924/app-image.override.yml"
+docker compose -p burnroom-deploy-package -f docker-compose.yml -f docker-compose.gpu.yml -f "$accept_override" config --quiet
+```
+
+部署前保护脚本执行成功，回传备份目录`/data/zhaojy/burnroom-data/deploy-backups/20261112T072324Z-2543781`及旧镜像标签`burnroom-app:rollback-20261112T072324Z-2543781`。脚本的数据库备份受运行条件控制；本次没有提供dump大小/指纹或隔离恢复结果，不能据此宣称数据库恢复已验收。
+
+若需回退，先冻结新任务并核对无活动任务，建立独立rollback override，仅设置`services.app-server.image`为上述旧镜像标签。使用原base、GPU及rollback三文件，**不叠加验收override的新路径command**，先config检查，再只对app-server执行`up -d --no-deps --force-recreate --pull never`。旧入口由原配置/旧镜像提供；不清空数据盘、数据库或其他容器。该回退路径已记录，尚未实际执行恢复演练。
+
+### 结论与下一步
+
+新路径、HTTP日志、应用账号目录检查、新版Room8单帧GPU及任务日志、旧视频Range读取的最小服务器验收通过。检查图人工审核仍独立保留；本次不代替原V1的完整视频验收。
+
+下一步提交本次文档记录，复核main最新状态与差异后，由用户审阅并决定合并main；不以真实数据库导入或前端完成作为本轮合并前置条件。之后依次进行真实数据导入、新版MinIO登记、Room8/R3任务API和最小网页。尚未执行merge、tag或新完整视频渲染。

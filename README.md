@@ -1,6 +1,6 @@
 # Burnroom：单房间火灾演示系统
 
-更新：2026-11-11。当前分支chore/room8-v1-baseline；源码已结束兼容期，只保留backend、render_engine、tools、deploy、tests等正式路径，没有app/release源码或test旧包。Room8 V1已阶段性出片，暂不重渲染；目录去重仅本地验收，远端新版本尚待复验，未据此合并main。
+更新：2026-11-12。当前分支chore/room8-v1-baseline；源码已结束兼容期，只保留backend、render_engine、tools、deploy、tests等正式路径，没有app/release源码或test旧包。Room8 V1已阶段性出片，暂不重渲染；新路径与操作日志在3be7124完成服务器最小验收，下一步审阅合并main，尚未执行合并。
 
 输入灾后扫描、户型及全景相机点位，输出独立房间资产和程序化火灾视频。它是演示/复盘辅助，不是CFD、真实起火原因认定或已完成的灾前重建。
 
@@ -11,7 +11,7 @@
 | 产品范围与验收 | [PRD](docs/PRD.md) |
 | 当前链路和目标系统 | [Architecture](docs/ARCHITECTURE.md) |
 | 进度/下一步/未验收项 | [项目状态](docs/PROJECT_STATUS.md) |
-| Room8 V1产物、版本和实测 | [发布基线](docs/RELEASES.md) |
+| Room8 V1及工程验收、部署回退 | [发布基线](docs/RELEASES.md) |
 | ID/版本/文件/数据库/MinIO关系 | [数据规范](docs/DATA_ASSET_SPEC.md) |
 | 房间资产 / R3样式 / 动画运行 | [资产](docs/rendering/room_assets.md) · [R3](docs/rendering/style.md) · [动画](docs/rendering/animation.md) |
 | 真实数据库导入 | [PostgreSQL计划](docs/database.md) |
@@ -24,7 +24,7 @@
 - Room8：独立裁切/UV材质贴图保留、13内部点BFS、R3火烟、独立overview、NVIDIA GPU动画、MP4与回执已远端跑通。正式视频24秒/1280×720/24fps/576帧；当次约6分钟，证据和限制见发布基线。
 - XY人工核验为6条房间记录、22个点位，不是6个有效渲染房间；22客厅、32门口、42户型外、Room11无效。仅Room8有完整资产/视频验收。
 - PostgreSQL服务/八表/CLI/API已有，真实数据导入未完成；Legacy MinIO链路已有，新版Room8资产/视频未完整登记。
-- 公共HTTP/主要CLI/Room8关联日志已本地实现；前端、新版Room8任务API、远端日志验收、权限及东莞公网展示尚未完成。
+- 公共HTTP/主要CLI/Room8关联日志已实现；远端HTTP和Room8单帧GPU任务日志已核验。前端、新版Room8任务API、权限及东莞公网展示尚未完成。
 - floor_z=-1.35m是平层工程近似；火焰生命周期偏短、后段烟为主，Hybrid、复杂积顶、火烟按墙裁切及灾前重建仍待解决。V1保留，不为文档整理重渲染。
 
 ## 分类标准和实际调用链
@@ -77,7 +77,7 @@ WinSCP负责上传明确版本安装包/核验输入、下载产物；不在远�
 
 ## 下一步
 
-公共请求/操作/主要CLI及Room8日志已本地实现；接下来审阅提交、远端原环境验收和真实数据库导入（6房间、22点及人工关联），之后建设Room8/R3网页闭环和新版MinIO登记。前端上报与监控网页待实施，日志规则继续由AGENTS约束。第二房间、生命周期/Hybrid、权限与东莞展示各自排期。
+服务器最小验收已完成，接下来提交验收记录并审阅合并main。之后依次安排真实数据库导入（6房间、22点及人工关联）、新版Room8产物MinIO登记、Room8/R3任务API与最小网页。前端上报与监控网页待实施，日志规则继续由AGENTS约束。第二房间、生命周期/Hybrid、权限与东莞展示各自排期。
 
 main合并、标签、部署和真实数据写入不自动执行。当前源码提交号不冒充V1原远端checkout；完整交付与缺失附件以RELEASES为准。
 
@@ -277,7 +277,7 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 | --- | --- | --- |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 当前三条链路、组件/数据/进程边界与尚未实现的目标架构 | 文档/约束 |
 | [docs/DATA_ASSET_SPEC.md](docs/DATA_ASSET_SPEC.md) | 场景/房间/版本/任务ID、存储位置、指纹、上传登记及恢复规则 | 文档/约束 |
-| [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) | 公共HTTP/主要CLI/Room8关联日志、时间线、耗时、脱敏及待远端/前端验收边界 | 文档/约束 |
+| [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) | 公共HTTP/主要CLI/Room8关联日志、时间线、耗时、脱敏及远端最小验收/前端待验收边界 | 文档/约束 |
 | [docs/PRD.md](docs/PRD.md) | 产品目标、MVP、验收及日志/真实导入/网页的实施优先级 | 文档/约束 |
 | [docs/PROJECT_ORGANIZATION.md](docs/PROJECT_ORGANIZATION.md) | 职责/用途分类和依赖方向；逐文件表只在根README维护 | 文档/约束 |
 | [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) | 已完成/部分完成/待实施、限制及后续门禁，不追加每轮代码流水账 | 文档/约束 |

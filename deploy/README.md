@@ -15,4 +15,4 @@ prepare_deploy在备份前只读检查Legacy running及房间created/preparing/r
 
 现有保护会保存部署代码/配置、旧镜像标签、根视频及相应数据库备份条件；它不等于对所有新版Room8资产/帧做完整异地备份。V1私有归档范围见[发布记录](../docs/RELEASES.md)，数据库备份/恢复另验收。回退代码不清空数据库或数据盘。
 
-本轮没有构建/启动Docker、SSH、数据库或Blender。Linux原环境/GPU验收须后续安排；生产包不是完整开发仓库，Windows发布回归在完整源码检出执行。
+2026-11-12用户已在远端完成3be7124的最小验收，仅更新app-server，未导入真实数据或重出完整视频。当前运行使用原base、GPU及独立验收image/command override三份Compose文件；重建时只用原Compose可能切回旧镜像。精确路径、备份标签与回退边界见[发布记录](../docs/RELEASES.md)。生产包不是完整开发仓库，Windows发布回归在完整源码检出执行。

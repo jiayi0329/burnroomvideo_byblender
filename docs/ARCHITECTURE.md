@@ -1,6 +1,6 @@
 # 系统架构：当前实现与目标边界
 
-更新：2026-11-11。需求见[PRD](PRD.md)，状态见[PROJECT_STATUS](PROJECT_STATUS.md)，逐文件用途见[根README](../README.md)，编号/存储契约见[DATA_ASSET_SPEC](DATA_ASSET_SPEC.md)。当前架构只有新路径；兼容期过程见[归档](archive/20261111_process/engineering_history.md)。
+更新：2026-11-12。需求见[PRD](PRD.md)，状态见[PROJECT_STATUS](PROJECT_STATUS.md)，逐文件用途见[根README](../README.md)，编号/存储契约见[DATA_ASSET_SPEC](DATA_ASSET_SPEC.md)。当前架构只有新路径；兼容期过程见[归档](archive/20261111_process/engineering_history.md)。
 
 ## 1. 执行环境与依赖
 
@@ -69,7 +69,7 @@ render_engine.paths清单为26份Python和3份公共预设，共29份，包含�
 
 ## 4. 下一阶段目标（未实现）
 
-[公共操作日志](OBSERVABILITY.md)已本地实现：纯ASGI中间件覆盖HTTP结果，公共ContextVar/span连接主要CLI、Legacy守护线程与Room8子进程；JSONL服务分片和attempt事件分开存储，Markdown时间线由CLI生成。无前端上报或新监控API，旧状态/逐帧/GPU/timing证据保持原职责，远端尚未验收。再按[数据库计划](database.md)远端验收及真实导入；后续网页只支持Room8/R3受控任务，前端按钮经Backend调用现有安全启动器，查询状态和播放指定任务产物。
+[公共操作日志](OBSERVABILITY.md)已实现：纯ASGI中间件覆盖HTTP结果，公共ContextVar/span连接主要CLI、Legacy守护线程与Room8子进程；JSONL服务分片和attempt事件分开存储，Markdown时间线由CLI生成。2026-11-12完成HTTP、catalog只读检查及Room8单帧GPU任务的远端最小验收，详见[发布记录](RELEASES.md)。无前端上报或新监控API，旧状态/逐帧/GPU/timing证据保持原职责。工程基线审阅合并后按[数据库计划](database.md)真实导入；后续网页只支持Room8/R3受控任务，前端按钮经Backend调用现有安全启动器，查询状态和播放指定任务产物。
 
 拟议/api/room-jobs和业务房间查询尚未注册；不得调用旧渲染API代替。前端不传任意脚本/配置路径、工作目录或绕过审核参数；数据库ID与业务ID由适配器转换。MinIO上传后核对SHA再登记，对象成功/登记失败可重试，不能重启渲染补偿登记。
 
