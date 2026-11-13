@@ -158,3 +158,29 @@ docker compose -p burnroom-deploy-package -f docker-compose.yml -f docker-compos
 | review.json | 883de043a2a8106b8daac1299fe99a7f598ddfc200eeb4c91fbaffdb8c95bfdc |
 
 这是导入前备份恢复、实际导入、幂等、人工关系和API查询的验收；未做生产故障回滚、导入后全库恢复或全部原文件重新验SHA，导入日志trace也未单独提取。未启动渲染、上传MinIO或变更R3配置；29份输入文件索引不代表Room8模型/视频登记完成。下一步为新版Room8产物上传核对与关系登记。
+
+## 2026-11-13 Room8产物上传与登记验收
+
+证据来自用户回传的远程SSH输出。开发分支为feat/room8-web-registration-api；源码已提交822528a。实际执行的是独立代码包，不冒充服务镜像已升级：
+
+- 包：burnroom-deploy-package-v1.0.0-20261113-151113333-67a9f9fb.tar.gz，347144字节。
+- SHA256：5a36693d3b054017c36cc5765939eb51824386e944a37b4579aca62f2871135a；用户服务器校验OK。
+- 容器代码目录：/tmp/room8-registration.81IX4m。后台服务仍是验收镜像burnroom-app:acceptance-3be7124；本次没有重建容器或部署整个分支。
+- 资产版本仍为20261102T025550Z-7f677509，文件任务仍为20261105T040552Z_91f5fb7d，未重新渲染。
+
+| 检查 | 远端实际结果 |
+| --- | --- |
+| 首次登记 | layout_version_id=1，database_room_id=6，database_job_id=1，file_count=6，reused_job=false，upload_status=verified，registration_status=registered |
+| 再次登记 | 同一数据库任务1，reused_job=true，仍verified/registered；上传器逐对象回读验证后复用 |
+| 数据库资产 | room_blend 1、room_glb 1、room_preview 3、room_video 1；6份均有bucket/key |
+| 任务关系 | SQL任务1为done；实际渲染输入1份room.blend、视频输出1份；GLB及三视图仅关联房间 |
+| 查询与签名 | 既有catalog资产列表及share接口可用；视频资产ID=64，七天签名有效期604800秒 |
+| 视频读取 | 服务器localhost:9000连接，保留签名Host，Range bytes=0-0返回206、video/mp4、1字节 |
+
+首次回执：`/app/data/KK-EEz16cmU14/rooms/Room8/registrations/20261113T105526Z_09bb04ba/registration_receipt.json`。
+
+重复登记回执：同一registrations根下`20261113T113520Z_9d510484/registration_receipt.json`。两次独立保存，未覆盖原任务证据。模型/三视图使用burnroom-room-assets，视频使用burnroom-room-outputs；与旧桶分离，不改变Legacy分享策略。
+
+本次验收证明6份指定交付的上传回读、数据库关联、重复登记和服务器侧签名Range读取；不代表所有运行报告/原帧已上传，不是新增完整视频渲染/解码或浏览器整段播放验收，不证明公网可达。CLI关联日志已实现并指定持久化目录，但此次未单独提取完整trace或注入远端失败；不能将这些列为已实测。当前库的登记前备份命令已提供，用户未回传该备份的具体路径及校验输出，不将其与前一节已验证的导入前备份混同。
+
+第一批完成；同一分支下一批为新版Room8/R3任务API，再下一批为最小网页及真实按钮日志。既有catalog查询/分享不等于已有任务创建API。新分支未合并main，本条只补验收记录。

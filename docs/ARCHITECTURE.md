@@ -26,7 +26,7 @@ flowchart TD
     N[backend.api.room_api catalog] --> O[PostgreSQL关系目录]
 ```
 
-Room8视频由CLI运行，尚未接新版网页/任务API或完整登记MinIO。本场景catalog真实数据已导入版本1并通过查询核对；29份输入文件索引不包括完整Room8模型/视频登记，图中的连线不代表数据库已有全部资产。
+Room8视频由CLI运行，尚未接新版网页/任务API。本场景catalog版本1及29份原输入索引已导入；随后追加Room8指定6份交付的MinIO对象和数据库关联，远端核对通过。图中的连线不代表全部运行报告或原帧已登记。
 
 ### Legacy与Backend
 
@@ -38,7 +38,7 @@ Docker启动backend.api.main:app，监控backend/render_engine；根开发Compos
 
 SQL唯一位置为backend/database/migrations/001_rooms.sql。文件名/内容及schema_migrations校验不变，路径函数和打包按固定指纹保护；新结构另建后续迁移。迁移/账号授权、导入和资产上传均需显式调用，不随服务启动执行。
 
-首批产物登记已本地实现：services/room_registration只读构造计划，cli/register_room_assets负责互斥及独立回执，adapters/minio/room_objects验证专用私有桶并流式回读SHA，adapters/postgres/room_asset_repository验证已导入layout/review/点位后事务写入原八表。MinIO上传与数据库事务分开，失败保留对象供重试；不调用Blender，不修改原任务。任务外部ID/资产版本暂存render_jobs.config，所有摘要写入方需共用场景advisory锁，尚无独立唯一列。远端登记未执行，任务API及前端仍未实现；统一分支feat/room8-web-registration-api按三批推进。
+首批产物登记已实现并远端验收：services/room_registration只读构造计划，cli/register_room_assets负责互斥及独立回执，adapters/minio/room_objects验证专用私有桶并流式回读SHA，adapters/postgres/room_asset_repository验证已导入layout/review/点位后事务写入原八表。MinIO上传与数据库事务分开，失败保留对象供重试；不调用Blender，不修改原任务。任务外部ID/资产版本暂存render_jobs.config，所有摘要写入方需共用场景advisory锁，尚无独立唯一列。本次通过独立/tmp代码目录执行登记，后台镜像未升级；任务API及前端仍未实现，统一分支feat/room8-web-registration-api继续后两批。
 
 ### 独立房间与火烟
 
@@ -66,12 +66,12 @@ render_engine.paths清单为26份Python和3份公共预设，共29份，包含�
 | 基础manifest/validation | 资产来源及技术检查，不等于视频人工验收 |
 | 新任务status/manifest | 运行状态与已登记产物，attempt保留历史 |
 | Legacy render_status | 旧场景任务，不能覆盖新版job状态 |
-| PostgreSQL | 本场景版本1关系及输入索引已导入；Room8产物/任务摘要登记待完成 |
-| MinIO | 已上传对象，新文件在磁盘上不等于已上传登记 |
+| PostgreSQL | 本场景版本1关系及原输入索引已导入；Room8指定6份产物及任务摘要已登记 |
+| MinIO | Room8指定6份交付已回读SHA验证；不代表其他磁盘文件自动上传 |
 
 ## 4. 下一阶段目标（未实现）
 
-[公共操作日志](OBSERVABILITY.md)已实现：纯ASGI中间件覆盖HTTP结果，公共ContextVar/span连接主要CLI、Legacy守护线程与Room8子进程；JSONL服务分片和attempt事件分开存储，Markdown时间线由CLI生成。2026-11-12完成HTTP、catalog只读检查及Room8单帧GPU任务的远端最小验收，详见[发布记录](RELEASES.md)。无前端上报或新监控API，旧状态/逐帧/GPU/timing证据保持原职责。本场景真实导入已完成，接下来登记Room8产物；后续网页只支持Room8/R3受控任务，前端按钮经Backend调用现有安全启动器，查询状态和播放指定任务产物。
+[公共操作日志](OBSERVABILITY.md)已实现：纯ASGI中间件覆盖HTTP结果，公共ContextVar/span连接主要CLI、Legacy守护线程与Room8子进程；JSONL服务分片和attempt事件分开存储，Markdown时间线由CLI生成。2026-11-12完成HTTP、catalog只读检查及Room8单帧GPU任务的远端最小验收，详见[发布记录](RELEASES.md)。无前端上报或新监控API，旧状态/逐帧/GPU/timing证据保持原职责。本场景真实导入及指定产物登记已完成；后续网页只支持Room8/R3受控任务，前端按钮经Backend调用现有安全启动器，查询状态和播放指定任务产物。
 
 拟议/api/room-jobs和业务房间查询尚未注册；不得调用旧渲染API代替。前端不传任意脚本/配置路径、工作目录或绕过审核参数；数据库ID与业务ID由适配器转换。MinIO上传后核对SHA再登记，对象成功/登记失败可重试，不能重启渲染补偿登记。
 

@@ -1,6 +1,6 @@
 # PostgreSQL目录与真实数据导入
 
-更新：2026-11-13。本场景真实数据已导入版本1，应用账号检查、重复导入、关键人工关联和房间列表API核对通过。下文命令保留为维护说明，不因阅读自动执行；新版Room8模型/视频及MinIO登记仍待完成。原过程见[数据库历史](archive/20261111_process/database_history.md)。
+更新：2026-11-13。本场景真实数据已导入版本1，应用账号、人工关联及查询核对通过；指定Room8交付6份也已上传登记、重复登记和签名Range核对通过。下文命令保留为维护说明，不因阅读自动执行。原过程见[数据库历史](archive/20261111_process/database_history.md)。
 
 ## 本次实际验收
 
@@ -19,7 +19,7 @@
 
 实际probe版本为`20261027T063858Z_12484e9d`。服务器缺少原alignment目录文件，因此将本地已核验的`20261029T032340Z_177df64f`两份JSON原样补传至场景内独立目录`diagnostics/db_import_inputs/20261113T062625Z-2763655/`。预览通过输入指纹及人工review绑定校验后才apply；没有重新计算或改写人工结论。
 
-备份位置与SHA见[发布记录](RELEASES.md#2026-11-13-真实数据库导入验收)。恢复演练验证的是导入前空业务库的备份；不是导入后完整数据备份，也没有执行生产恢复或错误注入。此次未重新采集原模型/历史视频的导入后SHA，未单独提取导入trace时间线，不能将这些列为已实测项目。后续先做新版MinIO登记，不重复导入或自动删除备份/验证库。
+备份位置与SHA见[发布记录](RELEASES.md#2026-11-13-真实数据库导入验收)。恢复演练验证的是导入前空业务库的备份；不是导入后完整数据备份，也没有执行生产恢复或错误注入。此次未重新采集原模型/历史视频的导入后SHA，未单独提取导入trace时间线，不能将这些列为已实测项目。指定交付的后续登记已完成，见下节；不重复导入或自动删除备份/验证库。
 
 ## 当前文件与存储
 
@@ -104,9 +104,11 @@ docker compose exec -T app-server python3 /app/backend/cli/check_catalog.py --sc
 
 数据库真实导入完成后，新版Room8资产/视频的MinIO上传核对与登记继续单独实施；数据库摘要不是任务状态真相源，登记失败不重新渲染视频。
 
-## Room8产物登记（本地实现，待远端）
+## Room8产物登记（远端首批已验收）
 
-统一分支`feat/room8-web-registration-api`按“产物登记→任务API→网页”推进。本批仅完成登记CLI和离线测试；不把后两项表述为已实现。
+统一分支`feat/room8-web-registration-api`按“产物登记→任务API→网页”推进。登记CLI与首批远端验收已完成；任务API与网页尚未实现。
+
+实际结果：数据库room_id=6、job_id=1、视频asset_id=64，原file_job_id不变；6份指定产物均有bucket/key。重复apply返回reused_job=true、verified/registered；SQL关系为1个输入和1个输出；既有catalog查询/分享及服务器Range读取206通过。具体包、临时目录、两次回执和验收边界见[发布记录](RELEASES.md#2026-11-13-room8产物上传与登记验收)。这些数据库ID是本次查询值，后续不可写死。
 
 入口为`python3 -m backend.cli.register_room_assets`。显式传入scene、asset、job和layout-version-id，默认只读预览，不访问数据库/MinIO；操作日志仍按公共契约落盘。`--apply`执行数据库绑定预检、上传回读、独立数据库事务，不调用渲染器/编码器，不创建新SQL迁移。
 
@@ -122,10 +124,10 @@ docker compose exec -T app-server python3 /app/backend/cli/check_catalog.py --sc
 
 MinIO和PostgreSQL没有共享事务：上传成功而登记失败时保留对象与回执，用相同参数重跑验证并登记，不重新渲染、不删除其他任务产物。提交后回执写入失败也应先查询/重试，不能清空表重做。
 
-以下仅供新代码安装后的远程SSH预览；当前服务器仍是旧验收镜像，不能假称已经有此模块：
+以下是完整代码安装后的维护预览示例；本次实际运行独立/tmp/room8-registration.81IX4m内的脚本，后台仍是旧验收镜像。直接在/app中使用新模块尚不可用：
 
 ```bash
 python3 -m backend.cli.register_room_assets --scene KK-EEz16cmU14 --asset /app/data/KK-EEz16cmU14/rooms/Room8/20261102T025550Z-7f677509/asset --job /app/data/KK-EEz16cmU14/rooms/Room8/render_jobs/20261105T040552Z_91f5fb7d --layout-version-id 1
 ```
 
-预期mode=preview、files共6项、upload_status=not_uploaded、registration_status=not_registered。核对版本及路径后才安排显式apply；本地PowerShell只编辑/测试/打包，WinSCP只传代码包/回执，远端执行预览与登记。部署保持原NVIDIA及三文件Compose约束，不能直接重建回latest旧镜像。远端登记、签名播放和浏览器验收完成后再记入RELEASES。
+预览始终输出mode=preview、6项files、not_uploaded/not_registered，表示本命令未执行远端操作，不能用预览状态否定已有登记。本地PowerShell只编辑/测试/打包，WinSCP只传代码包/回执，远端执行预览与登记。部署保持原NVIDIA及三文件Compose约束，不能直接重建回latest旧镜像。首批结果已记入RELEASES；浏览器整段播放、任务API和前端另行验收。
