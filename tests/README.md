@@ -21,6 +21,12 @@ python -B -m tests.run_regression --group backend --group tools
 
 本次回归发现分支checkout会改变原SQL和R1的换行，已恢复为Git中原批准字节并设置.gitattributes；R2/R3保留各自原批准CRLF字节。既有SQL/预设哈希常量未改，不能通过更新校验值掩盖输入漂移。
 
+2026-11-13新版任务API最终全量离线回归400项：398通过、2跳过，unittest执行127.895秒，runner总耗时129.454秒；报告release/out/room-jobs-api-final-offline-20261113.json。新增41项在backend/test_room_jobs，覆盖受控参数、提交开关、幂等、GPU/活动状态冲突、父子握手时序、失败保留、审核策略、数据库摘要、文件历史、Range/HEAD、SHA和日志关联/脱敏。打包回归实际导入新后端模块并验证原路由保留。跳过项目与上批相同；Windows另覆盖stat/fstat的ctime差异，Linux仍保留ctime检查。
+
+全量通过后将视频GET/HEAD拆为两个路由登记以避免OpenAPI operationId重复，API和既有入口兼容性46项针对性回归再次通过（6.743秒），包含Schema标识唯一性断言；接口行为和允许方法不变。
+
+另使用私有归档内原V1快照/回执/视频做新读取逻辑的只读兼容核对，SHA、24秒/720p/576帧、overview和参考机位记录通过；未重新解码、调用数据库/MinIO、启动Blender或改写旧证据。新增API尚未远端部署，离线Mock进程成功不等于真实任务出片。
+
 每次功能/缺陷修改新增相应测试并标注PRD/Architecture、输入输出、环境、副作用和命令。功能测试保留语义断言；目录变更需覆盖实际导入、CLI、AST定位、完整包及失败保护，不能只改预期使测试通过。新增API/CLI/后台/前端动作按[日志契约](../docs/OBSERVABILITY.md)覆盖关联、耗时、失败和脱敏。
 
 真实PostgreSQL集成须显式启用且使用隔离schema/事务；真实timeline测试会改源场景文件，不能在V1目录误跑。远端GPU/GLB/视频/浏览器视觉、应用账号权限、恢复和重复导入分别验收，不以离线替身代替。历史记录见[测试归档](../docs/archive/20261111_process/testing_history.md)。

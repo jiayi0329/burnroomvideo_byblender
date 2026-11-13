@@ -1,6 +1,6 @@
 # 场景、房间、资产与任务的一致性规范
 
-更新：2026-11-13。区分“实现”与“验收”；本场景关系导入及Room8指定6份交付上传登记均已远端核对，任务API与网页仍待开发。职责见 [ARCHITECTURE](ARCHITECTURE.md)，版本示例见 [RELEASES](RELEASES.md)。
+更新：2026-11-13。区分“实现”与“验收”；本场景关系导入及Room8指定6份交付登记已远端核对；任务API本地已实现待远端验收，网页待开发。职责见 [ARCHITECTURE](ARCHITECTURE.md)，版本示例见 [RELEASES](RELEASES.md)。
 
 ## 1. 业务编号与数据库主键
 
@@ -184,13 +184,15 @@ fire_final.mp4  c339c91d12709797b43989c680474286e5b2641a64de160d3fde7902267404dd
 
 这里的source_relative_path以场景数据根为基准，实际位置可以是服务器场景根或归档incoming中的同场景根，由可信适配器映射；不将开发者Windows路径永久写入跨环境业务标识。JSON模板bucket/key为null仅演示未上传情形；上表和发布记录才是本次实际登记位置。
 
-## 7. 新版网页 API 的文件适配边界（待实现）
+## 7. 新版任务 API 的文件适配边界（本地实现，远端待验收）
 
-拟议房间查询 `/api/room-scenes/<scene_id>/rooms` 返回业务 room_id、可用资产版本、内部/边界点数量、可用预览与发布状态；避免与已有 catalog 的整数 ID 语义混用。
+`GET /api/room-jobs/sources` 返回已登记Room8的scene_code、业务room_id、asset_version、layout_version_id及数据库ID；点位/预览仍通过catalog查询。未新增旧草稿中的/api/room-scenes路由，避免与catalog整数ID语义混用。
 
-拟议 `POST /api/room-jobs` 只接收可信业务字段，例如 scene_id、room_id、asset_version、preset、camera_mode、受控 style preset 引用。后端查清单并检查版本，再构建当前引擎所需的真实 CLI/JSON；不允许客户端指定工作目录、Python路径、任意命令或未经审核的 direct-final 绕过参数。
+`POST /api/room-jobs` 使用scene_code（不是草稿scene_id）、room_id=Room8、asset_version、layout_version_id、style_preset=r3、preset=test/final、camera_mode、confirm_render=true和可选approval_job_id，要求Idempotency-Key头。后端校验登记SHA、人工绑定及R3输入，再构建原引擎快照；不接受路径、任意命令/配置或direct_final。服务端默认关闭提交；正式档另需有效审核或运维显式策略，详见[API契约](../backend/README.md)。
 
-拟议查询为 `GET /api/room-jobs/<render_job_id>?scene_id=<scene_id>&room_id=<room_id>`，按三元组定位；不凭一个UUID后缀全盘扫描或挑最新任务。如未来另建全局唯一索引，可在另一版接口中简化上下文。返回原始任务阶段、技术完成、人工审核、有效帧数、日志摘要与可用产物引用；仅凭 MP4 文件存在不能标记成功。视频通过后端可信路径或经登记对象按需签名交付，浏览器不能自行遍历服务器路径。这些路由尚未实现。
+`GET /api/room-jobs/<file_job_id>?scene_code=SCENE&room_id=Room8` 按明确命名空间定位，room_id默认Room8；不凭UUID后缀全盘扫描或挑最新任务。历史使用同前缀根GET并支持分页。返回文件状态、技术完成、人工审核未记录、有效帧数、本次尝试耗时和video_url；仅凭MP4存在不算成功。video子路由校验签名/回执/SHA后支持GET/HEAD及单Range；数据库离线仍可查已有文件任务。尚无独立日志查询API，继续使用log_timeline CLI。
+
+新任务附加api_request.json、api_launch.json、api_launcher.log及必要的api_failure.json，均在新任务目录；数据根.room_job_requests/<键哈希>.json只保存请求到任务的对应，不增加新状态机。数据库render_jobs.config保存file_job_id、asset_version、snapshot_signature及运行摘要，复用原表和场景advisory锁。API任务完成后不自动上传/登记交付，仍走显式登记；失败不删帧、不改历史文件，强制退出留下的活动状态需人工核查。
 
 ## 8. 一致性与恢复规则
 
@@ -206,4 +208,4 @@ Room8 V1 当前缺少本地原帧和四份 R3 原始参考附件，历史远端 
 
 2026-11-07：保留现有业务编号映射和版本key方向；补齐唯一性范围、路径约束、可变状态/不可变交付、两阶段上传登记及跨路径续跑边界。示例已列出真实文件大小和SHA，bucket/key维持null。
 
-上述为11月7日审阅结论。现已完成纯函数解耦、首批登记隔离测试及指定产物远端验收；错误对象拒绝覆盖、失败重试和状态/审批分离有本地测试，远端本次只验收成功/幂等/关系/签名读取，不冒称故障注入。未因此授权改名旧资产、批量扩展其他房间或修改已应用SQL。下一步为任务API，再接网页。
+上述为11月7日审阅结论。现已完成纯函数解耦、首批登记隔离测试及指定产物远端验收；错误对象拒绝覆盖、失败重试和状态/审批分离有本地测试，远端本次只验收成功/幂等/关系/签名读取，不冒称故障注入。未因此授权改名旧资产、批量扩展其他房间或修改已应用SQL。任务API本地已实现，下一步远端验收后接网页。

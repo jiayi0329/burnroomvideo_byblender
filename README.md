@@ -77,9 +77,9 @@ WinSCP负责上传明确版本安装包/核验输入、下载产物；不在远�
 
 ## 下一步
 
-工程基线已进入main，本场景真实数据库导入及Room8指定产物上传登记已通过核对。下一步建设Room8/R3任务API，再接最小网页。前端上报与监控网页待实施，日志规则继续由AGENTS约束。第二房间、生命周期/Hybrid、权限与东莞展示各自排期。
+工程基线已进入main，本场景真实数据库导入及Room8指定产物上传登记已通过核对。Room8/R3任务API已本地实现，待远端验收后接最小网页。前端上报与监控网页待实施，日志规则继续由AGENTS约束。第二房间、生命周期/Hybrid、权限与东莞展示各自排期。
 
-三项工作统一在`feat/room8-web-registration-api`分支按登记、任务API、网页顺序实施。首批登记已提交822528a并远端验收；CLI在独立/tmp目录执行，后台服务镜像未升级。下一批任务API尚未实现。具体边界见[登记说明](docs/database.md#room8产物登记远端首批已验收)。
+三项工作统一在`feat/room8-web-registration-api`分支按登记、任务API、网页顺序实施。首批登记已提交822528a并远端验收；后台服务镜像未升级。第二批API已本地实现，提交开关默认关闭，复用安全启动器并支持幂等/冲突检查、文件状态/历史、后端视频Range和操作日志；网页未实现。接口和后续验收步骤见[Backend](backend/README.md)，已登记范围见[登记说明](docs/database.md#room8产物登记远端首批已验收)。
 
 main合并、标签、部署和真实数据写入不自动执行。当前源码提交号不冒充V1原远端checkout；完整交付与缺失附件以RELEASES为准。
 
@@ -87,7 +87,7 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 
 下面逐项列出本次整理后可提交的文件（含待提交文档），不包含Git内部目录、被忽略数据/缓存和本地工具环境。后续新增/删除文件应同步本表；归档原文只供追溯。目录README只维护专项边界，不重复本总表。
 
-清单共 **158** 个文件。
+清单共 **164** 个文件。
 
 <details>
 <summary>根目录（10份）</summary>
@@ -108,11 +108,11 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 </details>
 
 <details>
-<summary>backend：后端实现（23份）</summary>
+<summary>backend：后端实现（28份）</summary>
 
 | 文件路径 | 用途 | 属性/运行环境 |
 | --- | --- | --- |
-| [backend/README.md](backend/README.md) | 后端接口/数据能力、当前入口及尚未登记Room8的边界 | 文档/约束 |
+| [backend/README.md](backend/README.md) | 后端接口、任务API契约和本地/远端能力及验收边界 | 文档/约束 |
 | [backend/__init__.py](backend/__init__.py) | Python包初始化/职责边界；不自动启动服务、连库或渲染 | 包/测试组登记 |
 | [backend/adapters/__init__.py](backend/adapters/__init__.py) | Python包初始化/职责边界；不自动启动服务、连库或渲染 | 包/测试组登记 |
 | [backend/adapters/minio/__init__.py](backend/adapters/minio/__init__.py) | Python包初始化/职责边界；不自动启动服务、连库或渲染 | 包/测试组登记 |
@@ -121,20 +121,25 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 | [backend/adapters/postgres/__init__.py](backend/adapters/postgres/__init__.py) | Python包初始化/职责边界；不自动启动服务、连库或渲染 | 包/测试组登记 |
 | [backend/adapters/postgres/database.py](backend/adapters/postgres/database.py) | PostgreSQL延迟连接、显式迁移/应用账号授权，不随服务启动执行 | 普通Python |
 | [backend/adapters/postgres/room_asset_repository.py](backend/adapters/postgres/room_asset_repository.py) | 校验户型/review/点位绑定，以事务登记房间资产和任务输入输出关系 | 普通Python |
+| [backend/adapters/postgres/room_job_repository.py](backend/adapters/postgres/room_job_repository.py) | 校验已登记基础资产和R3参考，以原表及场景锁建立/同步任务摘要 | 普通Python |
 | [backend/api/__init__.py](backend/api/__init__.py) | Python包初始化/职责边界；不自动启动服务、连库或渲染 | 包/测试组登记 |
 | [backend/api/main.py](backend/api/main.py) | FastAPI主实现：健康、场景获取、Legacy时间线/渲染/状态/分享和流水线 | 普通Python |
 | [backend/api/room_api.py](backend/api/room_api.py) | /api/catalog房间、点位、资产查询及签名；数据库整数ID语义 | 普通Python |
+| [backend/api/room_jobs.py](backend/api/room_jobs.py) | /api/room-jobs受控创建、来源/选项、状态/历史及视频GET/HEAD接口 | Backend/ASGI |
 | [backend/cli/__init__.py](backend/cli/__init__.py) | Python包初始化/职责边界；不自动启动服务、连库或渲染 | 包/测试组登记 |
 | [backend/cli/check_catalog.py](backend/cli/check_catalog.py) | 应用账号权限与已导入场景目录的只读核验 | 普通Python |
 | [backend/cli/import_rooms.py](backend/cli/import_rooms.py) | 核验输入构造关系计划；默认preview，--apply写库，上传另行明确 | 普通Python |
 | [backend/cli/log_timeline.py](backend/cli/log_timeline.py) | 只读JSONL时间线、HTTP子集统计及独立Markdown输出 | 普通Python/本地或远端CLI |
 | [backend/cli/register_room_assets.py](backend/cli/register_room_assets.py) | 已完成Room8交付的独立登记入口；预览/显式上传写库、互斥锁、失败回执及重试 | 普通Python/CLI |
+| [backend/cli/run_room_job.py](backend/cli/run_room_job.py) | 内部独立启动进程；验证API预留和父进程握手后调用安全动画入口 | 普通Python/内部CLI |
 | [backend/database/migrations/001_rooms.sql](backend/database/migrations/001_rooms.sql) | scenes等八张业务表的唯一初始迁移；文件名/内容保持不变 | 数据库迁移 |
 | [backend/paths.py](backend/paths.py) | 安装根、Legacy worker和SQL定位；不可变迁移指纹校验 | 普通Python |
 | [backend/services/__init__.py](backend/services/__init__.py) | Python包初始化/职责边界；不自动启动服务、连库或渲染 | 包/测试组登记 |
 | [backend/services/observability.py](backend/services/observability.py) | 已有Legacy生命周期/失败/状态/GPU监控；不是完整请求追踪 | 普通Python |
 | [backend/services/request_logging.py](backend/services/request_logging.py) | 纯ASGI请求/异常/取消追踪、响应ID及后台耗时区分 | Backend/ASGI中间件 |
 | [backend/services/room_registration.py](backend/services/room_registration.py) | 只读构造Room8登记清单，验证基础资产、冻结R3、视频回执和历史签名 | 普通Python |
+| [backend/services/room_job_service.py](backend/services/room_job_service.py) | 文件任务查询/幂等预留、GPU冲突检查、进程交接及摘要同步；不直接调用Blender | 普通Python |
+| [backend/services/room_video.py](backend/services/room_video.py) | 回执SHA核对缓存和单Range/HEAD MP4流式响应，拒绝证据不一致 | 普通Python |
 
 </details>
 
@@ -207,7 +212,7 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 </details>
 
 <details>
-<summary>tests：测试（48份）</summary>
+<summary>tests：测试（49份）</summary>
 
 | 文件路径 | 用途 | 属性/运行环境 |
 | --- | --- | --- |
@@ -220,6 +225,7 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 | [tests/backend/test_operation_logging.py](tests/backend/test_operation_logging.py) | API/CLI追踪、失败/脱敏、并发/轮转及时间线离线回归 | 离线测试/替身 |
 | [tests/backend/test_room_database.py](tests/backend/test_room_database.py) | 合成导入/人工结论保护及显式真实PostgreSQL事务集成 | 离线测试/替身 |
 | [tests/backend/test_room_registration.py](tests/backend/test_room_registration.py) | 登记清单、私有桶/SHA回读、输入绑定、事务/重试/锁及日志脱敏 | 离线测试/替身 |
+| [tests/backend/test_room_jobs.py](tests/backend/test_room_jobs.py) | 任务参数/幂等/冲突/握手/失败保留、文件历史、Range及日志关联回归 | 离线测试/替身 |
 | [tests/backend/test_v6_share.py](tests/backend/test_v6_share.py) | 预签名/已有产物、旧分享API、缓存及GPU温度保护 | 离线测试/替身 |
 | [tests/deploy/__init__.py](tests/deploy/__init__.py) | 登记该职责组的离线模块清单，供tests/suites.py汇总 | 包/测试组登记 |
 | [tests/deploy/test_canonical_layout.py](tests/deploy/test_canonical_layout.py) | 唯一正式路径、SQL/R3、29文件指纹及旧40文件任务拒绝 | 离线测试/替身 |

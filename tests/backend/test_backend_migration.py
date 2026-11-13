@@ -69,7 +69,7 @@ print('startup has no service calls',flush=True)
             self.assertIn('no service calls',python(code,Path(folder)).stdout)
             self.assertEqual(list(Path(folder).iterdir()),[])
 
-    def test_existing_asgi_routes_and_methods_are_preserved_without_new_room_job_api(self) -> None:
+    def test_existing_routes_preserved_and_room_job_api_is_separate(self) -> None:
         expected={
             ('/','GET'),('/api/scenes','GET'),('/api/download_scene/{scene_code}','GET'),
             ('/api/generate_timeline/{scene_code}','POST'),('/api/render/{scene_code}','POST'),
@@ -77,6 +77,9 @@ print('startup has no service calls',flush=True)
             ('/api/pipeline/{scene_code}','POST'),('/api/catalog/scenes/{scene_code}/rooms','GET'),
             ('/api/catalog/rooms/{room_id}/points','GET'),('/api/catalog/rooms/{room_id}/assets','GET'),
             ('/api/catalog/assets/{asset_id}/share','GET'),
+            ('/api/room-jobs/options','GET'),('/api/room-jobs/sources','GET'),
+            ('/api/room-jobs','POST'),('/api/room-jobs','GET'),('/api/room-jobs/{job_id}','GET'),
+            ('/api/room-jobs/{job_id}/video','GET'),('/api/room-jobs/{job_id}/video','HEAD'),
         }
         actual={(r.path,m) for r in main.app.routes if r.path=='/' or r.path.startswith('/api/') for m in r.methods}
         self.assertEqual(actual,expected)
@@ -115,7 +118,7 @@ class DatabasePaths(unittest.TestCase):
         self.assertEqual(hashlib.sha256(file.read_bytes()).hexdigest(),paths.BASELINE_MIGRATION_SHA256)
         self.assertEqual(paths.migration_files(),(file,))
         self.assertNotIn('app/db/001_rooms.sql',paths.PACKAGE_FILES)
-        self.assertEqual(len(paths.PACKAGE_FILES),22)
+        self.assertEqual(len(paths.PACKAGE_FILES),27)
 
     def test_missing_or_drifted_sql_fails_before_database_connection(self) -> None:
         with tempfile.TemporaryDirectory() as folder:

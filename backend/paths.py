@@ -18,6 +18,11 @@ MODULE_LOCATIONS = {
     'room_asset_repository': 'adapters/postgres',
     'room_objects': 'adapters/minio',
     'register_room_assets': 'cli',
+    'room_jobs': 'api',
+    'room_job_service': 'services',
+    'room_video': 'services',
+    'room_job_repository': 'adapters/postgres',
+    'run_room_job': 'cli',
 }
 PACKAGE_FILES = (
     'backend/__init__.py', 'backend/paths.py',
