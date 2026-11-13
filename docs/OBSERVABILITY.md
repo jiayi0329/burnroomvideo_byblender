@@ -10,7 +10,7 @@
 | 主要后台阶段 | catalog读取/分享，Legacy下载、时序、启动、后台守护及发布 | 旧文本/Blender第三方日志不是本组件输出；没有改写历史记录 |
 | catalog CLI | import_rooms的输入核验/显式apply、check_catalog、database显式迁移；包含参数拒绝、返回非零和异常 | 不自动执行导入/迁移；--help不写日志；诊断tools未全部接入 |
 | Room8产物登记CLI | register_room_assets的本地清单、数据库绑定、私有桶、上传回读、事务阶段与失败/耗时，关联原job_id；功能已远端验收 | 本次未单独提取完整trace或远端失败注入；登记回执不替代渲染状态 |
-| 新版任务API | HTTP→预留任务→独立CLI→原attempt/worker的trace/request/job关联，状态/视频查询及摘要失败日志 | 本地实现并离线测试，尚未远端验收；前端尚未实现 |
+| 新版任务API | 57b53f1已部署并生成GPU短片，响应trace及启动日志job/attempt可见；HTTP→CLI→worker结构化关联已有离线测试 | 尚未提取服务/attempt完整操作JSONL；真实前端及远端故障日志未验收 |
 | Room8启动器 | CLI、预检、冲突检查、job/attempt、Blender启动、编码、ffprobe、完整解码及失败 | 复用原状态、逐帧manifest、timing/GPU文件，不另建状态机 |
 | Blender动画worker | 继承关联上下文、准备阶段、worker总耗时、每24个输出的轻量进度事件 | 不复制完整逐帧记录；真实GPU单帧及准备/worker/attempt关联已验收；静帧/裁切入口未统一接入 |
 | 时间线CLI | 从JSONL生成单trace/job的JSON摘要及可选Markdown文档 | 本地/维护工具，不是公开日志API；无前端、鉴权、告警或集中监控集群 |
@@ -79,6 +79,8 @@ SCENE/JOB/ATTEMPT均需替换为实际值；历史任务没有operations文件�
 
 本地离线测试使用临时JSONL、进程/Blender替身和进程内TestClient，不启动服务器或调用真实外部API。新增tests/backend/test_operation_logging.py及tests/engine/test_room_operation_logging.py，覆盖脱敏、ID校验、父子span、线程/进程隔离、轮转、HTTP成功/拒绝/异常/取消/流式响应、响应后任务、CLI退出、日志失败、Room8输出隔离及子进程传递。
 
-前端下一阶段再实现按钮动作的关联ID、请求、后台阶段及结果/播放上报；前端输入视为不可信。远端最小验收已证明HTTP和单帧GPU任务能写入并关联日志；完整动画编码、失败恢复等本次没有重新实测，不能扩大验收范围。真实数据导入及首批产物登记功能已验收，但对应完整trace未单独提取；磁盘保留和真实前端仍待验收。日志不是鉴权、数据库审计或共享服务器全局调度器。
+前端下一阶段再实现按钮动作的关联ID、请求、后台阶段及结果/播放上报；前端输入视为不可信。11月12日最小验收证明HTTP和单帧GPU任务能写入并关联日志；11月13日API已实际生成4秒短片，但未提取完整结构化日志链，失败恢复未远端演练。真实导入及首批产物登记的完整trace也未单独提取；磁盘保留和真实前端仍待验收。日志不是鉴权、数据库审计或共享服务器全局调度器。
 
 2026-11-13新版任务API已本地接入：request_operation、注册来源核验、任务预留/进程握手、launcher_exit及数据库摘要同步复用公共stage。HTTP trace/request通过BURNROOM_OPERATION_CONTEXT传入独立CLI，再进入原Room8 attempt/worker。轮询和视频查询绑定scene/room/job；同键重试返回submission_trace_id指向原创建操作，当前HTTP仍有独立request_id。api_launcher.log为本任务子进程输出，操作JSONL继续分进程存放；不输出请求正文、幂等键明文、数据库错误正文或签名URL。视频流异常由现有ASGI中间件记录。离线测试覆盖这些关联和失败脱敏；尚未远端提取新API完整trace或验收前端按钮。
+
+同日远端核心路径验收：响应trace_id/submission_trace_id=room8-api-test-57b53f1-01、首次request_id=91c85a8b63864606bc035714336a6596，file_job_id=20261113T125240Z_20263360，启动日志attempt=20261113T125240Z_6a2e5d，技术完成80.125秒。该时间来自任务timing摘要，不是HTTP耗时，也不能把嵌套span相加反推。上述响应和文本日志不替代服务/attempt操作JSONL的完整trace核验；具体证据范围见[RELEASES](RELEASES.md#2026-11-13-新版room8任务api部署与短片验收)。

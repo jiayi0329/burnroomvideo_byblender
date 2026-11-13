@@ -184,3 +184,38 @@ docker compose -p burnroom-deploy-package -f docker-compose.yml -f docker-compos
 本次验收证明6份指定交付的上传回读、数据库关联、重复登记和服务器侧签名Range读取；不代表所有运行报告/原帧已上传，不是新增完整视频渲染/解码或浏览器整段播放验收，不证明公网可达。CLI关联日志已实现并指定持久化目录，但此次未单独提取完整trace或注入远端失败；不能将这些列为已实测。当前库的登记前备份命令已提供，用户未回传该备份的具体路径及校验输出，不将其与前一节已验证的导入前备份混同。
 
 第一批完成；同一分支下一批为新版Room8/R3任务API，再下一批为最小网页及真实按钮日志。既有catalog查询/分享不等于已有任务创建API。新分支未合并main，本条只补验收记录。
+
+## 2026-11-13 新版Room8任务API部署与短片验收
+
+证据来自用户回传的远程SSH输出。源码提交57b53f1541a988961ed12993a85105a49fcecd69，分支feat/room8-web-registration-api。部署包为burnroom-deploy-package-v1.0.0-20261113-202352919-9eeb2310.tar.gz，366962字节，SHA256为ec5e436bb1ca3199a4de8dcb2b4d0fabc10b70f74bc10f95c0c15fa0a700ad09，服务器sha256sum校验OK。
+
+构建镜像burnroom-app:room-jobs-57b53f1，用户检查Revision与上述提交一致，Cmd为uvicorn backend.api.main:app。先解压到独立acceptance-room-jobs-57b53f1目录，再按原base、GPU文件及新app-image.override.yml三文件切换app-server，原prod.env、数据挂载、数据库及MinIO服务保留。独立目录的完整时间戳路径未回传，不推测填写。
+
+部署前备份：/data/zhaojy/burnroom-data/deploy-backups/20261113T123831Z-2823904；回退镜像：burnroom-app:rollback-20261113T123831Z-2823904。保护脚本成功输出上述路径，活动渲染检查OK；本次没有回传备份内容指纹/数据库恢复结果，不能替代前文已做的导入前恢复验收。
+
+| 检查 | 实际结果 |
+| --- | --- |
+| 健康/开关 | 健康正常且appkey_loaded=true；最初两个开关均false，显式启用后render_enabled=true、direct_final_enabled=false |
+| 已登记来源 | scene=KK-EEz16cmU14、Room8、layout_version_id=1、database_room_id=6、blend_asset_id=59、asset_version=20261102T025550Z-7f677509 |
+| 原V1任务读取 | 20261105T040552Z_91f5fb7d，overview、24秒/720p/24fps/576帧，technical_complete=true，耗时360.54199667694047秒，video_available=true |
+| 原V1视频Range | 新后端video接口返回206、video/mp4 |
+| 新任务创建 | POST返回202，file_job_id=20261113T125240Z_20263360、database_job_id=2、reused=false，初始created状态 |
+| 新任务技术完成 | awaiting_visual_review，technical_complete=true，48/48帧，4秒/960×540/12fps，overview/R3，video_available=true、error_code=null |
+| 实测耗时 | total_seconds=80.12485336186364；api_launcher.log显示done、48帧、80.125秒；这是本次尝试总时间，不是逐帧平均或纯GPU耗时 |
+| 实际图形后端 | NVIDIA L20/PCIe/SSE2，NVIDIA Corporation，OpenGL 4.6.0 NVIDIA 580.178.04，device_type=NVIDIA，available=true，software_rendering_suspected=false |
+| 新短片Range | 后端video接口返回206、video/mp4 |
+| 同键同请求重试 | 返回原file_job_id、database_job_id=2、reused=true及相同完成结果，没有分配新任务号 |
+
+新任务目录：/app/data/KK-EEz16cmU14/rooms/Room8/render_jobs/20261113T125240Z_20263360/；产物fire_short.mp4。attempt=20261113T125240Z_6a2e5d，GPU证据位于attempts/<attempt>/renderer.json。新测试输出独立保存，原Room8 V1资产、R3和24秒视频未替换。
+
+提交响应X-Trace-ID及submission_trace_id为room8-api-test-57b53f1-01，首次X-Request-ID为91c85a8b63864606bc035714336a6596；启动日志串联相同文件任务与attempt。尚未分别提取服务/attempt的操作JSONL，不能宣称完整trace、请求统计或SQL结束摘要已远端核对。API返回database_job_id=2不等于已单独查询该SQL行的最终状态或产物关联。
+
+本次验收限定于新版API成功创建到短片技术完成、实际GPU、旧/新视频Range及同键复用。历史列表/分页、并发冲突、异参幂等拒绝、失败/中断恢复、HEAD/If-Range、数据库故障与完整日志链有本地测试，本次未单独远端演练。新短片human_acceptance仍为not_recorded，未回传浏览器整段播放/视觉审核或新回执/耗时报告的原文件；未自动上传MinIO，未通过新版API执行正式576帧。80.125秒不能直接外推为正式视频预计耗时。
+
+后续维护以实际容器标签com.docker.compose.project.config_files记录的base、GPU及本次新版override组合为准，不再沿用11月12日的旧acceptance override来更新应用。可在远程SSH原Compose目录只读查询：
+
+```bash
+docker inspect "$(docker compose ps -q app-server)" --format '{{index .Config.Labels "com.docker.compose.project.config_files"}}'
+```
+
+第二批核心成功路径验收通过，下一步为第三批Room8最小网页，优先显示已登记预览和原V1视频，再接受控提交/进度/播放与按钮日志。保留当前任务及缺口，不为前端开发自动追加测试渲染、执行Git合并或打标签。

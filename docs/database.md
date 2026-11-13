@@ -106,7 +106,7 @@ docker compose exec -T app-server python3 /app/backend/cli/check_catalog.py --sc
 
 ## Room8产物登记（远端首批已验收）
 
-统一分支`feat/room8-web-registration-api`按“产物登记→任务API→网页”推进。登记CLI与首批远端验收已完成；任务API已本地实现，尚未远端部署，网页未实现。任务摘要复用原八表及场景锁，不新增迁移，状态查询仍以文件为准；契约见[Backend](../backend/README.md)。
+统一分支`feat/room8-web-registration-api`按“产物登记→任务API→网页”推进。登记CLI与首批远端验收已完成；任务API57b53f1已部署并生成4秒GPU短片，同键复用返回原文件任务及database_job_id=2，网页未实现。任务摘要复用原八表及场景锁，不新增迁移，状态查询仍以文件为准；本次未独立查询SQL任务2最终摘要/产物关系，契约见[Backend](../backend/README.md)，验收边界见[RELEASES](RELEASES.md)。
 
 实际结果：数据库room_id=6、job_id=1、视频asset_id=64，原file_job_id不变；6份指定产物均有bucket/key。重复apply返回reused_job=true、verified/registered；SQL关系为1个输入和1个输出；既有catalog查询/分享及服务器Range读取206通过。具体包、临时目录、两次回执和验收边界见[发布记录](RELEASES.md#2026-11-13-room8产物上传与登记验收)。这些数据库ID是本次查询值，后续不可写死。
 
@@ -130,4 +130,4 @@ MinIO和PostgreSQL没有共享事务：上传成功而登记失败时保留对�
 python3 -m backend.cli.register_room_assets --scene KK-EEz16cmU14 --asset /app/data/KK-EEz16cmU14/rooms/Room8/20261102T025550Z-7f677509/asset --job /app/data/KK-EEz16cmU14/rooms/Room8/render_jobs/20261105T040552Z_91f5fb7d --layout-version-id 1
 ```
 
-预览始终输出mode=preview、6项files、not_uploaded/not_registered，表示本命令未执行远端操作，不能用预览状态否定已有登记。本地PowerShell只编辑/测试/打包，WinSCP只传代码包/回执，远端执行预览与登记。部署保持原NVIDIA及三文件Compose约束，不能直接重建回latest旧镜像。首批结果已记入RELEASES；浏览器整段播放、任务API和前端另行验收。
+预览始终输出mode=preview、6项files、not_uploaded/not_registered，表示本命令未执行远端操作，不能用预览状态否定已有登记。本地PowerShell只编辑/测试/打包，WinSCP只传代码包/回执，远端执行预览与登记。部署保持原NVIDIA及实际三文件Compose约束，不能直接重建回latest旧镜像。首批登记和后续API成功路径结果已记入RELEASES；浏览器整段播放、前端及其余未核验项独立验收。
