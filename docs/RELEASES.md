@@ -142,3 +142,19 @@ docker compose -p burnroom-deploy-package -f docker-compose.yml -f docker-compos
 新路径、HTTP日志、应用账号目录检查、新版Room8单帧GPU及任务日志、旧视频Range读取的最小服务器验收通过。检查图人工审核仍独立保留；本次不代替原V1的完整视频验收。
 
 下一步提交本次文档记录，复核main最新状态与差异后，由用户审阅并决定合并main；不以真实数据库导入或前端完成作为本轮合并前置条件。之后依次进行真实数据导入、新版MinIO登记、Room8/R3任务API和最小网页。尚未执行merge、tag或新完整视频渲染。
+
+## 2026-11-13 真实数据库导入验收
+
+证据为用户回传的远程SSH输出。既有验收镜像`burnroom-app:acceptance-3be7124`未重建。当前本地main及origin/main指向f29d662，已包含上述工程基线记录；本次不再执行Git合并或修改原Room8 V1证据。
+
+生产库burnroom首次导入成功：场景KK-EEz16cmU14，layout_version_id=1，6条房间、5条有效、22点，xy_verified=true，输出assets=29。相同输入再次apply复用版本1，返回reused=true、review_preserved=true。burnroom_app目录检查ok；关键人工关联及房间列表API与[数据库验收表](database.md#本次实际验收)一致。
+
+导入前备份目录：`/home/zhaojy/burnroom-prod/db-backups/20261113T062919Z-2763655/`，保存dump、archive-list、两份核验输入及restore.log。用户显示dump约31KB，pg_restore --list可读取；恢复到独立`burnroom_verify_20261113063131_2763655`退出码0，业务表8、迁移1，场景/房间/点位均0。没有恢复覆盖生产库，备份及验证库保留。
+
+| 文件 | 用户实测SHA256 |
+| --- | --- |
+| burnroom.dump | e3f9d5e686a223d1fd814cd84a86bcdd559b23e96640ee32d4abefff6c4d25b9 |
+| alignment_report.json | 95bdfd18aa233a718b6f21114fd84f3bd102dee68ea07561e46860c6c0114b8b |
+| review.json | 883de043a2a8106b8daac1299fe99a7f598ddfc200eeb4c91fbaffdb8c95bfdc |
+
+这是导入前备份恢复、实际导入、幂等、人工关系和API查询的验收；未做生产故障回滚、导入后全库恢复或全部原文件重新验SHA，导入日志trace也未单独提取。未启动渲染、上传MinIO或变更R3配置；29份输入文件索引不代表Room8模型/视频登记完成。下一步为新版Room8产物上传核对与关系登记。

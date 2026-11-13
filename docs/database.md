@@ -1,6 +1,25 @@
 # PostgreSQL目录与真实数据导入
 
-更新：2026-11-12。服务/八表/CLI实现已有；3be7124远端应用账号检查8表返回ok，真实场景导入尚未完成。本页为下一阶段计划和当前正确入口，本轮不执行任何命令。原部署和导入过程见[数据库历史](archive/20261111_process/database_history.md)。
+更新：2026-11-13。本场景真实数据已导入版本1，应用账号检查、重复导入、关键人工关联和房间列表API核对通过。下文命令保留为维护说明，不因阅读自动执行；新版Room8模型/视频及MinIO登记仍待完成。原过程见[数据库历史](archive/20261111_process/database_history.md)。
+
+## 本次实际验收
+
+证据来自用户回传的远程SSH输出，不是本地替身测试。
+
+| 项目 | 2026-11-13结果 |
+| --- | --- |
+| 数据版本 | KK-EEz16cmU14，layout_version_id=1，xy_verified=true |
+| 首次导入 / 再导入 | reused=false；相同输入再次apply返回reused=true、review_preserved=true，版本仍为1 |
+| 应用账号查询 | burnroom_app，8表检查ok，6条房间记录、5条有效、22点 |
+| 人工关联 | 22=Room8/interior，32=Room8/doorway，42=outside且不关联房间 |
+| 房间列表API | 版本1返回6条；Room11无效；Room8内部13点、门口1点、关联总计14 |
+| Room8数据库主键 | rooms.id=6；业务名Room8不是SQL主键，也不能将本次主键写死为通用值 |
+| 资产范围 | 导入输出assets=29，仅本地输入文件索引；未使用--upload-assets，不代表独立Room8资产或视频已登记 |
+| 恢复验证 | 导入前dump恢复到独立burnroom_verify_20261113063131_2763655，退出码0、8业务表、1迁移、场景/房间/点位均0 |
+
+实际probe版本为`20261027T063858Z_12484e9d`。服务器缺少原alignment目录文件，因此将本地已核验的`20261029T032340Z_177df64f`两份JSON原样补传至场景内独立目录`diagnostics/db_import_inputs/20261113T062625Z-2763655/`。预览通过输入指纹及人工review绑定校验后才apply；没有重新计算或改写人工结论。
+
+备份位置与SHA见[发布记录](RELEASES.md#2026-11-13-真实数据库导入验收)。恢复演练验证的是导入前空业务库的备份；不是导入后完整数据备份，也没有执行生产恢复或错误注入。此次未重新采集原模型/历史视频的导入后SHA，未单独提取导入trace时间线，不能将这些列为已实测项目。后续先做新版MinIO登记，不重复导入或自动删除备份/验证库。
 
 ## 当前文件与存储
 
@@ -46,9 +65,9 @@ docker compose exec -T app-server python3 /app/backend/cli/import_rooms.py --sce
 
 预期mode=preview、rooms=6、points=22、xy_verified=true，数据库/MinIO不写入。数目正确仍要核对来源指纹、人工结论和资产路径；不是拿6/22当唯一验收标准。
 
-### 显式写入与核验（后续授权步骤）
+### 显式写入与核验（本场景已完成）
 
-确认备份可用、预览及人工关联正确后，在同一组参数中显式增加--apply；本次真实导入先不加--upload-assets：
+其他版本需先确认备份可用、预览及人工关联正确，再在同一组参数中显式增加--apply；本次实际导入未加--upload-assets：
 
 ```bash
 docker compose exec -T app-server python3 /app/backend/cli/import_rooms.py --scene KK-EEz16cmU14 --probe-dir "$probe_dir" --alignment-dir "$alignment_dir" --review-file "$alignment_dir/review.json" --apply
