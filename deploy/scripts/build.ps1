@@ -29,10 +29,10 @@ Write-Host "===> [2/4] 组装核心代码与依赖..." -ForegroundColor Cyan
 # Backend implementations and unchanged baseline SQL accompany all app shims.
 $BackendModules = @{
     api = @('main', 'room_api')
-    'adapters/postgres' = @('database')
-    'adapters/minio' = @('s3_io')
-    cli = @('import_rooms', 'check_catalog', 'log_timeline')
-    services = @('observability', 'request_logging')
+    'adapters/postgres' = @('database', 'room_asset_repository')
+    'adapters/minio' = @('s3_io', 'room_objects')
+    cli = @('import_rooms', 'check_catalog', 'log_timeline', 'register_room_assets')
+    services = @('observability', 'request_logging', 'room_registration')
 }
 $BackendFiles = @('backend/__init__.py', 'backend/paths.py', 'backend/adapters/__init__.py', 'backend/database/migrations/001_rooms.sql')
 foreach ($Group in $BackendModules.Keys) {

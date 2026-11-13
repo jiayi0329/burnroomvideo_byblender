@@ -1,6 +1,6 @@
 # 场景、房间、资产与任务的一致性规范
 
-更新：2026-11-07。区分“当前实现”与“目标约定”；本文不执行迁移、上传、导入或重命名。职责见 [ARCHITECTURE](ARCHITECTURE.md)，版本示例见 [RELEASES](RELEASES.md)。
+更新：2026-11-13。区分“本地实现”与“远端验收”；本场景关系导入已核对，首批Room8产物登记CLI已实现但未远端上传。职责见 [ARCHITECTURE](ARCHITECTURE.md)，版本示例见 [RELEASES](RELEASES.md)。
 
 ## 1. 业务编号与数据库主键
 
@@ -73,13 +73,13 @@ MinIO不可变key用于已定稿的交付或明确时间点的快照，不能持
 
 ## 4. MinIO key：现状兼容与目标命名
 
-| 类型 | 当前实现 | 后续版本化约定（未实现上传器） |
+| 类型 | 当前范围 | 对象命名 |
 | --- | --- | --- |
 | 旧场景输入 | burnroom-assets：`<scene_code>/<filename>` | 保留兼容，不把嵌套目录扁平下载到场景根 |
 | 旧成片 | burnroom-outputs：`<scene_code>/output.mp4` | 保留；禁止写入 Room8 的 fire_final 来冒充旧产物 |
 | 目录导入附件 | burnroom-assets：`<scene_code>/catalog/<sha256>/<filename>` | 保留已有代码规则 |
-| 新版基础房间 | 尚未完整登记 | burnroom-assets：`scenes/<scene_id>/rooms/<room_id>/assets/<asset_version>/<filename>` |
-| 新版任务交付 | 尚未完整登记 | burnroom-outputs：`scenes/<scene_id>/rooms/<room_id>/render_jobs/<render_job_id>/<filename>` |
+| 新版基础房间 | CLI本地实现，待远端 | 独立私有burnroom-room-assets：`scenes/<scene_id>/rooms/<room_id>/assets/<asset_version>/<filename>` |
+| 新版任务交付 | CLI本地实现，待远端 | 独立私有burnroom-room-outputs：`scenes/<scene_id>/rooms/<room_id>/render_jobs/<render_job_id>/<filename>` |
 
 版本 key 为不可变内容约定：相同 key/相同 SHA 可复用，相同 key/不同 SHA 必须拒绝并新建版本，不静默覆盖。不能仅凭 S3 ETag 当作 SHA256；上传器须明确验证内容指纹、字节数和媒体类型，完成后才登记。
 
@@ -87,13 +87,15 @@ MinIO不可变key用于已定稿的交付或明确时间点的快照，不能持
 
 数据库永久保存 bucket、object_key、sha256、size_bytes 和关联；临时预签名 URL 按需生成，不作为主键、不写入长期 manifest。浏览器可达端点与签名主机必须一致，不能换签名 URL 的主机/端口；预签名不提供网络穿透。
 
-### 上传与登记顺序（目标约定）
+新版使用专用私有桶，是为隔离旧桶可能存在的公开读策略；不更改旧桶或Legacy命名。首批仅登记基础blend/GLB、三张检查图和正式MP4，不自动上传原始快照、完整运行报告。已有任何桶策略时保守拒绝，不静默修改管理员策略。
 
-1. 本地清单先确认场景/房间/版本、来源指纹与技术产物，保持 `upload_status=not_uploaded`、`registration_status=not_registered`；基础资产已生成不表示已允许公开外发。
+### 上传与登记顺序（首批CLI已实现，待远端）
+
+1. 本地预览先确认场景/房间/版本、来源指纹与技术产物，保持 `upload_status=not_uploaded`、`registration_status=not_registered`，不连数据库/MinIO；apply先校验明确的数据库版本及人工证据。基础资产已生成不表示已允许公开外发。
 2. 上传版本化对象；相同key已存在时先核对内容，不能直接覆盖。首次登记前回读对象并计算SHA，核对字节数和媒体类型，成功后才标记对象verified；仅metadata中的自报SHA或ETag不足以证明回读内容一致。
 3. 在独立数据库事务中登记对象与关系，成功后才标记registered。MinIO与PostgreSQL没有共享事务：上传成功但事务失败可能留下未登记对象，应保留并单独重试登记，不重新渲染、不自动删除原文件或回退其他任务。
 
-上传可用性、目录登记和人工审核是不同维度。未来API分别表达upload_status、registration_status、runtime_state与human_acceptance；现有表/接口没有实现完整状态组合，不把这些名称当成已落地字段。
+上传可用性、目录登记和人工审核是不同维度。登记CLI回执已有upload_status/registration_status，任务config摘要保留runtime_state/human_acceptance；未来API需分别表达，现有表没有独立的完整状态组合列，不把这些名称当成SQL字段。
 
 原始config_snapshot、完整日志和私有模型默认不作为可公开分享附件。当前代码支持可选桶级公开策略，但本轮未查询远端实际桶策略；新增上传器必须先确认访问范围。若旧产物桶存在全桶匿名读取，不将原始运行报告直接上传到该公开范围；私有报告的隔离方式另行设计，不在本轮改变旧视频访问权限。
 
@@ -114,7 +116,9 @@ MinIO不可变key用于已定稿的交付或明确时间点的快照，不能持
 
 现有 SQL 的任务状态只允许 unknown/running/done/failed；文件还含 created、preparing、rendering、encoding、awaiting_visual_review、interrupted。目标同步规则：活动阶段→running，技术验证通过且待审核→done，failed/interrupted→failed，缺失/无法核验→unknown。**这是待实现映射**，done 只表示技术完成，必须在 API 中另保留原始 runtime_state 与人工审核信息；现有表没有独立审核列，不冒称已能保存全部审核状态。
 
-后续增加任务外部标识、资产版本索引/关联及审核元数据时，新增迁移文件，评审唯一性和跨场景约束；不得修改已应用的 001_rooms.sql。可以先设计登记清单，不在本轮写库。
+首批登记仅实现“已完成final且awaiting_visual_review→SQL done”这一分支，并在config保留原始状态与未记录人工审核；活动/失败同步和API表达仍未实现。
+
+首批登记CLI使用render_jobs.config桥接file_job_id、asset_version、snapshot_signature、原运行状态及未记录人工验收状态，schema_version独立标记为registration_schema_version=1；通过场景advisory锁与Room8本地登记锁避免协作写入重复。输入/输出经render_job_assets关联；done仅表示技术完成。此方案不提供外部ID独立列的唯一约束，后续多机/其他写入方接入前需评审新迁移、唯一性及跨场景约束；不得修改已应用的001_rooms.sql。尚未远端执行登记。
 
 现有points按场景/device唯一保存坐标，import_rooms.py:111–115会拒绝同场景既有点位的坐标变更。新layout_version只解决户型/归属版本，不能自动解决扫描点位空间变化；如以后重新扫描，须另行设计scene revision及兼容关系，不静默覆盖points。
 

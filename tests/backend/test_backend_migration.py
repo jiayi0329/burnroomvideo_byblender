@@ -115,7 +115,7 @@ class DatabasePaths(unittest.TestCase):
         self.assertEqual(hashlib.sha256(file.read_bytes()).hexdigest(),paths.BASELINE_MIGRATION_SHA256)
         self.assertEqual(paths.migration_files(),(file,))
         self.assertNotIn('app/db/001_rooms.sql',paths.PACKAGE_FILES)
-        self.assertEqual(len(paths.PACKAGE_FILES),18)
+        self.assertEqual(len(paths.PACKAGE_FILES),22)
 
     def test_missing_or_drifted_sql_fails_before_database_connection(self) -> None:
         with tempfile.TemporaryDirectory() as folder:

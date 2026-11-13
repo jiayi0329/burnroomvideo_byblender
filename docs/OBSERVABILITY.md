@@ -9,6 +9,7 @@
 | backend.api.main全部HTTP请求 | 请求开始、响应完成、状态码、路由模板、UTC时间与单调耗时；覆盖404/422/503/500与取消 | 不记录请求体、查询字符串、Authorization或响应内容；不新增业务API |
 | 主要后台阶段 | catalog读取/分享，Legacy下载、时序、启动、后台守护及发布 | 旧文本/Blender第三方日志不是本组件输出；没有改写历史记录 |
 | catalog CLI | import_rooms的输入核验/显式apply、check_catalog、database显式迁移；包含参数拒绝、返回非零和异常 | 不自动执行导入/迁移；--help不写日志；诊断tools未全部接入 |
+| Room8产物登记CLI | register_room_assets的本地清单、数据库绑定、私有桶、上传回读、事务阶段与失败/耗时，关联原job_id | 本地实现待远端；登记回执不替代渲染状态，API/前端尚未接入 |
 | Room8启动器 | CLI、预检、冲突检查、job/attempt、Blender启动、编码、ffprobe、完整解码及失败 | 复用原状态、逐帧manifest、timing/GPU文件，不另建状态机 |
 | Blender动画worker | 继承关联上下文、准备阶段、worker总耗时、每24个输出的轻量进度事件 | 不复制完整逐帧记录；真实GPU单帧及准备/worker/attempt关联已验收；静帧/裁切入口未统一接入 |
 | 时间线CLI | 从JSONL生成单trace/job的JSON摘要及可选Markdown文档 | 本地/维护工具，不是公开日志API；无前端、鉴权、告警或集中监控集群 |

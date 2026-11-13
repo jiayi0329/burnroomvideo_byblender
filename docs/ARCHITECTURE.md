@@ -38,6 +38,8 @@ Docker启动backend.api.main:app，监控backend/render_engine；根开发Compos
 
 SQL唯一位置为backend/database/migrations/001_rooms.sql。文件名/内容及schema_migrations校验不变，路径函数和打包按固定指纹保护；新结构另建后续迁移。迁移/账号授权、导入和资产上传均需显式调用，不随服务启动执行。
 
+首批产物登记已本地实现：services/room_registration只读构造计划，cli/register_room_assets负责互斥及独立回执，adapters/minio/room_objects验证专用私有桶并流式回读SHA，adapters/postgres/room_asset_repository验证已导入layout/review/点位后事务写入原八表。MinIO上传与数据库事务分开，失败保留对象供重试；不调用Blender，不修改原任务。任务外部ID/资产版本暂存render_jobs.config，所有摘要写入方需共用场景advisory锁，尚无独立唯一列。远端登记未执行，任务API及前端仍未实现；统一分支feat/room8-web-registration-api按三批推进。
+
 ### 独立房间与火烟
 
 geometry包含OBJ/MTL/坐标、证据指纹、只读对齐和面级裁切；tools负责生成报告和人工检查资料。F8-B保存基础room.blend后重载核验，再导出GLB和派生视图；F8-D在基础资产上另存低墙/去顶展示，不重写基础几何。

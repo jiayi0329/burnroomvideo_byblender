@@ -79,13 +79,15 @@ WinSCP负责上传明确版本安装包/核验输入、下载产物；不在远�
 
 工程基线已进入main，本场景真实数据库导入已通过核对。下一步安排新版Room8产物MinIO上传核对与登记，再建设Room8/R3任务API与最小网页。前端上报与监控网页待实施，日志规则继续由AGENTS约束。第二房间、生命周期/Hybrid、权限与东莞展示各自排期。
 
+三项工作统一在`feat/room8-web-registration-api`分支按登记、任务API、网页顺序实施。首批`backend.cli.register_room_assets`已本地实现：默认预览，`--apply`才上传并登记，远端尚未执行。具体边界见[登记说明](docs/database.md#room8产物登记本地实现待远端)。
+
 main合并、标签、部署和真实数据写入不自动执行。当前源码提交号不冒充V1原远端checkout；完整交付与缺失附件以RELEASES为准。
 
 ## 完整文件清单
 
 下面逐项列出本次整理后可提交的文件（含待提交文档），不包含Git内部目录、被忽略数据/缓存和本地工具环境。后续新增/删除文件应同步本表；归档原文只供追溯。目录README只维护专项边界，不重复本总表。
 
-清单共 **153** 个文件。
+清单共 **158** 个文件。
 
 <details>
 <summary>根目录（10份）</summary>
@@ -93,7 +95,7 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 | 文件路径 | 用途 | 属性/运行环境 |
 | --- | --- | --- |
 | [.dockerignore](.dockerignore) | Docker构建白名单，排除私有数据和凭证；不等于Git忽略规则 | 配置/规则 |
-| [.gitattributes](.gitattributes) | Git文本换行规则，保证远端Shell为LF | 配置/规则 |
+| [.gitattributes](.gitattributes) | Shell/SQL固定LF；R1/R2/R3分别固定原批准换行，保护跨平台字节指纹 | 配置/规则 |
 | [.gitignore](.gitignore) | 不提交私有data、安装包、备份、凭证及缓存 | 配置/规则 |
 | [AGENTS.md](AGENTS.md) | 接续开发工具读取的规则，固定新API/CLI/前端/后台操作日志与测试要求 | 文档/约束 |
 | [CLAUDE.md](CLAUDE.md) | 进程隔离、数据保护、远端环境、编码、打包和Git硬约束 | 文档/约束 |
@@ -106,7 +108,7 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 </details>
 
 <details>
-<summary>backend：后端实现（19份）</summary>
+<summary>backend：后端实现（23份）</summary>
 
 | 文件路径 | 用途 | 属性/运行环境 |
 | --- | --- | --- |
@@ -115,8 +117,10 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 | [backend/adapters/__init__.py](backend/adapters/__init__.py) | Python包初始化/职责边界；不自动启动服务、连库或渲染 | 包/测试组登记 |
 | [backend/adapters/minio/__init__.py](backend/adapters/minio/__init__.py) | Python包初始化/职责边界；不自动启动服务、连库或渲染 | 包/测试组登记 |
 | [backend/adapters/minio/s3_io.py](backend/adapters/minio/s3_io.py) | MinIO下载/上传、产物检查、7天预签名及可选桶策略 | 普通Python |
+| [backend/adapters/minio/room_objects.py](backend/adapters/minio/room_objects.py) | Room8独立私有桶、版本key上传及流式SHA回读，拒绝覆盖不同内容 | 普通Python |
 | [backend/adapters/postgres/__init__.py](backend/adapters/postgres/__init__.py) | Python包初始化/职责边界；不自动启动服务、连库或渲染 | 包/测试组登记 |
 | [backend/adapters/postgres/database.py](backend/adapters/postgres/database.py) | PostgreSQL延迟连接、显式迁移/应用账号授权，不随服务启动执行 | 普通Python |
+| [backend/adapters/postgres/room_asset_repository.py](backend/adapters/postgres/room_asset_repository.py) | 校验户型/review/点位绑定，以事务登记房间资产和任务输入输出关系 | 普通Python |
 | [backend/api/__init__.py](backend/api/__init__.py) | Python包初始化/职责边界；不自动启动服务、连库或渲染 | 包/测试组登记 |
 | [backend/api/main.py](backend/api/main.py) | FastAPI主实现：健康、场景获取、Legacy时间线/渲染/状态/分享和流水线 | 普通Python |
 | [backend/api/room_api.py](backend/api/room_api.py) | /api/catalog房间、点位、资产查询及签名；数据库整数ID语义 | 普通Python |
@@ -124,11 +128,13 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 | [backend/cli/check_catalog.py](backend/cli/check_catalog.py) | 应用账号权限与已导入场景目录的只读核验 | 普通Python |
 | [backend/cli/import_rooms.py](backend/cli/import_rooms.py) | 核验输入构造关系计划；默认preview，--apply写库，上传另行明确 | 普通Python |
 | [backend/cli/log_timeline.py](backend/cli/log_timeline.py) | 只读JSONL时间线、HTTP子集统计及独立Markdown输出 | 普通Python/本地或远端CLI |
+| [backend/cli/register_room_assets.py](backend/cli/register_room_assets.py) | 已完成Room8交付的独立登记入口；预览/显式上传写库、互斥锁、失败回执及重试 | 普通Python/CLI |
 | [backend/database/migrations/001_rooms.sql](backend/database/migrations/001_rooms.sql) | scenes等八张业务表的唯一初始迁移；文件名/内容保持不变 | 数据库迁移 |
 | [backend/paths.py](backend/paths.py) | 安装根、Legacy worker和SQL定位；不可变迁移指纹校验 | 普通Python |
 | [backend/services/__init__.py](backend/services/__init__.py) | Python包初始化/职责边界；不自动启动服务、连库或渲染 | 包/测试组登记 |
 | [backend/services/observability.py](backend/services/observability.py) | 已有Legacy生命周期/失败/状态/GPU监控；不是完整请求追踪 | 普通Python |
 | [backend/services/request_logging.py](backend/services/request_logging.py) | 纯ASGI请求/异常/取消追踪、响应ID及后台耗时区分 | Backend/ASGI中间件 |
+| [backend/services/room_registration.py](backend/services/room_registration.py) | 只读构造Room8登记清单，验证基础资产、冻结R3、视频回执和历史签名 | 普通Python |
 
 </details>
 
@@ -201,7 +207,7 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 </details>
 
 <details>
-<summary>tests：测试（47份）</summary>
+<summary>tests：测试（48份）</summary>
 
 | 文件路径 | 用途 | 属性/运行环境 |
 | --- | --- | --- |
@@ -213,6 +219,7 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 | [tests/backend/test_room_api.py](tests/backend/test_room_api.py) | catalog房间/点位/资产接口、分页和错误处理 | 离线测试/替身 |
 | [tests/backend/test_operation_logging.py](tests/backend/test_operation_logging.py) | API/CLI追踪、失败/脱敏、并发/轮转及时间线离线回归 | 离线测试/替身 |
 | [tests/backend/test_room_database.py](tests/backend/test_room_database.py) | 合成导入/人工结论保护及显式真实PostgreSQL事务集成 | 离线测试/替身 |
+| [tests/backend/test_room_registration.py](tests/backend/test_room_registration.py) | 登记清单、私有桶/SHA回读、输入绑定、事务/重试/锁及日志脱敏 | 离线测试/替身 |
 | [tests/backend/test_v6_share.py](tests/backend/test_v6_share.py) | 预签名/已有产物、旧分享API、缓存及GPU温度保护 | 离线测试/替身 |
 | [tests/deploy/__init__.py](tests/deploy/__init__.py) | 登记该职责组的离线模块清单，供tests/suites.py汇总 | 包/测试组登记 |
 | [tests/deploy/test_canonical_layout.py](tests/deploy/test_canonical_layout.py) | 唯一正式路径、SQL/R3、29文件指纹及旧40文件任务拒绝 | 离线测试/替身 |

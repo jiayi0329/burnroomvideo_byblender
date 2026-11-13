@@ -103,3 +103,29 @@ docker compose exec -T app-server python3 /app/backend/cli/check_catalog.py --sc
 代码回退与数据库恢复是两件事：先停止写入，确认事务结果/错误阶段；必要时恢复上一代码镜像，不因此删除数据库数据。生产恢复须先选隔离目标核验，再明确切换，不能直接对当前库执行清空/--clean。目录改名本身没有SQL内容变化，也不要求重新建库。
 
 数据库真实导入完成后，新版Room8资产/视频的MinIO上传核对与登记继续单独实施；数据库摘要不是任务状态真相源，登记失败不重新渲染视频。
+
+## Room8产物登记（本地实现，待远端）
+
+统一分支`feat/room8-web-registration-api`按“产物登记→任务API→网页”推进。本批仅完成登记CLI和离线测试；不把后两项表述为已实现。
+
+入口为`python3 -m backend.cli.register_room_assets`。显式传入scene、asset、job和layout-version-id，默认只读预览，不访问数据库/MinIO；操作日志仍按公共契约落盘。`--apply`执行数据库绑定预检、上传回读、独立数据库事务，不调用渲染器/编码器，不创建新SQL迁移。
+
+清单仅含基础`room.blend`、`room.glb`、`top/oblique/interior.png`及已完成任务的`fire_final.mp4`，共6份。基础validation、manifest、candidate、源输入、历史签名、R3配置、13点BFS、视频回执和技术完成状态必须一致；不要求重新下载576张原帧，不重复完整解码。该检查验证既有技术证据，不冒充新的画面或解码验收，也不把旧ready_for_fire_effects=false改为true。
+
+新增专用桶`burnroom-room-assets`和`burnroom-room-outputs`，避免旧桶可能存在的公开读策略。仅在显式apply时创建缺失桶；若发现桶已有策略，保守拒绝并交管理员核对，不修改旧桶权限。key包含场景/房间/资产版本或任务号；已有相同内容回读校验后复用，不同内容拒绝覆盖。首次及重试都校验字节数、Content-Type和完整回读SHA，不用ETag或自报metadata冒充。
+
+数据库预检绑定明确的layout_version_id、人工review/对齐文件SHA及当前有效归属；32门口和42户型外不加入传播。事务复用assets、render_jobs、render_job_assets：实际使用的room.blend为input，视频为output；GLB/三视图仅关联房间，不伪称Blender输入。rooms.id动态解析。`render_jobs.config`中的registration_schema_version=1、file_job_id、asset_version、snapshot_signature和video为当前桥接元数据；所有摘要写入者必须复用本适配器及场景advisory锁。外部任务号暂时没有独立唯一列，多机/其他写入方接入前需评审后续迁移，不能假称已有数据库级唯一约束。
+
+文件状态仍是事实来源；SQL done只表示已有技术完成证据，runtime_state保留awaiting_visual_review，human_acceptance为not_recorded，不覆盖原任务或伪造老师审批。此次不会把原始config_snapshot、完整日志、私有报告自动上传。
+
+每次apply在`rooms/Room8/registrations/<run_id>/registration_receipt.json`保存独立回执，包括已验证对象、登记结果、时间和错误类型。操作日志分阶段记录验证、数据库预检、私有桶、上传回读和事务，关联job_id；不记录签名URL或异常正文。Room8登记目录的独占锁串行化本工具，退出释放自身锁；进程被强制终止留下的锁需人工确认，不能自动清除。该锁不约束外部S3客户端或管理员改桶策略。
+
+MinIO和PostgreSQL没有共享事务：上传成功而登记失败时保留对象与回执，用相同参数重跑验证并登记，不重新渲染、不删除其他任务产物。提交后回执写入失败也应先查询/重试，不能清空表重做。
+
+以下仅供新代码安装后的远程SSH预览；当前服务器仍是旧验收镜像，不能假称已经有此模块：
+
+```bash
+python3 -m backend.cli.register_room_assets --scene KK-EEz16cmU14 --asset /app/data/KK-EEz16cmU14/rooms/Room8/20261102T025550Z-7f677509/asset --job /app/data/KK-EEz16cmU14/rooms/Room8/render_jobs/20261105T040552Z_91f5fb7d --layout-version-id 1
+```
+
+预期mode=preview、files共6项、upload_status=not_uploaded、registration_status=not_registered。核对版本及路径后才安排显式apply；本地PowerShell只编辑/测试/打包，WinSCP只传代码包/回执，远端执行预览与登记。部署保持原NVIDIA及三文件Compose约束，不能直接重建回latest旧镜像。远端登记、签名播放和浏览器验收完成后再记入RELEASES。
