@@ -24,9 +24,13 @@ flowchart TD
     K[backend.api.main旧HTTP接口] --> L[legacy F6/F7/F8-C]
     L --> M[旧output.mp4与MinIO分享]
     N[backend.api.room_api catalog] --> O[PostgreSQL关系目录]
+    P[backend.api.room_jobs 新任务API] --> Q[room_job_service 预检及预留任务]
+    Q --> R[backend.cli.run_room_job 独立进程]
+    R --> F
+    Q --> O
 ```
 
-Room8视频由CLI运行，尚未接新版网页/任务API或完整登记MinIO。本场景catalog真实数据已导入版本1并通过查询核对；29份输入文件索引不包括完整Room8模型/视频登记，图中的连线不代表数据库已有全部资产。
+现有Room8 V1由CLI生成并保留；新版任务API57b53f1已部署，4秒48帧NVIDIA短片、查询/Range及同键复用已远端核对，网页尚未实现。本场景catalog版本1及29份原输入索引已导入；随后追加Room8指定6份交付的MinIO对象和数据库关联。API测试短片没有自动上传，图中的连线不代表全部附件已登记或所有故障路径已验收。
 
 ### Legacy与Backend
 
@@ -37,6 +41,10 @@ Docker启动backend.api.main:app，监控backend/render_engine；根开发Compos
 /api/catalog提供场景房间、房间点位/资产及资产签名，路径room_id/asset_id是数据库整数主键，不是Room8字符串。连库按请求进行，失效返回503；健康和旧分享不以PostgreSQL为启动前置。没有自动文件fallback或用户权限系统。
 
 SQL唯一位置为backend/database/migrations/001_rooms.sql。文件名/内容及schema_migrations校验不变，路径函数和打包按固定指纹保护；新结构另建后续迁移。迁移/账号授权、导入和资产上传均需显式调用，不随服务启动执行。
+
+首批产物登记已实现并远端验收：services/room_registration只读构造计划，cli/register_room_assets负责互斥及独立回执，adapters/minio/room_objects验证专用私有桶并流式回读SHA，adapters/postgres/room_asset_repository验证已导入layout/review/点位后事务写入原八表。MinIO上传与数据库事务分开，失败保留对象供重试；不调用Blender，不修改原任务。任务外部ID/资产版本暂存render_jobs.config，所有摘要写入方共用场景advisory锁，尚无独立唯一列。首批登记使用独立/tmp目录；第二批已切换为burnroom-app:room-jobs-57b53f1并完成API短片核心路径验收，前端未实现。
+
+新版/api/room-jobs只开放Room8/R3及test/final预设。room_job_repository校验已登记blend/人工核验绑定，固定原成片的R3相机参考；room_job_service在原GPU锁下预留原格式文件任务和SQL摘要，独立Python CLI等待管道握手后调用原安全启动器，以resume使用同一新任务号。持久幂等索引防止同键重复运行；独立输出不覆盖历史。查询以status/manifest为准；SQL仅摘要，失败不回滚成片。room_video核对回执及SHA，再提供200/单Range206/HEAD播放，无需MinIO直连。内部调用日志沿用HTTP trace/request及job上下文。接口、默认关闭开关、正式出片策略和恢复限制见[Backend](../backend/README.md)。未改变引擎29份保护清单、R3值或SQL。
 
 ### 独立房间与火烟
 
@@ -64,13 +72,13 @@ render_engine.paths清单为26份Python和3份公共预设，共29份，包含�
 | 基础manifest/validation | 资产来源及技术检查，不等于视频人工验收 |
 | 新任务status/manifest | 运行状态与已登记产物，attempt保留历史 |
 | Legacy render_status | 旧场景任务，不能覆盖新版job状态 |
-| PostgreSQL | 本场景版本1关系及输入索引已导入；Room8产物/任务摘要登记待完成 |
-| MinIO | 已上传对象，新文件在磁盘上不等于已上传登记 |
+| PostgreSQL | 本场景版本1关系及原输入索引已导入；Room8指定6份产物及任务摘要已登记 |
+| MinIO | Room8指定6份交付已回读SHA验证；不代表其他磁盘文件自动上传 |
 
 ## 4. 下一阶段目标（未实现）
 
-[公共操作日志](OBSERVABILITY.md)已实现：纯ASGI中间件覆盖HTTP结果，公共ContextVar/span连接主要CLI、Legacy守护线程与Room8子进程；JSONL服务分片和attempt事件分开存储，Markdown时间线由CLI生成。2026-11-12完成HTTP、catalog只读检查及Room8单帧GPU任务的远端最小验收，详见[发布记录](RELEASES.md)。无前端上报或新监控API，旧状态/逐帧/GPU/timing证据保持原职责。本场景真实导入已完成，接下来登记Room8产物；后续网页只支持Room8/R3受控任务，前端按钮经Backend调用现有安全启动器，查询状态和播放指定任务产物。
+[公共操作日志](OBSERVABILITY.md)已实现：纯ASGI中间件覆盖HTTP结果，公共ContextVar/span连接主要CLI、Legacy守护线程与Room8子进程；JSONL服务分片和attempt事件分开存储，Markdown时间线由CLI生成。2026-11-12完成HTTP、catalog只读检查及Room8单帧GPU任务的远端最小验收，详见[发布记录](RELEASES.md)。无前端上报或新监控API，旧状态/逐帧/GPU/timing证据保持原职责。本场景真实导入及指定产物登记已完成；后续网页只支持Room8/R3受控任务，前端按钮经Backend调用现有安全启动器，查询状态和播放指定任务产物。
 
-拟议/api/room-jobs和业务房间查询尚未注册；不得调用旧渲染API代替。前端不传任意脚本/配置路径、工作目录或绕过审核参数；数据库ID与业务ID由适配器转换。MinIO上传后核对SHA再登记，对象成功/登记失败可重试，不能重启渲染补偿登记。
+新版/api/room-jobs已部署并通过成功创建到短片技术完成、NVIDIA后端及同键复用核对，完整trace/历史分页/故障等尚未远端验证；sources提供已登记Room8可选版本，catalog仍提供整数ID的资产/点位查询。不得调用旧渲染API代替。前端不传任意脚本/配置路径、工作目录或绕过审核参数；数据库ID与业务ID由适配器转换。新任务产物不自动上传MinIO，仍通过显式登记CLI核对SHA再登记；对象成功/登记失败可重试，不能重启渲染补偿登记。
 
 真实前端、全链路监控、鉴权、第二房间及东莞公网入口仍待独立实施。自动高度仅保留设计方向：分别输出上下候选及覆盖/连续性/置信度，低可信需人工判断，不用极值/众数冒充物理地板，也不替换当前Room8近似。

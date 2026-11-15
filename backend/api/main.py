@@ -13,6 +13,7 @@ from backend.paths import legacy_render_script, project_root
 from render_engine.legacy.F6_detect import find_ignition_point
 from render_engine.legacy.F7_spread import SpreadTimeline, bfs_spread, load_adjacency
 from backend.api.room_api import router as room_router
+from backend.api.room_jobs import router as job_router
 from backend.services.request_logging import OperationLoggingMiddleware
 from render_engine.jobs.operation_logging import mark_failure, stage, traced
 from backend.services.observability import (
@@ -37,6 +38,7 @@ app = FastAPI(title="火灾蔓延视频生成系统 API")
 app.add_middleware(OperationLoggingMiddleware)
 
 app.include_router(room_router)
+app.include_router(job_router)
 
 BASE_URL = "https://api.4dkankan.com"
 APP_KEY = os.getenv("DK_APPKEY")

@@ -1,6 +1,6 @@
 # 场景、房间、资产与任务的一致性规范
 
-更新：2026-11-07。区分“当前实现”与“目标约定”；本文不执行迁移、上传、导入或重命名。职责见 [ARCHITECTURE](ARCHITECTURE.md)，版本示例见 [RELEASES](RELEASES.md)。
+更新：2026-11-13。区分“实现”与“验收”；本场景关系导入及Room8指定6份交付登记已远端核对；任务API已部署并通过GPU短片核心路径、Range及同键复用核对，网页待开发。职责见 [ARCHITECTURE](ARCHITECTURE.md)，版本示例见 [RELEASES](RELEASES.md)。
 
 ## 1. 业务编号与数据库主键
 
@@ -33,7 +33,7 @@
 | PostgreSQL | 场景、户型、房间、点位、文件及任务关联 | 关系目录与查询摘要；不是 Blender 的输入接口或另一套实时状态机 |
 | 基线备份 | 固定版本的源码包、数据包、SHA清单 | 恢复副本，不是日常任务读取的“最新目录”；同盘副本不等于独立异地备份 |
 
-当前 Room8 主要在文件目录运行，Legacy 才已有成片上传/分享链路。“最终由 MinIO 管文件”不等于新版已完成入库上传。先登记关系和指纹，再逐项迁移；存储暂不可达与文件不存在须分开显示。
+当前Room8渲染主要在文件目录运行，指定6份交付已完成MinIO上传/数据库登记及签名Range核对；Legacy原链路保留。该结果不代表全部运行文件已迁移；存储暂不可达与文件不存在须分开显示。
 
 ## 3. 当前物理目录（保持原样）
 
@@ -73,13 +73,13 @@ MinIO不可变key用于已定稿的交付或明确时间点的快照，不能持
 
 ## 4. MinIO key：现状兼容与目标命名
 
-| 类型 | 当前实现 | 后续版本化约定（未实现上传器） |
+| 类型 | 当前范围 | 对象命名 |
 | --- | --- | --- |
 | 旧场景输入 | burnroom-assets：`<scene_code>/<filename>` | 保留兼容，不把嵌套目录扁平下载到场景根 |
 | 旧成片 | burnroom-outputs：`<scene_code>/output.mp4` | 保留；禁止写入 Room8 的 fire_final 来冒充旧产物 |
 | 目录导入附件 | burnroom-assets：`<scene_code>/catalog/<sha256>/<filename>` | 保留已有代码规则 |
-| 新版基础房间 | 尚未完整登记 | burnroom-assets：`scenes/<scene_id>/rooms/<room_id>/assets/<asset_version>/<filename>` |
-| 新版任务交付 | 尚未完整登记 | burnroom-outputs：`scenes/<scene_id>/rooms/<room_id>/render_jobs/<render_job_id>/<filename>` |
+| 新版基础房间 | Room8 blend/GLB/三视图已远端登记 | 独立私有burnroom-room-assets：`scenes/<scene_id>/rooms/<room_id>/assets/<asset_version>/<filename>` |
+| 新版任务交付 | Room8指定final视频已远端登记 | 独立私有burnroom-room-outputs：`scenes/<scene_id>/rooms/<room_id>/render_jobs/<render_job_id>/<filename>` |
 
 版本 key 为不可变内容约定：相同 key/相同 SHA 可复用，相同 key/不同 SHA 必须拒绝并新建版本，不静默覆盖。不能仅凭 S3 ETag 当作 SHA256；上传器须明确验证内容指纹、字节数和媒体类型，完成后才登记。
 
@@ -87,13 +87,15 @@ MinIO不可变key用于已定稿的交付或明确时间点的快照，不能持
 
 数据库永久保存 bucket、object_key、sha256、size_bytes 和关联；临时预签名 URL 按需生成，不作为主键、不写入长期 manifest。浏览器可达端点与签名主机必须一致，不能换签名 URL 的主机/端口；预签名不提供网络穿透。
 
-### 上传与登记顺序（目标约定）
+新版使用专用私有桶，是为隔离旧桶可能存在的公开读策略；不更改旧桶或Legacy命名。首批仅登记基础blend/GLB、三张检查图和正式MP4，不自动上传原始快照、完整运行报告。已有任何桶策略时保守拒绝，不静默修改管理员策略。
 
-1. 本地清单先确认场景/房间/版本、来源指纹与技术产物，保持 `upload_status=not_uploaded`、`registration_status=not_registered`；基础资产已生成不表示已允许公开外发。
+### 上传与登记顺序（首批CLI已远端验收）
+
+1. 本地预览先确认场景/房间/版本、来源指纹与技术产物，保持 `upload_status=not_uploaded`、`registration_status=not_registered`，不连数据库/MinIO；apply先校验明确的数据库版本及人工证据。基础资产已生成不表示已允许公开外发。
 2. 上传版本化对象；相同key已存在时先核对内容，不能直接覆盖。首次登记前回读对象并计算SHA，核对字节数和媒体类型，成功后才标记对象verified；仅metadata中的自报SHA或ETag不足以证明回读内容一致。
 3. 在独立数据库事务中登记对象与关系，成功后才标记registered。MinIO与PostgreSQL没有共享事务：上传成功但事务失败可能留下未登记对象，应保留并单独重试登记，不重新渲染、不自动删除原文件或回退其他任务。
 
-上传可用性、目录登记和人工审核是不同维度。未来API分别表达upload_status、registration_status、runtime_state与human_acceptance；现有表/接口没有实现完整状态组合，不把这些名称当成已落地字段。
+上传可用性、目录登记和人工审核是不同维度。登记CLI回执已有upload_status/registration_status，任务config摘要保留runtime_state/human_acceptance；未来API需分别表达，现有表没有独立的完整状态组合列，不把这些名称当成SQL字段。
 
 原始config_snapshot、完整日志和私有模型默认不作为可公开分享附件。当前代码支持可选桶级公开策略，但本轮未查询远端实际桶策略；新增上传器必须先确认访问范围。若旧产物桶存在全桶匿名读取，不将原始运行报告直接上传到该公开范围；私有报告的隔离方式另行设计，不在本轮改变旧视频访问权限。
 
@@ -114,11 +116,13 @@ MinIO不可变key用于已定稿的交付或明确时间点的快照，不能持
 
 现有 SQL 的任务状态只允许 unknown/running/done/failed；文件还含 created、preparing、rendering、encoding、awaiting_visual_review、interrupted。目标同步规则：活动阶段→running，技术验证通过且待审核→done，failed/interrupted→failed，缺失/无法核验→unknown。**这是待实现映射**，done 只表示技术完成，必须在 API 中另保留原始 runtime_state 与人工审核信息；现有表没有独立审核列，不冒称已能保存全部审核状态。
 
-后续增加任务外部标识、资产版本索引/关联及审核元数据时，新增迁移文件，评审唯一性和跨场景约束；不得修改已应用的 001_rooms.sql。可以先设计登记清单，不在本轮写库。
+首批登记仅实现“已完成final且awaiting_visual_review→SQL done”这一分支，并在config保留原始状态与未记录人工审核；活动/失败同步和API表达仍未实现。
+
+首批登记CLI使用render_jobs.config桥接file_job_id、asset_version、snapshot_signature、原运行状态及未记录人工验收状态，schema_version独立标记为registration_schema_version=1；通过场景advisory锁与Room8本地登记锁避免协作写入重复。输入/输出经render_job_assets关联；done仅表示技术完成。此方案不提供外部ID独立列的唯一约束，后续多机/其他写入方接入前需评审新迁移、唯一性及跨场景约束；不得修改已应用的001_rooms.sql。首批已远端登记，并复用同一任务验证幂等。
 
 现有points按场景/device唯一保存坐标，import_rooms.py:111–115会拒绝同场景既有点位的坐标变更。新layout_version只解决户型/归属版本，不能自动解决扫描点位空间变化；如以后重新扫描，须另行设计scene revision及兼容关系，不静默覆盖points。
 
-2026-11-13真实导入版本1已核对：6条房间记录（5条有效，含无效Room11）、22个点位；22人工关联Room8内部，32为Room8门口，42户型外且不关联房间。Room8 API返回内部13点、门口1点，两类数量分开；相同输入再次导入复用版本1并保留review。Room8本次数据库主键为6，仅用于查询，不可写死。详细证据及备份见[数据库记录](database.md#本次实际验收)；独立房间模型/视频登记仍待完成。
+2026-11-13真实导入版本1已核对：6条房间记录（5条有效，含无效Room11）、22个点位；22人工关联Room8内部，32为Room8门口，42户型外且不关联房间。Room8 API返回内部13点、门口1点，两类数量分开；相同输入再次导入复用版本1并保留review。Room8本次数据库主键为6，仅用于查询，不可写死。详细证据及备份见[数据库记录](database.md#本次实际验收)；随后指定6份交付已登记，数据库任务1、视频资产64，原文件任务号不变。
 
 ## 6. Room8 V1 跨存储完整示例
 
@@ -126,8 +130,8 @@ MinIO不可变key用于已定稿的交付或明确时间点的快照，不能持
 | --- | --- | --- |
 | 本地 incoming | `rooms/Room8/20261102T025550Z-7f677509/asset/room.blend` | `rooms/Room8/render_jobs/20261105T040552Z_91f5fb7d/fire_final.mp4` |
 | 服务器/容器 | 在上述场景数据根下使用同样相对路径 | 同左；任务快照绑定基础房间与 R3 指纹 |
-| MinIO 目标 key | `scenes/KK-EEz16cmU14/rooms/Room8/assets/20261102T025550Z-7f677509/room.blend` | `scenes/KK-EEz16cmU14/rooms/Room8/render_jobs/20261105T040552Z_91f5fb7d/fire_final.mp4` |
-| PostgreSQL 目标关系 | scenes/rooms → assets 的对应行，实际 ID 入库后才有 | render_jobs → render_job_assets(input/output) → 对应资产行 |
+| MinIO 已登记key | burnroom-room-assets：`scenes/KK-EEz16cmU14/rooms/Room8/assets/20261102T025550Z-7f677509/room.blend` | burnroom-room-outputs：`scenes/KK-EEz16cmU14/rooms/Room8/render_jobs/20261105T040552Z_91f5fb7d/fire_final.mp4` |
+| PostgreSQL 已登记关系 | 房间主键6 → assets；blend关联渲染输入，GLB/三视图仅属房间 | 任务主键1 → render_job_assets → 视频资产64，角色output |
 | Git | 基线源码、R3、[脱敏发布记录](RELEASES.md) | 只记录任务号、参数和指纹，不提交视频 |
 
 本地 incoming 指基线备份内的 incoming，本次下载没有将正式资产复制进项目日常 data/。资产与视频 SHA 分别为：
@@ -137,7 +141,7 @@ room.blend      3123e1373296c866602f683a22c80d80d4ac1507cf4a86243ee44a4852f3bce1
 fire_final.mp4  c339c91d12709797b43989c680474286e5b2641a64de160d3fde7902267404dd
 ```
 
-拟议登记描述示例（仅文档约定；不是现有 manifest 的替代，也未创建实际登记文件）：
+以下保留2026-11-07拟议描述模板，用于说明未上传状态；不是当前验收结果或CLI回执格式，也不替代原manifest。当前真实登记结果见RELEASES：
 
 ```json
 {
@@ -178,15 +182,19 @@ fire_final.mp4  c339c91d12709797b43989c680474286e5b2641a64de160d3fde7902267404dd
 
 所有文件描述条目须记录 kind、业务关联、source_relative_path、sha256、size_bytes；上传后才填实际 bucket/object_key。发布文件和运行缓存分别列出，不凭本示例自动创建上传记录或填充 SQL ID。
 
-这里的source_relative_path以场景数据根为基准，实际位置可以是服务器场景根或归档incoming中的同场景根，由可信适配器映射；不将开发者Windows路径永久写入跨环境业务标识。表中MinIO key是计划位置，示例bucket/key为null，表示没有冒充远端上传验收。
+这里的source_relative_path以场景数据根为基准，实际位置可以是服务器场景根或归档incoming中的同场景根，由可信适配器映射；不将开发者Windows路径永久写入跨环境业务标识。JSON模板bucket/key为null仅演示未上传情形；上表和发布记录才是本次实际登记位置。
 
-## 7. 新版网页 API 的文件适配边界（待实现）
+## 7. 新版任务 API 的文件适配边界
 
-拟议房间查询 `/api/room-scenes/<scene_id>/rooms` 返回业务 room_id、可用资产版本、内部/边界点数量、可用预览与发布状态；避免与已有 catalog 的整数 ID 语义混用。
+`GET /api/room-jobs/sources` 返回已登记Room8的scene_code、业务room_id、asset_version、layout_version_id及数据库ID；点位/预览仍通过catalog查询。未新增旧草稿中的/api/room-scenes路由，避免与catalog整数ID语义混用。
 
-拟议 `POST /api/room-jobs` 只接收可信业务字段，例如 scene_id、room_id、asset_version、preset、camera_mode、受控 style preset 引用。后端查清单并检查版本，再构建当前引擎所需的真实 CLI/JSON；不允许客户端指定工作目录、Python路径、任意命令或未经审核的 direct-final 绕过参数。
+`POST /api/room-jobs` 使用scene_code（不是草稿scene_id）、room_id=Room8、asset_version、layout_version_id、style_preset=r3、preset=test/final、camera_mode、confirm_render=true和可选approval_job_id，要求Idempotency-Key头。后端校验登记SHA、人工绑定及R3输入，再构建原引擎快照；不接受路径、任意命令/配置或direct_final。服务端默认关闭提交；正式档另需有效审核或运维显式策略，详见[API契约](../backend/README.md)。
 
-拟议查询为 `GET /api/room-jobs/<render_job_id>?scene_id=<scene_id>&room_id=<room_id>`，按三元组定位；不凭一个UUID后缀全盘扫描或挑最新任务。如未来另建全局唯一索引，可在另一版接口中简化上下文。返回原始任务阶段、技术完成、人工审核、有效帧数、日志摘要与可用产物引用；仅凭 MP4 文件存在不能标记成功。视频通过后端可信路径或经登记对象按需签名交付，浏览器不能自行遍历服务器路径。这些路由尚未实现。
+`GET /api/room-jobs/<file_job_id>?scene_code=SCENE&room_id=Room8` 按明确命名空间定位，room_id默认Room8；不凭UUID后缀全盘扫描或挑最新任务。历史使用同前缀根GET并支持分页。返回文件状态、技术完成、人工审核未记录、有效帧数、本次尝试耗时和video_url；仅凭MP4存在不算成功。video子路由校验签名/回执/SHA后支持GET/HEAD及单Range；数据库离线仍可查已有文件任务。尚无独立日志查询API，继续使用log_timeline CLI。
+
+新任务附加api_request.json、api_launch.json、api_launcher.log及必要的api_failure.json，均在新任务目录；数据根.room_job_requests/<键哈希>.json只保存请求到任务的对应，不增加新状态机。数据库render_jobs.config保存file_job_id、asset_version、snapshot_signature及运行摘要，复用原表和场景advisory锁。API任务完成后不自动上传/登记交付，仍走显式登记；失败不删帧、不改历史文件，强制退出留下的活动状态需人工核查。
+
+2026-11-13远端API测试新建file_job_id=20261113T125240Z_20263360，响应database_job_id=2，attempt=20261113T125240Z_6a2e5d；同键重试复用以上任务。48帧测试视频技术完成、NVIDIA及后端Range已核对，未自动上传MinIO；未据此改写原V1任务1或人工验收。完整SQL最终摘要/产物关系和操作JSONL尚未独立核对，见[发布范围](RELEASES.md#2026-11-13-新版room8任务api部署与短片验收)。
 
 ## 8. 一致性与恢复规则
 
@@ -202,4 +210,4 @@ Room8 V1 当前缺少本地原帧和四份 R3 原始参考附件，历史远端 
 
 2026-11-07：保留现有业务编号映射和版本key方向；补齐唯一性范围、路径约束、可变状态/不可变交付、两阶段上传登记及跨路径续跑边界。示例已列出真实文件大小和SHA，bucket/key维持null。
 
-本规范可以指导下一步纯函数解耦；尚未具备直接实施数据库迁移、批量上传或改名既有资产的条件。后续登记功能须新增隔离测试，覆盖对象已存在但SHA不同、上传成功登记失败、状态/审批分离、同任务号跨房间歧义以及路径变化后拒绝续跑。测试与实际接入分别验收，不用文档状态代替运行结果。
+上述为11月7日审阅结论。现已完成纯函数解耦、首批登记隔离测试及指定产物远端验收；错误对象拒绝覆盖、失败重试和状态/审批分离有本地测试，远端登记只验收成功/幂等/关系/签名读取，不冒称故障注入。未因此授权改名旧资产、批量扩展其他房间或修改已应用SQL。任务API核心成功路径已远端核对，下一步接网页，保留其余待核验边界。
