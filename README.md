@@ -78,9 +78,9 @@ WinSCP负责上传明确版本安装包/核验输入、下载产物；不在远�
 
 ## 下一步
 
-工程基线已进入main，本场景真实数据库导入及Room8指定产物登记已通过核对。Room8/R3任务API已部署并通过核心成功路径验收，下一步接最小网页，优先展示原V1与已有任务。前端上报与监控网页待实施，日志规则继续由AGENTS约束。第二房间、生命周期/Hybrid、权限与东莞展示各自排期。
+工程基线、本场景数据导入及Room8产物登记已验收，任务API核心路径已通过。2026-11-16新增第一阶段本地中文前端：四页、六模块入口、参数演示草稿与统一状态/错误结构，见[前端运行说明](frontend/README.md)。下一步只读接入Room8真实GLB、点位、检查图与V1视频，再接受控任务及真实按钮日志。第二房间、生命周期/Hybrid、权限与公网展示各自排期。
 
-三项工作统一在`feat/room8-web-registration-api`分支推进。首批登记822528a已验收，第二批API57b53f1已部署为burnroom-app:room-jobs-57b53f1；当前提交开关显式开启、直接正式出片关闭。同键复用已远端核对，冲突/故障等有离线测试但本次未远端演练，第三批网页未实现。接口见[Backend](backend/README.md)，最新镜像/任务/备份及Compose维护边界见[发布记录](docs/RELEASES.md#2026-11-13-新版room8任务api部署与短片验收)。
+登记与API在`feat/room8-web-registration-api`完成，前端从同步提交f2fc0ef派生`feature/frontend-mvp`开发。首批822528a、第二批57b53f1的远端验收边界保持不变，现有服务为burnroom-app:room-jobs-57b53f1；提交开关以实际服务器配置为准。前端尚未连接任何真实业务API，也未部署。接口见[Backend](backend/README.md)，镜像/任务/备份及Compose维护边界见[发布记录](docs/RELEASES.md#2026-11-13-新版room8任务api部署与短片验收)。
 
 main合并、标签、部署和真实数据写入不自动执行。当前源码提交号不冒充V1原远端checkout；完整交付与缺失附件以RELEASES为准。
 
@@ -88,7 +88,51 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 
 下面逐项列出本次整理后可提交的文件（含待提交文档），不包含Git内部目录、被忽略数据/缓存和本地工具环境。后续新增/删除文件应同步本表；归档原文只供追溯。目录README只维护专项边界，不重复本总表。
 
-清单共 **164** 个文件。
+清单共 **200** 个文件。
+
+<details>
+<summary>frontend：本地中文前端（36份）</summary>
+
+| 文件路径 | 用途 | 属性/运行环境 |
+| --- | --- | --- |
+| [frontend/.gitignore](frontend/.gitignore) | 依赖、构建及测试报告忽略规则 | 本地前端 |
+| [frontend/.oxlintrc.json](frontend/.oxlintrc.json) | 前端静态检查规则 | 本地前端 |
+| [frontend/.prettierignore](frontend/.prettierignore) | 格式化排除规则 | 本地前端 |
+| [frontend/.prettierrc.json](frontend/.prettierrc.json) | 源码格式规范 | 本地前端 |
+| [frontend/README.md](frontend/README.md) | 本地运行、验证及后续接入边界 | 本地前端 |
+| [frontend/components.json](frontend/components.json) | shadcn/ui别名与主题配置 | 本地前端 |
+| [frontend/e2e/workspace.spec.ts](frontend/e2e/workspace.spec.ts) | 真实浏览器中文交互与响应式验收 | 本地前端 |
+| [frontend/index.html](frontend/index.html) | 中文应用文档入口 | 本地前端 |
+| [frontend/package-lock.json](frontend/package-lock.json) | 锁定前端依赖 | 本地前端 |
+| [frontend/package.json](frontend/package.json) | 依赖与开发/检查脚本 | 本地前端 |
+| [frontend/playwright.config.ts](frontend/playwright.config.ts) | 本机Edge浏览器检查配置 | 本地前端 |
+| [frontend/src/App.test.tsx](frontend/src/App.test.tsx) | 导航、参数、状态与无真实请求回归 | 本地前端 |
+| [frontend/src/App.tsx](frontend/src/App.tsx) | 统一布局与四页路由 | 本地前端 |
+| [frontend/src/components/PageHeading.tsx](frontend/src/components/PageHeading.tsx) | 页面标题与操作区域 | 本地前端 |
+| [frontend/src/components/StatusPanel.tsx](frontend/src/components/StatusPanel.tsx) | 统一资源状态、错误与追踪展示 | 本地前端 |
+| [frontend/src/components/TaskMonitor.tsx](frontend/src/components/TaskMonitor.tsx) | 任务流程占位，不生成运行进度 | 本地前端 |
+| [frontend/src/components/ui/button.tsx](frontend/src/components/ui/button.tsx) | shadcn风格Radix/CVA按钮 | 本地前端 |
+| [frontend/src/features/room-preview/RoomPreview.tsx](frontend/src/features/room-preview/RoomPreview.tsx) | 媒体切换占位及后续三维资源接口 | 本地前端 |
+| [frontend/src/features/simulation/ParameterPanel.tsx](frontend/src/features/simulation/ParameterPanel.tsx) | 演示参数草稿、校验、差异与重置 | 本地前端 |
+| [frontend/src/index.css](frontend/src/index.css) | 深色工业主题与响应式布局 | 本地前端 |
+| [frontend/src/lib/api/client.test.ts](frontend/src/lib/api/client.test.ts) | 请求拒绝、脱敏、关联与无重试回归 | 本地前端 |
+| [frontend/src/lib/api/client.ts](frontend/src/lib/api/client.ts) | 默认关闭的只读请求适配与安全错误 | 本地前端 |
+| [frontend/src/lib/api/contracts.ts](frontend/src/lib/api/contracts.ts) | 现有业务身份与请求字段类型 | 本地前端 |
+| [frontend/src/lib/telemetry/operations.test.ts](frontend/src/lib/telemetry/operations.test.ts) | 事件关联、失败脱敏与传输隔离回归 | 本地前端 |
+| [frontend/src/lib/telemetry/operations.ts](frontend/src/lib/telemetry/operations.ts) | 本地事件契约，默认无接收和持久化 | 本地前端 |
+| [frontend/src/lib/utils.ts](frontend/src/lib/utils.ts) | 组件样式合并工具 | 本地前端 |
+| [frontend/src/main.tsx](frontend/src/main.tsx) | React挂载入口 | 本地前端 |
+| [frontend/src/pages/ResultsPage.tsx](frontend/src/pages/ResultsPage.tsx) | 任务与成果中心 | 本地前端 |
+| [frontend/src/pages/RoomProcessingPage.tsx](frontend/src/pages/RoomProcessingPage.tsx) | 房间处理工作台 | 本地前端 |
+| [frontend/src/pages/SceneLibraryPage.tsx](frontend/src/pages/SceneLibraryPage.tsx) | 场景资源库 | 本地前端 |
+| [frontend/src/pages/SimulationPage.tsx](frontend/src/pages/SimulationPage.tsx) | 火灾模拟工作台 | 本地前端 |
+| [frontend/tsconfig.app.json](frontend/tsconfig.app.json) | 应用TypeScript配置 | 本地前端 |
+| [frontend/tsconfig.json](frontend/tsconfig.json) | TypeScript项目引用 | 本地前端 |
+| [frontend/tsconfig.node.json](frontend/tsconfig.node.json) | 构建配置TypeScript检查 | 本地前端 |
+| [frontend/vite.config.ts](frontend/vite.config.ts) | React/Tailwind插件、别名及本机预览 | 本地前端 |
+| [frontend/vitest.config.ts](frontend/vitest.config.ts) | 离线组件与日志契约测试配置 | 本地前端 |
+
+</details>
 
 <details>
 <summary>根目录（10份）</summary>
