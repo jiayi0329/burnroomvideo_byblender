@@ -21,7 +21,7 @@
 | configs/render | R1/R2/R3各一份 | R3默认，R1/R2回归，内容不同 |
 | docs | 当前规范/指南与archive | 历史命令不作当前指令 |
 
-frontend已建立第一阶段本地中文界面：四个页面、六个业务模块入口、参数演示草稿与共享状态/错误组件。真实API、GLB、视频及日志接收均待接入；通过API访问Backend，不直接连库或取得MinIO管理凭证。运行和验证见frontend/README.md。
+frontend已建立四页中文界面并只读接入Room8真实GLB、扫描点位、检查图、V1视频及历史。features/resources校验身份与数据，room-preview负责R3F/Drei，local/readonly-proxy只在本机Vite代理读取并校验资产SHA；不直接连库、不取得MinIO管理凭证、不改生产服务。可信按钮日志接收及任务提交待接入。运行和验收见frontend/README.md。
 
 ## 依赖与版本
 

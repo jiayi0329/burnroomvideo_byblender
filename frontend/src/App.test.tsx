@@ -32,6 +32,7 @@ describe('中文前端业务骨架', () => {
     expect(value.value).toBe('75')
     fireEvent.change(value, { target: { value: '101' } })
     expect(screen.getByRole('alert').textContent).toContain('0–100')
+    fireEvent.click(screen.getByText('镜头与输出', { selector: 'summary' }))
     fireEvent.change(screen.getByLabelText('相机'), { target: { value: 'closeup' } })
     fireEvent.change(screen.getByLabelText('质量预设'), { target: { value: 'final' } })
     expect((screen.getByLabelText('相机') as HTMLSelectElement).value).toBe('overview')
@@ -50,7 +51,7 @@ describe('中文前端业务骨架', () => {
     fireEvent.click(screen.getByRole('button', { name: '火灾视频' }))
     expect(screen.getByRole('heading', { name: '已生成视频待接入' })).toBeTruthy()
     expect(document.querySelector('video,canvas,progress')).toBeNull()
-    expect(screen.getByText('尚未连接任务')).toBeTruthy()
+    expect(screen.getByText('当前任务：未选择')).toBeTruthy()
   })
   it('统一错误显示安全摘要与追踪信息，支持所有资源状态', () => {
     const { rerender } = render(

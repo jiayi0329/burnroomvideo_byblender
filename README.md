@@ -78,9 +78,9 @@ WinSCP负责上传明确版本安装包/核验输入、下载产物；不在远�
 
 ## 下一步
 
-工程基线、本场景数据导入及Room8产物登记已验收，任务API核心路径已通过。2026-11-16新增第一阶段本地中文前端：四页、六模块入口、参数演示草稿与统一状态/错误结构，见[前端运行说明](frontend/README.md)。下一步只读接入Room8真实GLB、点位、检查图与V1视频，再接受控任务及真实按钮日志。第二房间、生命周期/Hybrid、权限与公网展示各自排期。
+工程基线、本场景数据导入及Room8产物登记已验收，任务API核心路径已通过。2026-11-16本地前端完成四页精简与Room8真实GLB、14个关联点、三张检查图、原V1视频及历史只读接入；运行、SSH隧道及验收见[前端说明](frontend/README.md)。下一步补足边界/起火点元数据与受控任务、真实按钮日志。第二房间、生命周期/Hybrid、权限与公网展示各自排期。
 
-登记与API在`feat/room8-web-registration-api`完成，前端从同步提交f2fc0ef派生`feature/frontend-mvp`开发。首批822528a、第二批57b53f1的远端验收边界保持不变，现有服务为burnroom-app:room-jobs-57b53f1；提交开关以实际服务器配置为准。前端尚未连接任何真实业务API，也未部署。接口见[Backend](backend/README.md)，镜像/任务/备份及Compose维护边界见[发布记录](docs/RELEASES.md#2026-11-13-新版room8任务api部署与短片验收)。
+登记与API在`feat/room8-web-registration-api`完成，前端从同步提交f2fc0ef派生`feature/frontend-mvp`开发。首批822528a、第二批57b53f1的验收边界不变。前端只读连接新版API；GLB/检查图经本机受限代理与用户SSH隧道读取，视频走原后端Range接口。不提交任务、不改生产配置或归档V1，未部署。接口见[Backend](backend/README.md)，服务器镜像/任务/备份及Compose边界仍以[发布记录](docs/RELEASES.md#2026-11-13-新版room8任务api部署与短片验收)为准。
 
 main合并、标签、部署和真实数据写入不自动执行。当前源码提交号不冒充V1原远端checkout；完整交付与缺失附件以RELEASES为准。
 
@@ -88,10 +88,10 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 
 下面逐项列出本次整理后可提交的文件（含待提交文档），不包含Git内部目录、被忽略数据/缓存和本地工具环境。后续新增/删除文件应同步本表；归档原文只供追溯。目录README只维护专项边界，不重复本总表。
 
-清单共 **200** 个文件。
+清单共 **209** 个文件。
 
 <details>
-<summary>frontend：本地中文前端（36份）</summary>
+<summary>frontend：本地中文前端（45份，不含本机env、私有截图及日志）</summary>
 
 | 文件路径 | 用途 | 属性/运行环境 |
 | --- | --- | --- |
@@ -101,8 +101,17 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 | [frontend/.prettierrc.json](frontend/.prettierrc.json) | 源码格式规范 | 本地前端 |
 | [frontend/README.md](frontend/README.md) | 本地运行、验证及后续接入边界 | 本地前端 |
 | [frontend/components.json](frontend/components.json) | shadcn/ui别名与主题配置 | 本地前端 |
+| [frontend/local/readonly-proxy.ts](frontend/local/readonly-proxy.ts) | 受限只读API/资产代理、签名Host保留、SHA验证及脱敏日志 | 本机Vite，不是生产网关 |
+| [frontend/playwright.live.config.ts](frontend/playwright.live.config.ts) | 显式真实资源浏览器验收配置 | 本机Edge/已连接隧道 |
+| [frontend/e2e-live/room8.spec.ts](frontend/e2e-live/room8.spec.ts) | 真实GLB、点位、三图、V1播放/Range/下载及响应式验收 | 显式只读联网测试 |
+| [frontend/src/features/resources/ResourceProvider.tsx](frontend/src/features/resources/ResourceProvider.tsx) | 真实来源、资产、点位、历史读取及刷新 | 本地前端 |
+| [frontend/src/features/resources/context.ts](frontend/src/features/resources/context.ts) | 跨页资源与连接状态上下文 | 本地前端 |
+| [frontend/src/features/resources/contracts.ts](frontend/src/features/resources/contracts.ts) | 真实响应校验与点位坐标适配 | 本地前端 |
+| [frontend/src/features/resources/contracts.test.ts](frontend/src/features/resources/contracts.test.ts) | 响应拒绝、坐标与代理日志脱敏回归 | 离线测试 |
+| [frontend/src/features/room-preview/ModelCanvas.tsx](frontend/src/features/room-preview/ModelCanvas.tsx) | R3F/Drei真实GLB、点位、相机控制及空间检查 | 浏览器WebGL |
 | [frontend/e2e/workspace.spec.ts](frontend/e2e/workspace.spec.ts) | 真实浏览器中文交互与响应式验收 | 本地前端 |
 | [frontend/index.html](frontend/index.html) | 中文应用文档入口 | 本地前端 |
+| [frontend/public/favicon.svg](frontend/public/favicon.svg) | 本地品牌图标，避免浏览器默认图标404 | 浏览器静态资源 |
 | [frontend/package-lock.json](frontend/package-lock.json) | 锁定前端依赖 | 本地前端 |
 | [frontend/package.json](frontend/package.json) | 依赖与开发/检查脚本 | 本地前端 |
 | [frontend/playwright.config.ts](frontend/playwright.config.ts) | 本机Edge浏览器检查配置 | 本地前端 |
@@ -112,7 +121,7 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 | [frontend/src/components/StatusPanel.tsx](frontend/src/components/StatusPanel.tsx) | 统一资源状态、错误与追踪展示 | 本地前端 |
 | [frontend/src/components/TaskMonitor.tsx](frontend/src/components/TaskMonitor.tsx) | 任务流程占位，不生成运行进度 | 本地前端 |
 | [frontend/src/components/ui/button.tsx](frontend/src/components/ui/button.tsx) | shadcn风格Radix/CVA按钮 | 本地前端 |
-| [frontend/src/features/room-preview/RoomPreview.tsx](frontend/src/features/room-preview/RoomPreview.tsx) | 媒体切换占位及后续三维资源接口 | 本地前端 |
+| [frontend/src/features/room-preview/RoomPreview.tsx](frontend/src/features/room-preview/RoomPreview.tsx) | 真实模型/检查图/视频切换、错误重取、全屏与下载 | 本地前端 |
 | [frontend/src/features/simulation/ParameterPanel.tsx](frontend/src/features/simulation/ParameterPanel.tsx) | 演示参数草稿、校验、差异与重置 | 本地前端 |
 | [frontend/src/index.css](frontend/src/index.css) | 深色工业主题与响应式布局 | 本地前端 |
 | [frontend/src/lib/api/client.test.ts](frontend/src/lib/api/client.test.ts) | 请求拒绝、脱敏、关联与无重试回归 | 本地前端 |

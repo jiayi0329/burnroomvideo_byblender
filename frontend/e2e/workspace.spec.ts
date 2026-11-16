@@ -18,12 +18,12 @@ test('四个中文页面桌面/窄屏访问，无真实API请求或横向溢出'
     ]) {
       await page.goto(`/${path}`)
       await expect(page).toHaveTitle('基于三维场景的火灾可视化与视频生成平台')
-      await expect(
-        page.getByRole('link', { name: '基于三维场景的火灾可视化与视频生成平台首页' }),
-      ).toBeVisible()
+      await expect(page.getByRole('link', { name: '火灾可视化平台首页' })).toBeVisible()
       if (path === 'scenes') {
         await expect(page.getByRole('region', { name: '项目说明' })).toContainText('实验室科研原型')
-        await expect(page.getByRole('region', { name: '项目说明' })).toContainText('Room8 是已验证的演示样例')
+        await expect(page.getByRole('region', { name: '项目说明' })).toContainText(
+          'Room8 是已验证的演示样例',
+        )
       }
       await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible()
       expect(
@@ -47,6 +47,7 @@ test('实际浏览器草稿交互、中文错误、预览切换与导航', async
   await page.getByRole('button', { name: '重置演示草稿' }).click()
   await expect(value).toHaveValue('50')
   await expect(page.getByRole('alert')).toHaveCount(0)
+  await page.getByText('镜头与输出', { exact: true }).click()
   await page.getByLabel('质量预设').selectOption('final')
   await expect(page.getByLabel('相机')).toHaveValue('overview')
   await expect(page.getByRole('button', { name: '开始渲染 · 待接入' })).toBeDisabled()

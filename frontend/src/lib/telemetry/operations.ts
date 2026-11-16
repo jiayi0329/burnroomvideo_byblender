@@ -1,5 +1,15 @@
 /** Browser contract only. No persistent log, console sink, server endpoint or raw payload. */
-export type Action = 'navigate' | 'preview_tab' | 'draft_change' | 'draft_reset'
+export type Action =
+  | 'navigate'
+  | 'preview_tab'
+  | 'draft_change'
+  | 'draft_reset'
+  | 'resource_refresh'
+  | 'resource_select'
+  | 'view_reset'
+  | 'view_fullscreen'
+  | 'point_select'
+  | 'media_retry'
 export interface OperationEvent {
   schema_version: 1
   trace_id: string

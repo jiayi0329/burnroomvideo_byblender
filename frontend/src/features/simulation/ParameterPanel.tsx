@@ -66,71 +66,80 @@ export function ParameterPanel() {
         <p className="muted tiny">
           范围 0–100 仅用于界面操作；引擎默认值、单位与允许范围待确认，初始演示值为 50。
         </p>
-        {parameters.map(({ key, label }) => (
-          <div className="slider-field" key={key}>
-            <div>
-              <label htmlFor={key}>{label}</label>
-              <input
-                aria-label={`${label}数值`}
-                type="number"
-                min="0"
-                max="100"
-                value={draft[key]}
-                onChange={(e) => update(key, e.target.value)}
-              />
-            </div>
-            <input
-              id={key}
-              type="range"
-              min="0"
-              max="100"
-              value={draft[key]}
-              onChange={(e) => update(key, e.target.value)}
-            />
-            <div className="range-label">
-              <span>0</span>
-              <span>100 · 无物理单位</span>
-            </div>
-          </div>
+        {[
+          { title: '火焰', items: parameters.slice(0, 2) },
+          { title: '烟雾', items: parameters.slice(2, 4) },
+          { title: '光照', items: parameters.slice(4) },
+        ].map((group, index) => (
+          <details key={group.title} className="parameter-group" open={index === 0}>
+            <summary>{group.title}</summary>
+            {group.items.map(({ key, label }) => (
+              <div className="slider-field" key={key}>
+                <div>
+                  <label htmlFor={key}>{label}</label>
+                  <input
+                    aria-label={`${label}数值`}
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={draft[key]}
+                    onChange={(e) => update(key, e.target.value)}
+                  />
+                </div>
+                <input
+                  id={key}
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={draft[key]}
+                  onChange={(e) => update(key, e.target.value)}
+                />
+                <div className="range-label">
+                  <span>0</span>
+                  <span>100 · 无物理单位</span>
+                </div>
+              </div>
+            ))}
+          </details>
         ))}
         {error && (
           <p className="inline-error" role="alert">
             {error}
           </p>
         )}
-        <div className="section-label">
-          镜头与输出 <span>契约选项预览</span>
-        </div>
-        <div className="field">
-          <label htmlFor="quality">质量预设</label>
-          <select
-            id="quality"
-            value={preset}
-            onChange={(e) =>
-              recorder.record('draft_change', () => {
-                setPreset(e.target.value)
-                if (e.target.value === 'final') setCamera('overview')
-              })
-            }
-          >
-            <option value="test">测试短片 · 960×540 / 12 帧每秒</option>
-            <option value="final">正式成片 · 1280×720 / 24 帧每秒</option>
-          </select>
-        </div>
-        <div className="field">
-          <label htmlFor="camera">相机</label>
-          <select
-            id="camera"
-            value={camera}
-            onChange={(e) => recorder.record('draft_change', () => setCamera(e.target.value))}
-          >
-            <option value="overview">总览（overview）</option>
-            <option value="closeup" disabled={preset === 'final'}>
-              近景（closeup）
-            </option>
-          </select>
-        </div>
-        <p className="muted tiny">正式档仅允许总览，并需后端核验审批。这里的选择不会发送请求。</p>
+        <details className="parameter-group">
+          <summary>镜头与输出</summary>
+          <div className="field">
+            <label htmlFor="quality">质量预设</label>
+            <select
+              id="quality"
+              value={preset}
+              onChange={(e) =>
+                recorder.record('draft_change', () => {
+                  setPreset(e.target.value)
+                  if (e.target.value === 'final') setCamera('overview')
+                })
+              }
+            >
+              <option value="test">测试短片 · 960×540 / 12 帧每秒</option>
+              <option value="final">正式成片 · 1280×720 / 24 帧每秒</option>
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="camera">相机</label>
+            <select
+              id="camera"
+              value={camera}
+              onChange={(e) => recorder.record('draft_change', () => setCamera(e.target.value))}
+            >
+              <option value="overview">总览（overview）</option>
+              <option value="closeup" disabled={preset === 'final'}>
+                近景（closeup）
+              </option>
+            </select>
+          </div>
+          <p className="muted tiny">正式档仅允许总览，并需后端核验审批。这里的选择不会发送请求。</p>
+        </details>
         <details className="draft-details">
           <summary>
             查看本次草稿修改{' '}

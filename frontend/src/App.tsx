@@ -7,13 +7,15 @@ import {
   Cable,
   ShieldCheck,
   ChevronRight,
-  BookOpen,
 } from 'lucide-react'
 import { SceneLibraryPage } from '@/pages/SceneLibraryPage'
 import { RoomProcessingPage } from '@/pages/RoomProcessingPage'
 import { SimulationPage } from '@/pages/SimulationPage'
 import { ResultsPage } from '@/pages/ResultsPage'
 import { recorder } from '@/lib/telemetry/operations'
+import { ResourceProvider } from '@/features/resources/ResourceProvider'
+import { useResources } from '@/features/resources/context'
+import { Button } from '@/components/ui/button'
 
 const navigation = [
   { to: '/scenes', title: '场景资源库', subtitle: '数据与资产', icon: Layers3, number: '01' },
@@ -34,21 +36,18 @@ const navigation = [
   },
 ]
 export function AppShell() {
+  const resources = useResources()
   const location = useLocation()
   const current = navigation.find((n) => n.to === location.pathname) ?? navigation[0]
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <NavLink
-          to="/scenes"
-          className="brand"
-          aria-label="基于三维场景的火灾可视化与视频生成平台首页"
-        >
+        <NavLink to="/scenes" className="brand" aria-label="火灾可视化平台首页">
           <div className="brand-mark">
             <Flame size={25} />
           </div>
           <div>
-            <strong>基于三维场景的火灾可视化与视频生成平台</strong>
+            <strong>火灾可视化平台</strong>
             <small>空间 · 火灾 · 可视化</small>
           </div>
         </NavLink>
@@ -72,25 +71,6 @@ export function AppShell() {
             </NavLink>
           ))}
         </nav>
-        <div className="sidebar-guide">
-          <div>
-            <BookOpen size={17} />
-            <strong>从扫描空间到视频成果</strong>
-          </div>
-          <p>六个业务模块，串联完整操作流程。当前仅开放本地界面交互。</p>
-          <ol>
-            {[
-              '场景数据管理',
-              '户型与房间处理',
-              '三维模型预览',
-              '火灾与渲染参数',
-              '渲染任务监控',
-              '视频成果管理',
-            ].map((x) => (
-              <li key={x}>{x}</li>
-            ))}
-          </ol>
-        </div>
         <div className="sidebar-bottom">
           <ShieldCheck size={18} />
           <div>
@@ -108,20 +88,26 @@ export function AppShell() {
           <div className="connection">
             <span className="dot" />
             <Cable size={14} />
-            真实服务未连接
+            {
+              {
+                unconfigured: '真实服务未配置',
+                loading: '正在读取真实服务…',
+                connected: '真实服务已连接 · 只读',
+                error: '真实服务读取失败',
+              }[resources.status]
+            }
+            <Button
+              variant="ghost"
+              disabled={resources.status === 'loading'}
+              onClick={resources.refresh}
+            >
+              重新获取
+            </Button>
             <span className="topbar-divider" />
             本地开发
           </div>
         </header>
         <main>
-          <div className="environment-note">
-            <span>
-              <ShieldCheck size={14} />
-              前端交互预览
-            </span>
-            <p>模型、视频与任务接口待接入；页面不会发送真实渲染请求。</p>
-            <NavLink to="/results">接入状态</NavLink>
-          </div>
           <Routes>
             <Route path="/" element={<Navigate to="/scenes" replace />} />
             <Route path="/scenes" element={<SceneLibraryPage />} />
@@ -131,7 +117,7 @@ export function AppShell() {
             <Route path="*" element={<Navigate to="/scenes" replace />} />
           </Routes>
           <footer className="page-footer">
-            <span>基于三维场景的火灾可视化与视频生成平台</span>
+            <span>燃境 BurnScape · 实验室科研原型</span>
             <span>程序化视觉演示，非 CFD 火灾动力学仿真</span>
           </footer>
         </main>
@@ -142,7 +128,9 @@ export function AppShell() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AppShell />
+      <ResourceProvider>
+        <AppShell />
+      </ResourceProvider>
     </BrowserRouter>
   )
 }

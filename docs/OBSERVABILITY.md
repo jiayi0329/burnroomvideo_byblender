@@ -1,6 +1,6 @@
 # 操作日志与执行追踪
 
-更新：2026-11-12。公共组件、API中间件、主要CLI及Room8任务接入已实现并离线验证；3be7124完成远端HTTP与Room8单帧GPU关联日志的最小验收，证据见[发布记录](RELEASES.md)。前端尚未存在，不能宣称已实现真实按钮上报或监控网页。
+更新：2026-11-12，2026-11-16补充本机前端只读代理。公共组件、API中间件、主要CLI及Room8任务接入已实现并离线验证；3be7124完成远端HTTP与Room8单帧GPU关联日志最小验收，证据见[发布记录](RELEASES.md)。前端现已只读接入真实资源，但尚无可信按钮上报或授权日志查询；不能宣称完整按钮日志闭环已验收。
 
 ## 已实现的范围
 
@@ -84,3 +84,10 @@ SCENE/JOB/ATTEMPT均需替换为实际值；历史任务没有operations文件�
 2026-11-13新版任务API已本地接入：request_operation、注册来源核验、任务预留/进程握手、launcher_exit及数据库摘要同步复用公共stage。HTTP trace/request通过BURNROOM_OPERATION_CONTEXT传入独立CLI，再进入原Room8 attempt/worker。轮询和视频查询绑定scene/room/job；同键重试返回submission_trace_id指向原创建操作，当前HTTP仍有独立request_id。api_launcher.log为本任务子进程输出，操作JSONL继续分进程存放；不输出请求正文、幂等键明文、数据库错误正文或签名URL。视频流异常由现有ASGI中间件记录。离线测试覆盖这些关联和失败脱敏；尚未远端提取新API完整trace或验收前端按钮。
 
 同日远端核心路径验收：响应trace_id/submission_trace_id=room8-api-test-57b53f1-01、首次request_id=91c85a8b63864606bc035714336a6596，file_job_id=20261113T125240Z_20263360，启动日志attempt=20261113T125240Z_6a2e5d，技术完成80.125秒。该时间来自任务timing摘要，不是HTTP耗时，也不能把嵌套span相加反推。上述响应和文本日志不替代服务/attempt操作JSONL的完整trace核验；具体证据范围见[RELEASES](RELEASES.md#2026-11-13-新版room8任务api部署与短片验收)。
+
+
+## 2026-11-16：本机前端只读代理
+
+frontend/local/readonly-proxy.ts作为JS开发适配器，将读取结果按既有schema字段写入项目data/logs/operations的独立JSONL分片，包含UTC时间、operation、stage、event、duration_ms、trace/request关联及有限error_code。HTTP X-Trace-ID继续传到原后端，沿用后端公共日志；不修改Python operation_logging或原状态机。路径、query、签名、凭证、原始点位/正文和异常原文不写入代理事件。
+
+frontend/src/features/resources/contracts.test.ts覆盖路由拒绝、响应类型/坐标边界和日志脱敏；原有client/operations回归继续覆盖时间、耗时、关联及失败。真实浏览器验收仅做GET/HEAD和已有文件读取，未提交新任务。代理JSONL落盘不等于按钮→GPU全链路验收，浏览器操作可信接收、存储查询与鉴权仍待实现。

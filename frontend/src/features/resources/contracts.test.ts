@@ -1,0 +1,38 @@
+import { describe, it, expect } from 'vitest'
+import { assets, sources, points, jobs, glbPoint } from './contracts'
+import { allowedApiPath, requestLog } from '../../../local/readonly-proxy'
+describe('只读资源边界', () => {
+  it('拒绝错误身份和任意媒体地址，不混淆业务号与数据库主键', () => {
+    expect(() =>
+      sources({ sources: [{ scene_code: 'scene', room_id: 'Room8', database_room_id: '6' }] }),
+    ).toThrow()
+    expect(() =>
+      assets({ assets: [{ id: 1, kind: 'room_glb', uploaded: true, sha256: 'wrong' }] }),
+    ).toThrow()
+    expect(() =>
+      jobs({
+        jobs: [{ job_id: 'job', runtime_state: 'done', video_url: 'https://elsewhere/video' }],
+      }),
+    ).toThrow()
+    expect(() =>
+      points({ points: [{ device: 1, x: NaN, y: 2, z: 3, review_kind: 'interior' }] }),
+    ).toThrow()
+  })
+  it('原始XYZ转换一次到GLB坐标，不变换模型本身', () => {
+    expect(glbPoint({ device: 1, x: 2, y: 3, z: 4, review_kind: 'interior' })).toEqual([2, 4, -3])
+  })
+  it('只允许新版读取路由，日志无路径、凭证或签名字段', () => {
+    expect(allowedApiPath('/api/render/scene')).toBe(false)
+    expect(allowedApiPath('/api/catalog/assets/60/share')).toBe(false)
+    expect(allowedApiPath('/api/room-jobs/options')).toBe(true)
+    const log = requestLog('trace-test', false, 12)
+    expect(log).toMatchObject({
+      schema_version: 1,
+      trace_id: 'trace-test',
+      event: 'failure',
+      duration_ms: 12,
+    })
+    for (const field of ['url', 'headers', 'body']) expect(log).not.toHaveProperty(field)
+    expect(JSON.stringify(log)).not.toMatch(/Authorization|signature|http:\/\//)
+  })
+})

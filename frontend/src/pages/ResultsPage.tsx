@@ -1,108 +1,191 @@
-import { Activity, Download, FileText, Film, ListFilter, Cable, Fingerprint } from 'lucide-react'
+import { useState } from 'react'
+import { Activity, Download, Fingerprint } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
-import { Button } from '@/components/ui/button'
 import { StatusPanel } from '@/components/StatusPanel'
-import { TaskMonitor } from '@/components/TaskMonitor'
+import { useResources } from '@/features/resources/context'
+const states: Record<string, string> = {
+  awaiting_visual_review: '技术完成 · 待人工审核',
+  failed: '失败',
+  interrupted: '中断',
+  unknown: '证据不可核验',
+  created: '已创建',
+  rendering: '渲染中',
+  encoding: '编码中',
+}
 export function ResultsPage() {
+  const r = useResources()
+  const [chosen, setChosen] = useState<string>()
+  const v1 = r.jobs
+    .filter((j) => j.preset === 'final' && j.technical_complete && j.video_available)
+    .sort((a, b) => a.job_id.localeCompare(b.job_id))[0]
+  const job = r.jobs.find((j) => j.job_id === chosen) ?? v1 ?? r.jobs[0]
+  const [mediaError, setMediaError] = useState(false)
   return (
     <>
       <PageHeading
         number="04"
         title="任务与成果中心"
-        description="把运行过程、配置与视频交付关联起来，让每次演示可追溯。"
-      >
-        <Button variant="outline" disabled>
-          <Download size={15} />
-          下载成果 · 待接入
-        </Button>
-      </PageHeading>
+        description="只读查看已有任务、文件运行状态与归档视频，不创建新任务。"
+      />
       <div className="results-layout">
         <section className="panel history-panel">
           <div className="panel-heading">
             <h2>
               <Activity size={17} />
-              任务历史
+              真实任务历史
             </h2>
-            <span className="badge">待接入</span>
           </div>
-          <div className="filter-row">
-            <ListFilter size={15} />
-            <label htmlFor="task-filter">任务筛选</label>
-            <select id="task-filter" disabled>
-              <option>连接后按真实状态筛选</option>
-            </select>
-          </div>
-          <StatusPanel
-            title="任务目录未连接"
-            description="不会自动启动任务，也不会生成演示任务记录。"
-          />
-          <div className="history-footnote">技术完成与人工审核状态将分别展示。</div>
+          {r.jobs.length ? (
+            r.jobs.map((j) => (
+              <button
+                key={j.job_id}
+                className="history-button"
+                aria-pressed={job?.job_id === j.job_id}
+                onClick={() => {
+                  setChosen(j.job_id)
+                  setMediaError(false)
+                }}
+              >
+                <code>{j.job_id}</code>
+                <span className="job-state">{states[j.runtime_state] ?? j.runtime_state}</span>
+              </button>
+            ))
+          ) : (
+            <StatusPanel
+              state={r.status === 'loading' ? 'loading' : r.status === 'error' ? 'error' : 'empty'}
+              title="暂无可显示的任务"
+              description={r.error ?? '连接来源后读取已有历史，不生成演示记录。'}
+              traceId={r.traceId}
+            />
+          )}
         </section>
         <div className="results-main">
           <section className="panel">
             <div className="panel-heading">
-              <h2>
-                <Film size={17} />
-                视频成果
-              </h2>
-              <span className="badge">未选择任务</span>
+              <h2>已有视频成果</h2>
+              <span className="badge">{job?.preset === 'final' ? '正式档归档' : '历史任务'}</span>
             </div>
-            <StatusPanel
-              title="视频来源待接入"
-              description="选择已有真实任务后，提供播放、拖动与下载；不自动生成新视频。"
-            />
+            {job?.video_url && !mediaError ? (
+              <video
+                className="results-video"
+                key={job.job_id}
+                aria-label="归档任务视频"
+                src={job.video_url}
+                controls
+                preload="metadata"
+                onError={() => setMediaError(true)}
+              />
+            ) : (
+              <StatusPanel
+                state={mediaError ? 'error' : 'empty'}
+                title={mediaError ? '视频读取失败' : '当前任务无可用视频'}
+                description="仅播放通过技术验证的实际文件。"
+              />
+            )}
             <div className="result-actions">
-              <Button variant="outline" disabled>
-                <FileText size={14} />
-                任务配置
-              </Button>
-              <Button variant="outline" disabled>
-                <FileText size={14} />
-                运行报告
-              </Button>
-              <Button disabled>
-                <Download size={14} />
-                下载视频
-              </Button>
+              {job?.video_url ? (
+                <a
+                  className="ui-button button-outline"
+                  href={job.video_url}
+                  download={job.job_id + '.mp4'}
+                >
+                  <Download size={14} />
+                  下载已有视频
+                </a>
+              ) : null}
+              {mediaError && (
+                <button className="ui-button button-outline" onClick={() => setMediaError(false)}>
+                  重新获取视频
+                </button>
+              )}
             </div>
           </section>
-          <TaskMonitor />
           <section className="panel">
             <div className="panel-heading">
+              <h2>任务进度与结果</h2>
+            </div>
+            {job ? (
+              <>
+                <dl className="data-list">
+                  <div>
+                    <dt>任务编号</dt>
+                    <dd>
+                      <code>{job.job_id}</code>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>实际状态</dt>
+                    <dd>{states[job.runtime_state] ?? job.runtime_state}</dd>
+                  </div>
+                  <div>
+                    <dt>帧数</dt>
+                    <dd>
+                      {job.completed_frames ?? '—'} / {job.total_frames ?? '—'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>本次尝试耗时</dt>
+                    <dd>
+                      {job.total_seconds == null ? '未提供' : job.total_seconds.toFixed(3) + ' 秒'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>人工审核</dt>
+                    <dd>
+                      {job.human_acceptance === 'not_recorded'
+                        ? '未记录'
+                        : (job.human_acceptance ?? '未提供')}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>错误摘要</dt>
+                    <dd>{job.error_code ?? '无错误码'}</dd>
+                  </div>
+                  <div>
+                    <dt>GPU / 配置 / 完整运行报告</dt>
+                    <dd>现有只读接口未提供</dd>
+                  </div>
+                </dl>
+                {job.completed_frames != null &&
+                job.total_frames != null &&
+                job.total_frames > 0 ? (
+                  <div className="runtime-progress">
+                    <label>
+                      服务器记录的完成帧数
+                      <progress value={job.completed_frames} max={job.total_frames} />
+                    </label>
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <p className="panel-note">尚未选择任务。</p>
+            )}
+          </section>
+          <details className="panel diagnostics">
+            <summary className="panel-heading">
               <h2>
                 <Fingerprint size={17} />
-                追踪与接口日志
+                API 诊断与追踪
               </h2>
-              <span className="badge">待接入</span>
-            </div>
+            </summary>
             <dl className="data-list">
-              {[
-                ['任务编号', '尚未连接任务'],
-                ['请求 / 追踪编号', '无真实请求'],
-                ['GPU 运行摘要', '待接入'],
-                ['前端事件接收与存储', '待接入'],
-              ].map(([k, v]) => (
-                <div key={k}>
-                  <dt>{k}</dt>
-                  <dd>{v}</dd>
-                </div>
-              ))}
+              <div>
+                <dt>读取状态</dt>
+                <dd>{r.status}</dd>
+              </div>
+              <div>
+                <dt>最近失败追踪编号</dt>
+                <dd>{r.traceId ?? '无失败编号'}</dd>
+              </div>
+              <div>
+                <dt>读取方式</dt>
+                <dd>本机同源只读代理</dd>
+              </div>
             </dl>
-            <div className="info-note">
-              <Cable size={16} />
-              <p>
-                前端事件契约与请求适配层已预留，尚未连接可信后端接收、存储和查询接口；当前没有持久化操作日志。
-              </p>
-            </div>
-            <div className="result-actions">
-              <Button variant="outline" disabled>
-                授权日志查询 · 待接入
-              </Button>
-            </div>
             <p className="panel-note">
-              服务异常时显示脱敏错误与追踪编号。网络超时需先核对原任务，避免重复提交。
+              代理读请求记录脱敏JSONL，复用既有日志字段；前端按钮全链路接收、授权日志查询仍待接入。不会向浏览器公开签名URL或服务器原始日志。
             </p>
-          </section>
+          </details>
         </div>
       </div>
     </>

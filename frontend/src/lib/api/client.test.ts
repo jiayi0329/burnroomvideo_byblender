@@ -18,14 +18,12 @@ describe('只读请求适配边界', () => {
     expect(fetcher).not.toHaveBeenCalled()
   })
   it('只读请求关联追踪编号，每次请求独立；不记录路径、正文或签名', async () => {
-    const fetcher = vi
-      .fn()
-      .mockImplementation(
-        async () =>
-          new Response(JSON.stringify({ render_enabled: false }), {
-            headers: { 'X-Request-ID': 'server-request-1' },
-          }),
-      )
+    const fetcher = vi.fn().mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ render_enabled: false }), {
+          headers: { 'X-Request-ID': 'server-request-1' },
+        }),
+    )
     const sink = vi.fn()
     const client = createApiClient({ enabled: true, fetcher, sink })
     expect(await client.read('/api/room-jobs/options')).toEqual({ render_enabled: false })
