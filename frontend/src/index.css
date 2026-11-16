@@ -1332,6 +1332,67 @@ select:disabled {
 }
 
 /* Compact read-only workspace: the document owns scrolling. */
+.point-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  flex-wrap: wrap;
+  font-size: 11px;
+}
+.point-selector select {
+  max-width: 360px;
+  width: auto;
+  flex: 1;
+  min-width: 160px;
+}
+.point-legend {
+  display: flex;
+  gap: 16px;
+  font-size: 11px;
+  padding: 0 14px 12px;
+  flex-wrap: wrap;
+}
+.point-legend span:nth-child(1) {
+  color: #ff803d;
+}
+.point-legend span:nth-child(2) {
+  color: #8ec6ed;
+}
+.point-legend span:nth-child(3) {
+  color: #ffe29c;
+}
+.resource-provenance summary {
+  font-size: 12px;
+  cursor: pointer;
+}
+.resource-provenance dd {
+  max-width: 75%;
+  overflow-wrap: anywhere;
+}
+.connection time {
+  font-size: 9px;
+  color: #94a7bc;
+}
+.connection-notice {
+  border: 1px solid #77553a;
+  border-radius: 6px;
+  background: #29221d;
+  padding: 12px;
+  margin-bottom: 16px;
+  font-size: 11px;
+  line-height: 1.9;
+  color: #dfc6ad;
+}
+.connection-notice code {
+  overflow-wrap: anywhere;
+}
+.point-inspector .panel-note {
+  padding-bottom: 12px;
+}
+.point-inspector .data-list dd {
+  overflow-wrap: anywhere;
+}
 .image-select {
   display: flex;
   align-items: center;

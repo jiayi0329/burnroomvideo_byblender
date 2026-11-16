@@ -31,6 +31,14 @@ test('真实Room8 GLB、点位、检查图与原V1视频只读验收', async ({ 
     timeout: 20000,
   })
   await expect(page.getByText(/个点位在模型包围盒内/)).toBeVisible({ timeout: 30000 })
+  const pointResponse=await request.get(`/api/catalog/rooms/${source.database_room_id}/points`)
+  const {points}=await pointResponse.json()
+  const point=points[0]
+  await page.getByLabel('查看扫描点位').selectOption(String(point.device))
+  await expect(page.getByRole('region',{name:'点位信息'})).toContainText([point.x,point.y,point.z].map((v:number)=>v.toFixed(3)).join(' / '))
+  await page.getByText('资源版本与来源',{exact:true}).click()
+  await expect(page.locator('.resource-provenance')).toContainText(source.asset_version)
+  await expect(page.locator('.resource-provenance')).toContainText(glb.sha256)
   const canvas = page.locator('canvas')
   await expect(canvas).toBeVisible()
   const before = await canvas.screenshot()

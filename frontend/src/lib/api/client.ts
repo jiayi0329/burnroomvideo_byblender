@@ -1,7 +1,8 @@
 import type { OperationEvent } from '@/lib/telemetry/operations'
 
 export class ApiError extends Error {
-  code: 'NOT_CONNECTED' | 'NETWORK_ERROR' | 'HTTP_ERROR' | 'INVALID_RESPONSE'
+  code:
+    'NOT_CONNECTED' | 'NETWORK_ERROR' | 'HTTP_ERROR' | 'INVALID_RESPONSE' | 'TIMEOUT' | 'CANCELLED'
   traceId: string
   requestId?: string
   constructor(code: ApiError['code'], traceId: string, requestId?: string) {
@@ -11,6 +12,8 @@ export class ApiError extends Error {
         NETWORK_ERROR: '网络连接失败，请先查询原任务，勿重复提交',
         HTTP_ERROR: '服务端返回错误，请凭追踪编号排查',
         INVALID_RESPONSE: '服务端响应格式异常',
+        TIMEOUT: '读取超时，请检查 API 连接后手动重新获取',
+        CANCELLED: '读取已取消',
       }[code],
     )
     this.code = code
@@ -29,10 +32,15 @@ export interface RequestEvent {
   error_code?: ApiError['code']
 }
 export function createApiClient(
-  options: { enabled?: boolean; fetcher?: typeof fetch; sink?: (event: RequestEvent) => void } = {},
+  options: {
+    enabled?: boolean
+    fetcher?: typeof fetch
+    sink?: (event: RequestEvent) => void
+    timeoutMs?: number
+  } = {},
 ) {
   return {
-    async read<T>(path: string): Promise<T> {
+    async read<T>(path: string, request: { signal?: AbortSignal } = {}): Promise<T> {
       const traceId = crypto.randomUUID()
       // Explicitly read-only allowlist. No legacy API, submission, arbitrary URL or credential forwarding.
       if (
@@ -46,10 +54,13 @@ export function createApiClient(
       const start = performance.now()
       let requestId: string | undefined
       let failure: ApiError | undefined
+      const timeout = AbortSignal.timeout(options.timeoutMs ?? 10000)
+      const signal = request.signal ? AbortSignal.any([request.signal, timeout]) : timeout
       try {
         const response = await (options.fetcher ?? fetch)(path, {
           headers: { 'X-Trace-ID': traceId },
           credentials: 'same-origin',
+          signal,
         })
         const incoming = response.headers.get('X-Request-ID')
         requestId = incoming && /^[A-Za-z0-9_.:-]{1,96}$/.test(incoming) ? incoming : undefined
@@ -61,7 +72,17 @@ export function createApiClient(
         }
       } catch (error) {
         failure =
-          error instanceof ApiError ? error : new ApiError('NETWORK_ERROR', traceId, requestId)
+          error instanceof ApiError
+            ? error
+            : new ApiError(
+                request.signal?.aborted
+                  ? 'CANCELLED'
+                  : timeout.aborted
+                    ? 'TIMEOUT'
+                    : 'NETWORK_ERROR',
+                traceId,
+                requestId,
+              )
         throw failure
       } finally {
         try {

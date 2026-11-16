@@ -1,6 +1,44 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createApiClient } from './client'
 describe('只读请求适配边界', () => {
+  it('读取超时不重试，日志只包含有限错误码', async () => {
+    const fetcher = vi.fn(
+      (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(Error('private timeout body')), {
+            once: true,
+          })
+        }),
+    )
+    const sink = vi.fn()
+    await expect(
+      createApiClient({ enabled: true, fetcher, sink, timeoutMs: 5 }).read(
+        '/api/room-jobs/options',
+      ),
+    ).rejects.toMatchObject({ code: 'TIMEOUT' })
+    expect(fetcher).toHaveBeenCalledOnce()
+    expect(sink.mock.calls[0][0]).toMatchObject({ result: 'failure', error_code: 'TIMEOUT' })
+    expect(JSON.stringify(sink.mock.calls)).not.toContain('private')
+  })
+  it('主动取消沿用关联编号，保留取消结果而非当作网络失败', async () => {
+    const controller = new AbortController()
+    const fetcher = vi.fn(
+      (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(Error('private cancellation')), {
+            once: true,
+          })
+        }),
+    )
+    const sink = vi.fn()
+    const pending = createApiClient({ enabled: true, fetcher, sink }).read(
+      '/api/room-jobs/options',
+      { signal: controller.signal },
+    )
+    controller.abort()
+    await expect(pending).rejects.toMatchObject({ code: 'CANCELLED' })
+    expect(sink.mock.calls[0][0]).toMatchObject({ error_code: 'CANCELLED', result: 'failure' })
+  })
   it('默认不调用真实服务，拒绝旧API和外部地址', async () => {
     const fetcher = vi.fn()
     await expect(createApiClient({ fetcher }).read('/api/room-jobs/options')).rejects.toMatchObject(

@@ -88,10 +88,10 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 
 下面逐项列出本次整理后可提交的文件（含待提交文档），不包含Git内部目录、被忽略数据/缓存和本地工具环境。后续新增/删除文件应同步本表；归档原文只供追溯。目录README只维护专项边界，不重复本总表。
 
-清单共 **209** 个文件。
+清单共 **214** 个文件。
 
 <details>
-<summary>frontend：本地中文前端（45份，不含本机env、私有截图及日志）</summary>
+<summary>frontend：本地中文前端（49份，不含本机env、私有截图及日志）</summary>
 
 | 文件路径 | 用途 | 属性/运行环境 |
 | --- | --- | --- |
@@ -105,10 +105,14 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 | [frontend/playwright.live.config.ts](frontend/playwright.live.config.ts) | 显式真实资源浏览器验收配置 | 本机Edge/已连接隧道 |
 | [frontend/e2e-live/room8.spec.ts](frontend/e2e-live/room8.spec.ts) | 真实GLB、点位、三图、V1播放/Range/下载及响应式验收 | 显式只读联网测试 |
 | [frontend/src/features/resources/ResourceProvider.tsx](frontend/src/features/resources/ResourceProvider.tsx) | 真实来源、资产、点位、历史读取及刷新 | 本地前端 |
+| [frontend/src/features/resources/ResourceProvider.test.tsx](frontend/src/features/resources/ResourceProvider.test.tsx) | 断线保留、恢复身份与缺少配置回归 | 离线测试 |
 | [frontend/src/features/resources/context.ts](frontend/src/features/resources/context.ts) | 跨页资源与连接状态上下文 | 本地前端 |
 | [frontend/src/features/resources/contracts.ts](frontend/src/features/resources/contracts.ts) | 真实响应校验与点位坐标适配 | 本地前端 |
 | [frontend/src/features/resources/contracts.test.ts](frontend/src/features/resources/contracts.test.ts) | 响应拒绝、坐标与代理日志脱敏回归 | 离线测试 |
 | [frontend/src/features/room-preview/ModelCanvas.tsx](frontend/src/features/room-preview/ModelCanvas.tsx) | R3F/Drei真实GLB、点位、相机控制及空间检查 | 浏览器WebGL |
+| [frontend/src/features/room-preview/PointInspector.tsx](frontend/src/features/room-preview/PointInspector.tsx) | 点位只读选择、原始/GLB坐标及图例 | 本地前端 |
+| [frontend/src/features/room-preview/PointInspector.test.tsx](frontend/src/features/room-preview/PointInspector.test.tsx) | 点位详情、选择取消与空数据回归 | 离线测试 |
+| [frontend/src/features/room-preview/RoomPreview.test.tsx](frontend/src/features/room-preview/RoomPreview.test.tsx) | 媒体失败追踪、重取及资源切换回归 | 离线测试 |
 | [frontend/e2e/workspace.spec.ts](frontend/e2e/workspace.spec.ts) | 真实浏览器中文交互与响应式验收 | 本地前端 |
 | [frontend/index.html](frontend/index.html) | 中文应用文档入口 | 本地前端 |
 | [frontend/public/favicon.svg](frontend/public/favicon.svg) | 本地品牌图标，避免浏览器默认图标404 | 浏览器静态资源 |
@@ -338,7 +342,7 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 </details>
 
 <details>
-<summary>docs：当前规范与指南（12份）</summary>
+<summary>docs：当前规范与指南（13份）</summary>
 
 | 文件路径 | 用途 | 属性/运行环境 |
 | --- | --- | --- |
@@ -354,6 +358,7 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 | [docs/rendering/animation.md](docs/rendering/animation.md) | 完整代码包、overview动画、GPU证据、逐帧观察、视频验收及续跑 | 文档/约束 |
 | [docs/rendering/room_assets.md](docs/rendering/room_assets.md) | 核验→面级裁切→基础blend/GLB→展示检查及平层近似边界 | 文档/约束 |
 | [docs/rendering/style.md](docs/rendering/style.md) | 独立可读的当前R3参数/效果/六样帧指南；不需要先读R1/R2 | 文档/约束 |
+| [docs/frontend_spatial_metadata.md](docs/frontend_spatial_metadata.md) | 边界/起火点文件来源、指纹核验与拟议只读摘要接口（未实施） | 设计/约束 |
 
 </details>
 

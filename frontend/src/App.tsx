@@ -85,7 +85,7 @@ export function AppShell() {
             工作空间 <ChevronRight size={13} />
             <span>{current.title}</span>
           </div>
-          <div className="connection">
+          <div className="connection" title="显示最近一次元数据读取结果，不代表持续心跳">
             <span className="dot" />
             <Cable size={14} />
             {
@@ -105,9 +105,30 @@ export function AppShell() {
             </Button>
             <span className="topbar-divider" />
             本地开发
+            {resources.lastUpdated && (
+              <time dateTime={resources.lastUpdated}>
+                最近读取{' '}
+                {new Date(resources.lastUpdated).toLocaleTimeString('zh-CN', { hour12: false })}
+              </time>
+            )}
           </div>
         </header>
         <main>
+          {resources.status === 'error' && (
+            <div className="connection-notice" role="alert">
+              <strong>{resources.error ?? '服务读取失败'}</strong>
+              <p>
+                {resources.stale ? '正在显示上次成功读取的资源，非实时数据。' : '尚无可用资源。'}{' '}
+                请确认前端/API连接；GLB与检查图另需保持MinIO隧道运行。连接恢复后点击顶部“重新获取”，不会自动创建或重试渲染任务。
+              </p>
+              {resources.traceId && <code>追踪编号：{resources.traceId}</code>}
+            </div>
+          )}
+          {resources.status === 'loading' && resources.stale && (
+            <p className="connection-notice" role="status">
+              正在刷新；当前画面来自上次成功读取，尚未确认最新状态。
+            </p>
+          )}
           <Routes>
             <Route path="/" element={<Navigate to="/scenes" replace />} />
             <Route path="/scenes" element={<SceneLibraryPage />} />

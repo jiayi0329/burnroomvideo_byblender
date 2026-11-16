@@ -1,0 +1,46 @@
+# 房间边界与任务起火点：只读元数据方案
+
+2026-11-16。当前仅完成源码来源核对与接口设计；下文接口尚未实现或部署。不得将本文当作已取得Room8私有文件实测结果，也不能从源码中的22号约束直接生成网页起火点标记。
+
+## 已找到的来源与适用范围
+
+| 来源 | 确认的字段 | 能说明什么 |
+| --- | --- | --- |
+| render_engine/geometry/prepare_room_candidate.py生成candidate.json | polygon_raw_xy、ignition_device、interior_devices、boundary_devices、floor_z、provenance、source_fingerprints | 候选裁切边界与当时输入的起火点；须由已验证资产指纹绑定，不能任选最新候选 |
+| render_engine/blender/F8_prepare_room_asset.py生成asset/manifest.json | candidate_sha256、clipping_parameters.polygon_raw_xy、engineering_policy.floor_z、raw_to_asset_matrix、glb_coordinate_mapping、点位/成员及artifacts SHA | 基础资产采用的裁切输入和坐标约定；不证明物理墙厚或真实地板 |
+| config_snapshot.json | signature、inputs.asset、inputs.points、inputs.guards、inputs.timeline.start_point/allowed_devices/spread_events | 特定历史任务冻结的输入；是该任务起火点的优先来源，不能被当前场景timeline替代 |
+| 现有/api/catalog及/api/room-jobs | 动态房间主键、资产SHA、已核验点位关系、文件任务号/版本与状态 | 目录与文件身份关联；当前没有边界和实际起火点的网页字段 |
+
+当前工作站没有可据此独立复核的candidate/manifest/任务快照私有副本；已有MinIO登记的GLB、三图与视频不等于原始报告已全部上传。当前SSH仅由用户保持只转发9000的隧道，不应绕过该边界猜测文件访问地址或遍历MinIO对象。
+
+## 拟议最小接口（未实现）
+
+建议先增加后端只读摘要服务，再增加路由：
+
+`GET /api/room-jobs/{job_id}/spatial-context?scene_code=...&room_id=Room8`
+
+以明确文件任务身份解析来源，复用既有安全路径/快照校验。请求不接受文件路径、任意配置或目录；不返回原始完整快照、guard绝对路径、review正文、凭证或签名URL。资产预览没有关联历史任务时，只返回有证据的资产边界，起火点明确为空，不能隐式取“最近任务”。
+
+摘要应包含：
+
+- schema_version、scene_code、room_id、layout_version_id、asset_version、file_job_id。
+- source：候选/manifest/快照相关文件SHA和原坐标约定；按实际核对结果填写，不假造指纹。
+- boundary：有限的原始XY多边形、工程近似floor_z及policy；不是墙面语义、真实净高或CFD边界。
+- ignition：从该任务快照提取的点位号、经核对的原始坐标与来源；不接受浏览器传入的新点位。
+- 有限成员列表和核验结论。证据缺失、过期或不一致时返回明确错误，不退回当前场景值或客户端推断值。
+
+## 校验顺序
+
+1. 按现有允许根和标识校验定位任务；验证原快照签名、场景/房间/资产版本及冻结输入，不改快照或重新签名。
+2. 验证本地manifest、candidate及GLB的SHA关联；manifest的candidate_sha256须匹配实际候选，任务guards也须匹配所使用的文件。原历史源码指纹不能用当前源码替换。
+3. 核对候选、manifest、快照中的版本/成员、点位源SHA和坐标映射；多边形只接收有限数值、有效顶点数和非退化结果，不由GLB包围盒反推边界。
+4. 起火点优先取inputs.timeline.start_point，须存在于该任务allowed_devices和已核验内部点中；与候选绑定不一致即拒绝，不能把门口点当内部起火点。
+5. 前端原始点/边界仅转换一次(x,y,z)→(x,z,-y)，模型保持原导出坐标；用独立标记显示已证实的历史起火点，保留“只读查看”的语义。
+
+catalog资产列表目前没有逐项asset_version字段。扩展多版本时需显式返回与sources版本对应的GLB/检查图ID，不能按列表第一项或mtime挑选。现阶段仅Room8单一登记版本已实测。
+
+## 计划验收与后续边界
+
+实现时须新增缺失/篡改文件、签名不符、场景/版本错配、路径越界、错误成员/起火点及坐标转换回归；通过现有operation_logging记录请求、核验阶段、结果、耗时、trace/request/job上下文，并验证脱敏。只读失败不触发渲染、不写数据库、不修复历史文件。
+
+代码实现、服务器原文件只读核验及部署分别验收。在摘要经真实证据核对前，网页继续不画边界或标起火点。随后才安排受控测试任务：明确确认、幂等键、服务端允许列表、正式档审批及可信操作日志；自由参数和公网仍单独排期。

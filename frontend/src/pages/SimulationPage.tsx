@@ -7,8 +7,21 @@ import { Link } from 'react-router-dom'
 import { useResources } from '@/features/resources/context'
 import { glbPoint } from '@/features/resources/contracts'
 import { recorder } from '@/lib/telemetry/operations'
+import { PointInspector } from '@/features/room-preview/PointInspector'
 export function SimulationPage() {
   const r = useResources()
+  const [selection, setSelection] = useState<{ source: string; id?: string }>()
+  const sourceKey = r.source
+    ? [
+        r.source.scene_code,
+        r.source.room_id,
+        r.source.layout_version_id,
+        r.source.asset_version,
+      ].join('/')
+    : 'unconnected'
+  const selectedPointId = selection?.source === sourceKey ? selection.id : undefined
+  const selectPoint = (id?: string) =>
+    recorder.record('point_select', () => setSelection({ source: sourceKey, id }))
   const glb = r.assets.find((a) => a.kind === 'room_glb' && a.uploaded)
   const images = r.assets.filter((a) => a.kind === 'room_preview' && a.uploaded)
   const [imageId, setImageId] = useState<number>()
@@ -91,12 +104,50 @@ export function SimulationPage() {
             </div>
           )}
           <RoomPreview
-            key={r.source?.asset_version ?? 'unconnected'}
+            key={sourceKey}
             modelUrl={glb ? `/room-assets/${glb.id}` : undefined}
             imageUrl={image ? `/room-assets/${image.id}` : undefined}
             videoUrl={v1?.video_url ?? undefined}
             points={previewPoints}
+            selectedPointId={selectedPointId}
+            onPointSelect={selectPoint}
           />
+          <PointInspector points={r.points} selectedId={selectedPointId} onSelect={selectPoint} />
+          <details className="panel resource-provenance">
+            <summary className="panel-heading">资源版本与来源</summary>
+            <dl className="data-list">
+              <div>
+                <dt>场景 / 房间</dt>
+                <dd>{r.source ? `${r.source.scene_code} / ${r.source.room_id}` : '未选择'}</dd>
+              </div>
+              <div>
+                <dt>户型版本</dt>
+                <dd>{r.source?.layout_version_id ?? '未提供'}</dd>
+              </div>
+              <div>
+                <dt>基础资产版本</dt>
+                <dd>
+                  <code>{r.source?.asset_version ?? '未提供'}</code>
+                </dd>
+              </div>
+              <div>
+                <dt>GLB 文件 SHA256</dt>
+                <dd>
+                  <code>{glb?.sha256 ?? '未提供'}</code>
+                </dd>
+              </div>
+              <div>
+                <dt>当前检查图资产</dt>
+                <dd>{image?.id ?? '未选择'}</dd>
+              </div>
+              <div>
+                <dt>V1 文件任务</dt>
+                <dd>
+                  <code>{v1?.job_id ?? '未提供'}</code>
+                </dd>
+              </div>
+            </dl>
+          </details>
           <p className="muted tiny">
             房间边界与实际起火点：现有只读接口未提供相应核验证据，暂不绘制。
           </p>

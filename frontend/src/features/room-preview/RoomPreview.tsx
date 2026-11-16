@@ -13,6 +13,7 @@ export interface RoomPreviewProps {
   imageUrl?: string
   videoUrl?: string
   points?: PreviewPoint[]
+  selectedPointId?: string
   onPointSelect?: (id: string) => void
   onResetView?: () => void
   onLoadState?: (state: 'loading' | 'success' | 'error') => void
@@ -41,36 +42,43 @@ export function RoomPreview({
   imageUrl,
   videoUrl,
   points = noPoints,
+  selectedPointId,
   onPointSelect,
   onResetView,
 }: RoomPreviewProps) {
   const [view, setView] = useState('model')
   const [reset, setReset] = useState(0)
   const [retry, setRetry] = useState(0)
-  const [modelStatus, setModelStatus] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [trace, setTrace] = useState<string>()
+  const [head, setHead] = useState<{ key: string; status: 'ready' | 'error'; trace?: string }>()
   const [mediaError, setMediaError] = useState(false)
   const [alignment, setAlignment] = useState('')
   const [fullError, setFullError] = useState('')
   const root = useRef<HTMLElement>(null)
   const url = view === 'model' ? modelUrl : view === 'image' ? imageUrl : videoUrl
+  const resourceKey = `${url ?? ''}|${retry}`
+  const modelStatus = head?.key === resourceKey ? head.status : 'loading'
+  const trace = head?.key === resourceKey ? head.trace : undefined
   useEffect(() => {
-    let active = true
+    const controller = new AbortController()
+    const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(15000)])
     if (url)
-      void fetch(url, { method: 'HEAD' })
+      void fetch(url, { method: 'HEAD', signal })
         .then((r) => {
-          if (!active) return
+          if (controller.signal.aborted) return
           const id = r.headers.get('X-Trace-ID')
-          if (id && /^[A-Za-z0-9_.:-]{1,96}$/.test(id)) setTrace(id)
-          setModelStatus(r.ok ? 'ready' : 'error')
+          setHead({
+            key: resourceKey,
+            status: r.ok ? 'ready' : 'error',
+            trace: id && /^[A-Za-z0-9_.:-]{1,96}$/.test(id) ? id : undefined,
+          })
         })
         .catch(() => {
-          if (active) setModelStatus('error')
+          if (!controller.signal.aborted) setHead({ key: resourceKey, status: 'error' })
         })
     return () => {
-      active = false
+      controller.abort()
     }
-  }, [url, retry])
+  }, [url, resourceKey])
   return (
     <section className="preview" ref={root}>
       <div className="preview-toolbar">
@@ -82,8 +90,6 @@ export function RoomPreview({
               onClick={() =>
                 recorder.record('preview_tab', () => {
                   if (view === id) return
-                  setModelStatus('loading')
-                  setTrace(undefined)
                   setView(id)
                   setMediaError(false)
                 })
@@ -136,10 +142,10 @@ export function RoomPreview({
               <ModelCanvas
                 url={modelUrl!}
                 points={points}
+                selectedPointId={selectedPointId}
                 reset={reset}
                 onReady={setAlignment}
                 onPointSelect={(id) => {
-                  recorder.record('point_select')
                   onPointSelect?.(id)
                 }}
               />
@@ -190,8 +196,6 @@ export function RoomPreview({
           disabled={!url}
           onClick={() =>
             recorder.record('media_retry', () => {
-              setModelStatus('loading')
-              setTrace(undefined)
               setRetry((n) => n + 1)
               setMediaError(false)
             })

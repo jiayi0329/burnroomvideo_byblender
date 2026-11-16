@@ -4,6 +4,8 @@ export interface Resources {
   status: 'unconfigured' | 'loading' | 'connected' | 'error'
   error?: string
   traceId?: string
+  lastUpdated?: string
+  stale: boolean
   sources: Source[]
   source?: Source
   assets: Asset[]
@@ -14,6 +16,7 @@ export interface Resources {
 }
 export const empty: Resources = {
   status: 'unconfigured',
+  stale: false,
   sources: [],
   assets: [],
   points: [],

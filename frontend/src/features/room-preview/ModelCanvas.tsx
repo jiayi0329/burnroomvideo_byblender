@@ -1,23 +1,25 @@
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { Bounds, OrbitControls, useBounds, useGLTF } from '@react-three/drei'
+import { Bounds, useBounds } from '@react-three/drei/core/Bounds.js'
+import { OrbitControls } from '@react-three/drei/core/OrbitControls.js'
+import { useGLTF } from '@react-three/drei/core/Gltf.js'
 import { Box3, Vector3, CanvasTexture } from 'three'
 import type { PreviewPoint } from './RoomPreview'
 
-function PointLabel({ id }: { id: string }) {
+function PointLabel({ id, selected }: { id: string; selected: boolean }) {
   const texture = useMemo(() => {
     const canvas = document.createElement('canvas')
     canvas.width = 128
     canvas.height = 64
     const context = canvas.getContext('2d')!
-    context.fillStyle = '#17212ddd'
+    context.fillStyle = selected ? '#86632b' : '#17212ddd'
     context.fillRect(0, 0, 128, 64)
     context.fillStyle = '#ffffff'
     context.font = '40px sans-serif'
     context.textAlign = 'center'
     context.fillText(id, 64, 46)
     return new CanvasTexture(canvas)
-  }, [id])
+  }, [id, selected])
   useEffect(() => () => texture.dispose(), [texture])
   return (
     <sprite position={[0, 0.2, 0]} scale={[0.42, 0.21, 1]} renderOrder={2}>
@@ -31,17 +33,18 @@ function Model({
   reset,
   onReady,
   onPointSelect,
+  selectedPointId,
 }: {
   url: string
   points: PreviewPoint[]
   reset: number
   onReady: (text: string) => void
   onPointSelect?: (id: string) => void
+  selectedPointId?: string
 }) {
   const { scene } = useGLTF(url, false, false)
   const clone = useMemo(() => scene.clone(true), [scene])
   const bounds = useBounds()
-  const [selected, setSelected] = useState<string>()
   useEffect(() => {
     bounds.refresh(clone).clip()
     const { center, distance } = bounds.getSize()
@@ -61,15 +64,14 @@ function Model({
           position={p.position}
           onClick={(e) => {
             e.stopPropagation()
-            setSelected(p.id)
             onPointSelect?.(p.id)
           }}
         >
-          <sphereGeometry args={[selected === p.id ? 0.08 : 0.065, 12, 8]} />
+          <sphereGeometry args={[selectedPointId === p.id ? 0.08 : 0.065, 12, 8]} />
           <meshBasicMaterial
-            color={selected === p.id ? '#ffe29c' : p.selectable ? '#ff803d' : '#8ec6ed'}
+            color={selectedPointId === p.id ? '#ffe29c' : p.selectable ? '#ff803d' : '#8ec6ed'}
           />
-          <PointLabel id={p.id} />
+          <PointLabel id={p.id} selected={selectedPointId === p.id} />
         </mesh>
       ))}
     </>
@@ -81,9 +83,11 @@ export default function ModelCanvas(props: {
   reset: number
   onReady: (text: string) => void
   onPointSelect?: (id: string) => void
+  selectedPointId?: string
 }) {
   return (
     <Canvas
+      frameloop="demand"
       camera={{ position: [12, 10, 12], fov: 45 }}
       dpr={[1, 1.5]}
       fallback={<p>浏览器不支持 WebGL，请更换支持三维的浏览器。</p>}
