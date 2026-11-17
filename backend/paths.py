@@ -21,6 +21,7 @@ MODULE_LOCATIONS = {
     'room_jobs': 'api',
     'room_job_service': 'services',
     'room_video': 'services',
+    'room_spatial_context': 'services',
     'room_job_repository': 'adapters/postgres',
     'run_room_job': 'cli',
 }

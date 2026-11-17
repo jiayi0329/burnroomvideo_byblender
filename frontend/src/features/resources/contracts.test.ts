@@ -25,6 +25,8 @@ describe('只读资源边界', () => {
     expect(allowedApiPath('/api/render/scene')).toBe(false)
     expect(allowedApiPath('/api/catalog/assets/60/share')).toBe(false)
     expect(allowedApiPath('/api/room-jobs/options')).toBe(true)
+    expect(allowedApiPath('/api/room-jobs/job-1/spatial-context')).toBe(true)
+    expect(allowedApiPath('/api/room-jobs/job-1/arbitrary-file')).toBe(false)
     const log = requestLog('trace-test', false, 12)
     expect(log).toMatchObject({
       schema_version: 1,

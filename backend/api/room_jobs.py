@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from backend.adapters.postgres import room_job_repository
 from backend.services import room_job_service as jobs
 from backend.services import room_video
+from backend.services import room_spatial_context
 from render_engine.jobs.operation_logging import stage
 
 router = APIRouter(prefix='/api/room-jobs', tags=['Room8 jobs'])
@@ -80,6 +81,13 @@ def list_jobs(scene_code: Annotated[str, Query(pattern=r'^[A-Za-z0-9][A-Za-z0-9_
 def get_job(job_id: JobIdentifier, scene_code: Annotated[str, Query(pattern=r'^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$')],
             room_id: Literal['Room8'] = 'Room8'):
     return call(jobs.get_job, scene_code, job_id,
+                _context={'scene_code': scene_code, 'room_id': room_id, 'job_id': job_id})
+
+
+@router.get('/{job_id}/spatial-context')
+def spatial_context(job_id: JobIdentifier, scene_code: Annotated[str, Query(pattern=r'^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$')],
+                    room_id: Literal['Room8'] = 'Room8'):
+    return call(room_spatial_context.get_context, scene_code, job_id,
                 _context={'scene_code': scene_code, 'room_id': room_id, 'job_id': job_id})
 
 

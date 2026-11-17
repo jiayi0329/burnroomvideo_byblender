@@ -91,3 +91,7 @@ SCENE/JOB/ATTEMPT均需替换为实际值；历史任务没有operations文件�
 frontend/local/readonly-proxy.ts作为JS开发适配器，将读取结果按既有schema字段写入项目data/logs/operations的独立JSONL分片，包含UTC时间、operation、stage、event、duration_ms、trace/request关联及有限error_code。HTTP X-Trace-ID继续传到原后端，沿用后端公共日志；不修改Python operation_logging或原状态机。路径、query、签名、凭证、原始点位/正文和异常原文不写入代理事件。
 
 frontend/src/features/resources/contracts.test.ts覆盖路由拒绝、响应类型/坐标边界和日志脱敏；原有client/operations回归继续覆盖时间、耗时、关联及失败。真实浏览器验收仅做GET/HEAD和已有文件读取，未提交新任务。代理JSONL落盘不等于按钮→GPU全链路验收，浏览器操作可信接收、存储查询与鉴权仍待实现。
+
+## 2026-11-17：只读空间摘要
+
+room_jobs路由传递scene/room/job上下文，room_spatial_context复用operation_logging，记录room.spatial的read_context及verify_snapshot、verify_asset、verify_membership、recheck_fingerprints的start/success/failure、耗时和父子关联。只返回有限错误码，不记录JSON正文、原始路径、原点位/多边形、review、签名URL或凭证。合成HTTP测试覆盖成功与失败的trace/job/阶段/时间/耗时及脱敏；未部署或宣称真实服务器摘要日志已验收。

@@ -87,7 +87,7 @@ class HTTPContracts(JobsFixture):
         operations = [value['operationId'] for path, methods in schema['paths'].items()
             if path.startswith('/api/room-jobs') for value in methods.values() if 'operationId' in value]
         self.assertEqual(len(operations), len(set(operations)))
-        self.assertEqual(len(operations), 7)
+        self.assertEqual(len(operations), 8)
         with patch.dict(os.environ, {'ROOM_JOB_RENDER_ENABLED': '0'}), \
              patch.object(database, 'resolve') as resolve, patch.object(service.subprocess, 'Popen') as process:
             options = self.client.get('/api/room-jobs/options').json()

@@ -66,3 +66,15 @@ Room8采用floor_z=-1.35m工程近似，未确认真实地板/平台/吊顶/墙�
 核对生成源码：candidate包含polygon_raw_xy/ignition_device，基础manifest包含裁切多边形、工程地板、坐标约定、candidate_sha256和文件指纹，任务快照inputs.timeline.start_point及guards可绑定特定历史任务。仅完成来源核对，未取得服务器原候选/manifest/快照进行独立实测；拟议摘要接口和校验门禁见frontend_spatial_metadata.md，当前没有新增后端路由或在网页伪画边界/起火点。
 
 类型检查、Lint、生产构建、21项离线回归、2项默认浏览器检查通过。显式真实Room8浏览器验收通过，新增点位详情/版本信息核对，并复查模型操作、三图、V1完整播放/定位/Range/下载及响应式。没有创建新任务、自由调参、引擎/R3/数据库/生产配置变更、部署或Git提交。
+
+## 2026-11-17：历史任务只读空间摘要（本地实现，未部署）
+
+新增GET /api/room-jobs/{job_id}/spatial-context，仅依据明确任务及其冻结签名/数据指纹返回最小边界、起火点、成员和坐标摘要。核对manifest/candidate/GLB/原点位、成员/传播事件，读取结束重验数据SHA；拒绝路径错配、JSON重复键/非有限值和无效边界，不连接数据库、MinIO或调用渲染。原历史源码guard不换成当前代码，不修改旧签名。layout_version_id无文件证据时为null，返回alignment/review指纹与file_fingerprints_only，不猜主键；verified仅限file_consistency_only。
+
+复用公共operation_logging关联trace/request/job及verify_snapshot/verify_asset/verify_membership/recheck_fingerprints阶段；服务和测试已登记到路径/打包白名单，build.ps1仅增加模块，不执行部署或改变生产Compose。前端本机只读代理允许新路由，但UI没有提前请求或绘制边界。
+
+新电脑在忽略目录release/out/backend-test-env准备了Python3.11.9与requirements依赖，没有修改系统PATH或远端环境。测试前恢复SQL及R1工作区为其Git批准字节（仅换行恢复，无内容/校验值变更，R2/R3不改）；进程内TEMP/TMP使用项目test-temp避免8.3短路径，PowerShell脚本策略仅限离线测试进程。未修改生产数据库或已应用迁移。
+
+生产服务器尚未部署新接口，也没有取得原candidate/manifest/快照的独立校验结果。后续先原文件只读验收、审核部署，再接网页边界/历史起火点；受控新任务另行安排。当前仍无新渲染、真实数据库写入、公网发布或Git提交。
+
+本轮最终离线回归420项（418通过、2跳过），空间摘要专项20项通过；前端21项测试及2项默认浏览器测试、类型/Lint/构建通过。证据位于忽略目录release/out/spatial-context-verified-regression.json；服务器新接口、原文件指纹及其日志尚未验收。

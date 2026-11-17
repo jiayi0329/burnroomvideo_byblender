@@ -5,4 +5,5 @@ MODULES = (
     'tests.backend.test_operation_logging',
     'tests.backend.test_room_registration',
     'tests.backend.test_room_jobs',
+    'tests.backend.test_room_spatial_context',
 )

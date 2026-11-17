@@ -66,3 +66,9 @@ curl -fsS --range 0-0 -o /dev/null -w '%{http_code}\n' 'http://127.0.0.1:8000/ap
 ```
 
 最后一条预期206，不启动任务。3. 已完成test成功路径和同键重试，本轮无需追加渲染；完整操作JSONL、历史分页及故障等远端边界另行核验，不宣称均已通过。4. WinSCP仅下载已生成任务的状态/回执/日志和测试视频供审核，不改代码、基础资产、review或历史任务。
+
+## 空间摘要接口：本地已实现，未部署
+
+GET /api/room-jobs/{job_id}/spatial-context?scene_code=SCENE&room_id=Room8 只读校验明确历史任务的快照签名、manifest/candidate/GLB/点位指纹、成员、边界及冻结起火点。返回最小原始坐标摘要与SHA，不泄露完整快照、绝对路径、原始review或签名URL；不连接数据库或渲染。
+
+layout_version_id无法从旧文件证明时返回null及文件指纹绑定，不猜主键。verified/file_consistency_only不是人工审批。证据缺失或冲突返回409有限错误码，缺任务404。详细字段与限制见[空间元数据](../docs/frontend_spatial_metadata.md)。新服务已登记到打包白名单，未执行部署，不能把本地合成测试当作Room8原文件验收。

@@ -88,7 +88,7 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 
 下面逐项列出本次整理后可提交的文件（含待提交文档），不包含Git内部目录、被忽略数据/缓存和本地工具环境。后续新增/删除文件应同步本表；归档原文只供追溯。目录README只维护专项边界，不重复本总表。
 
-清单共 **214** 个文件。
+清单共 **216** 个文件。
 
 <details>
 <summary>frontend：本地中文前端（49份，不含本机env、私有截图及日志）</summary>
@@ -166,7 +166,7 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 </details>
 
 <details>
-<summary>backend：后端实现（28份）</summary>
+<summary>backend：后端实现（29份）</summary>
 
 | 文件路径 | 用途 | 属性/运行环境 |
 | --- | --- | --- |
@@ -197,6 +197,7 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 | [backend/services/request_logging.py](backend/services/request_logging.py) | 纯ASGI请求/异常/取消追踪、响应ID及后台耗时区分 | Backend/ASGI中间件 |
 | [backend/services/room_registration.py](backend/services/room_registration.py) | 只读构造Room8登记清单，验证基础资产、冻结R3、视频回执和历史签名 | 普通Python |
 | [backend/services/room_job_service.py](backend/services/room_job_service.py) | 文件任务查询/幂等预留、GPU冲突检查、进程交接及摘要同步；不直接调用Blender | 普通Python |
+| [backend/services/room_spatial_context.py](backend/services/room_spatial_context.py) | 历史任务空间摘要与数据指纹核验，未部署 | 普通Python/只读 |
 | [backend/services/room_video.py](backend/services/room_video.py) | 回执SHA核对缓存和单Range/HEAD MP4流式响应，拒绝证据不一致 | 普通Python |
 
 </details>
@@ -270,7 +271,7 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 </details>
 
 <details>
-<summary>tests：测试（49份）</summary>
+<summary>tests：测试（50份）</summary>
 
 | 文件路径 | 用途 | 属性/运行环境 |
 | --- | --- | --- |
@@ -283,6 +284,7 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 | [tests/backend/test_operation_logging.py](tests/backend/test_operation_logging.py) | API/CLI追踪、失败/脱敏、并发/轮转及时间线离线回归 | 离线测试/替身 |
 | [tests/backend/test_room_database.py](tests/backend/test_room_database.py) | 合成导入/人工结论保护及显式真实PostgreSQL事务集成 | 离线测试/替身 |
 | [tests/backend/test_room_registration.py](tests/backend/test_room_registration.py) | 登记清单、私有桶/SHA回读、输入绑定、事务/重试/锁及日志脱敏 | 离线测试/替身 |
+| [tests/backend/test_room_spatial_context.py](tests/backend/test_room_spatial_context.py) | 空间摘要指纹、边界、点位及脱敏日志回归 | 离线/合成文件 |
 | [tests/backend/test_room_jobs.py](tests/backend/test_room_jobs.py) | 任务参数/幂等/冲突/握手/失败保留、文件历史、Range及日志关联回归 | 离线测试/替身 |
 | [tests/backend/test_v6_share.py](tests/backend/test_v6_share.py) | 预签名/已有产物、旧分享API、缓存及GPU温度保护 | 离线测试/替身 |
 | [tests/deploy/__init__.py](tests/deploy/__init__.py) | 登记该职责组的离线模块清单，供tests/suites.py汇总 | 包/测试组登记 |

@@ -7,7 +7,7 @@ import http from 'node:http'
 
 export function allowedApiPath(path: string) {
   return (
-    /^\/api\/room-jobs(?:\/(?:options|sources|[A-Za-z0-9_-]+(?:\/video)?))?$/.test(path) ||
+    /^\/api\/room-jobs(?:\/(?:options|sources|[A-Za-z0-9_-]+(?:\/(?:video|spatial-context))?))?$/.test(path) ||
     /^\/api\/catalog\/(?:scenes\/[A-Za-z0-9_-]+\/rooms|rooms\/\d+\/(?:points|assets))$/.test(path)
   )
 }

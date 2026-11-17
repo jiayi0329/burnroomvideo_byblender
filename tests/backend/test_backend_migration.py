@@ -79,6 +79,7 @@ print('startup has no service calls',flush=True)
             ('/api/catalog/assets/{asset_id}/share','GET'),
             ('/api/room-jobs/options','GET'),('/api/room-jobs/sources','GET'),
             ('/api/room-jobs','POST'),('/api/room-jobs','GET'),('/api/room-jobs/{job_id}','GET'),
+            ('/api/room-jobs/{job_id}/spatial-context','GET'),
             ('/api/room-jobs/{job_id}/video','GET'),('/api/room-jobs/{job_id}/video','HEAD'),
         }
         actual={(r.path,m) for r in main.app.routes if r.path=='/' or r.path.startswith('/api/') for m in r.methods}
@@ -118,7 +119,7 @@ class DatabasePaths(unittest.TestCase):
         self.assertEqual(hashlib.sha256(file.read_bytes()).hexdigest(),paths.BASELINE_MIGRATION_SHA256)
         self.assertEqual(paths.migration_files(),(file,))
         self.assertNotIn('app/db/001_rooms.sql',paths.PACKAGE_FILES)
-        self.assertEqual(len(paths.PACKAGE_FILES),27)
+        self.assertEqual(len(paths.PACKAGE_FILES),28)
 
     def test_missing_or_drifted_sql_fails_before_database_connection(self) -> None:
         with tempfile.TemporaryDirectory() as folder:

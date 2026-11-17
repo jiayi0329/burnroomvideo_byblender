@@ -30,3 +30,20 @@ python -B -m tests.run_regression --group backend --group tools
 每次功能/缺陷修改新增相应测试并标注PRD/Architecture、输入输出、环境、副作用和命令。功能测试保留语义断言；目录变更需覆盖实际导入、CLI、AST定位、完整包及失败保护，不能只改预期使测试通过。新增API/CLI/后台/前端动作按[日志契约](../docs/OBSERVABILITY.md)覆盖关联、耗时、失败和脱敏。
 
 真实PostgreSQL集成须显式启用且使用隔离schema/事务；真实timeline测试会改源场景文件，不能在V1目录误跑。远端GPU/GLB/视频/浏览器视觉、应用账号权限、恢复和重复导入分别验收，不以离线替身代替。历史记录见[测试归档](../docs/archive/20261111_process/testing_history.md)。
+
+## 2026-11-17空间摘要回归
+
+新测试tests/backend/test_room_spatial_context使用临时合成文件、真实ASGI路由与替身，不代表Room8原文件验收。覆盖成功/只读、冻结签名、SHA/身份/坐标/成员/边界拒绝、读取中变更、历史源码guard保留、日志关联与脱敏。
+
+本机新增隔离解释器位于release/out/backend-test-env/python.exe（不在Scripts子目录），所有环境和报告均Git忽略。为避免Windows临时路径短名及本机脚本策略干扰，可只对测试进程设置：
+
+```powershell
+$env:TEMP = "$PWD/release/out/test-temp"
+$env:TMP = $env:TEMP
+$env:PSExecutionPolicyPreference = 'Bypass'
+./release/out/backend-test-env/python.exe -B -m tests.run_regression
+```
+
+先确保test-temp已创建，且从项目根运行。不永久更改系统执行策略。测试中的Blender、SSH、数据库、MinIO均为替身；模拟出片日志不是本次真实渲染。
+
+最终全量420项：418通过、2项跳过（真实PostgreSQL与可选Matplotlib），本次runner测试耗时85.217秒；空间摘要专项20项通过。最终报告：release/out/spatial-context-verified-regression.json。前端类型/Lint/构建、21项单元测试与2项默认离线浏览器测试通过。没有执行真实渲染或新接口远端验收。

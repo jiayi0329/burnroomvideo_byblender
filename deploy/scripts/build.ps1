@@ -32,7 +32,7 @@ $BackendModules = @{
     'adapters/postgres' = @('database', 'room_asset_repository', 'room_job_repository')
     'adapters/minio' = @('s3_io', 'room_objects')
     cli = @('import_rooms', 'check_catalog', 'log_timeline', 'register_room_assets', 'run_room_job')
-    services = @('observability', 'request_logging', 'room_registration', 'room_job_service', 'room_video')
+    services = @('observability', 'request_logging', 'room_registration', 'room_job_service', 'room_video', 'room_spatial_context')
 }
 $BackendFiles = @('backend/__init__.py', 'backend/paths.py', 'backend/adapters/__init__.py', 'backend/database/migrations/001_rooms.sql')
 foreach ($Group in $BackendModules.Keys) {
