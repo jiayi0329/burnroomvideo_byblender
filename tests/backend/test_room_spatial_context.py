@@ -179,6 +179,24 @@ class ReadOnlyContext(SpatialFixture):
         self.candidate['points'][0]['x'] = 100
         self.bind(); self.invalid()
 
+    def test_original_pose_translation_format_is_verified_without_changing_files(self):
+        nested = [{'device': p['device'], 'pose': {'translation': {k: p[k] for k in ('x', 'y', 'z')}}}
+                  for p in self.raw_points]
+        self.write(self.scene/'points.json', nested)
+        self.manifest['points'] = deepcopy(nested[:-1])
+        self.candidate['points'] = deepcopy(nested[:-1])
+        value = digest(self.scene/'points.json')
+        self.manifest['source_fingerprints']['points.json'] = value
+        self.candidate['source_fingerprints']['points.json'] = value
+        self.bind()
+        response = self.get()
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()['ignition']['device'], 22)
+
+    def test_conflicting_flat_and_nested_coordinates_are_rejected(self):
+        self.candidate['points'][0]['pose'] = {'translation': {'x': 100, 'y': 100, 'z': 100}}
+        self.bind(); self.invalid()
+
     def test_duplicate_json_keys_are_rejected_even_with_updated_hash(self):
         path = self.asset.parent/'candidate.json'
         path.write_text('{"floor_z":123,'+path.read_text(encoding='utf-8')[1:], encoding='utf-8')

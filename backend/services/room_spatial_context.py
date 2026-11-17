@@ -59,7 +59,16 @@ def positions(value: object) -> dict[int, list[float]]:
         key = device(point['device'])
         if key in result:
             raise ValueError('Duplicate point')
-        result[key] = [number(point[axis]) for axis in ('x', 'y', 'z')]
+        # Original scans use pose.translation; catalog-shaped test/export data
+        # may carry flat XYZ. If both exist they must agree, never pick one.
+        nested = point.get('pose', {}).get('translation')
+        flat = any(axis in point for axis in ('x', 'y', 'z'))
+        if nested is None and not flat:
+            raise ValueError('Missing point coordinates')
+        xyz = [number((nested if nested is not None else point)[axis]) for axis in ('x', 'y', 'z')]
+        if nested is not None and flat and xyz != [number(point[axis]) for axis in ('x', 'y', 'z')]:
+            raise ValueError('Ambiguous point coordinates')
+        result[key] = xyz
     return result
 
 
