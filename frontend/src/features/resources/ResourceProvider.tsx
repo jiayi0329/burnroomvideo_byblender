@@ -28,13 +28,25 @@ export function ResourceProvider({ children }: { children: ReactNode }) {
         signal: AbortSignal.any([signal, AbortSignal.timeout(10000)]),
       })
       if (!response.ok) throw Error('config')
-      const config = (await response.json()) as { configured?: boolean }
+      const config = (await response.json()) as {
+        configured?: boolean
+        test_submit_enabled?: boolean
+        spatial_context_enabled?: boolean
+      }
       if (typeof config.configured !== 'boolean') throw Error('config')
       if (!config.configured) {
         if (generation === version.current && !signal.aborted) setState(empty)
         return
       }
-      await read.read('/api/room-jobs/options', { signal })
+      const options = await read.read<{
+        render_enabled?: boolean
+        camera_modes?: string[]
+        room_ids?: string[]
+        style_presets?: string[]
+        presets?: {
+          test?: { duration_seconds?: number; fps?: number; resolution?: number[]; stage?: string }
+        }
+      }>('/api/room-jobs/options', { signal })
       const all = sources(await read.read('/api/room-jobs/sources', { signal }))
       const source = key ? all.find((s) => identity(s) === key) : all[0]
       if (key && !source) throw Error('source_removed')
@@ -64,6 +76,19 @@ export function ResourceProvider({ children }: { children: ReactNode }) {
           assets: assets(a),
           points: points(p),
           jobs: jobs(j),
+          submitEnabled: config.test_submit_enabled === true,
+          spatialEnabled: config.spatial_context_enabled === true,
+          renderEnabled:
+            options.render_enabled === true &&
+            options.room_ids?.includes('Room8') === true &&
+            options.style_presets?.includes('r3') === true &&
+            options.presets?.test?.duration_seconds === 4 &&
+            options.presets.test.fps === 12 &&
+            options.presets.test.stage === 'short' &&
+            JSON.stringify(options.presets.test.resolution) === '[960,540]',
+          allowedCameras: (options.camera_modes ?? []).filter(
+            (v): v is 'overview' | 'closeup' => v === 'overview' || v === 'closeup',
+          ),
           lastUpdated: new Date().toISOString(),
         })
     } catch (error) {

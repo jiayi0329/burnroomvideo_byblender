@@ -8,8 +8,16 @@ import { useResources } from '@/features/resources/context'
 import { glbPoint } from '@/features/resources/contracts'
 import { recorder } from '@/lib/telemetry/operations'
 import { PointInspector } from '@/features/room-preview/PointInspector'
+import { TestSubmissionPanel } from '@/features/jobs/TestSubmissionPanel'
+import { restoreSubmission } from '@/features/jobs/submission'
 export function SimulationPage() {
   const r = useResources()
+  const saved = restoreSubmission()
+  const currentSubmission =
+    saved?.payload.scene_code === r.source?.scene_code &&
+    saved?.payload.asset_version === r.source?.asset_version
+      ? saved
+      : undefined
   const [selection, setSelection] = useState<{ source: string; id?: string }>()
   const sourceKey = r.source
     ? [
@@ -49,7 +57,7 @@ export function SimulationPage() {
       <PageHeading
         number="03"
         title="火灾模拟工作台"
-        description="只读查看已登记空间与归档成果；参数草稿不参与真实渲染。"
+        description="查看真实空间与归档成果；受控测试需明确确认，演示草稿不参与渲染。"
       />
       <div className="simulation-layout">
         <aside className="room-navigation panel">
@@ -149,18 +157,34 @@ export function SimulationPage() {
             </dl>
           </details>
           <p className="muted tiny">
-            房间边界与实际起火点：现有只读接口未提供相应核验证据，暂不绘制。
+            已归档边界与历史起火点请到房间处理工作台查看；新摘要未部署验收时保持关闭，不设置新起火点。
           </p>
           <div className="current-task-summary">
             <span>
-              {v1
-                ? `V1 · ${v1.completed_frames}/${v1.total_frames} 帧 · 技术完成，人工审核未记录`
-                : '当前任务：未选择'}
+              {currentSubmission?.job_id
+                ? `当前测试任务：${currentSubmission.job_id}，实际进度见任务中心`
+                : v1
+                  ? `V1 · ${v1.completed_frames}/${v1.total_frames} 帧 · 技术完成，人工审核未记录`
+                  : '当前任务：未选择'}
             </span>
-            <Link to="/results">查看任务与成果 →</Link>
+            <Link
+              to={
+                currentSubmission?.job_id
+                  ? `/results?scene=${currentSubmission.payload.scene_code}&job=${currentSubmission.job_id}`
+                  : '/results'
+              }
+            >
+              查看任务与成果 →
+            </Link>
           </div>
         </div>
-        <ParameterPanel />
+        <aside>
+          <TestSubmissionPanel key={sourceKey} />
+          <details className="panel">
+            <summary className="panel-heading">仅本地演示草稿（不会提交）</summary>
+            <ParameterPanel />
+          </details>
+        </aside>
       </div>
     </>
   )

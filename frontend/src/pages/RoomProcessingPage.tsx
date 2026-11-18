@@ -1,8 +1,9 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, Scissors, Ruler, FileBox, Map, ScanLine } from 'lucide-react'
+import { ArrowRight, Scissors, Ruler, FileBox, Map } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { Button } from '@/components/ui/button'
 import { useResources } from '@/features/resources/context'
+import { SpatialPanel } from '@/features/resources/SpatialPanel'
 export function RoomProcessingPage() {
   const r = useResources()
   return (
@@ -45,17 +46,7 @@ export function RoomProcessingPage() {
               )}
             </select>
           </div>
-          <div className="plan-placeholder">
-            <ScanLine size={40} strokeWidth={1} />
-            <h3>房间边界接口尚未提供</h3>
-            <p>
-              {r.points.length
-                ? `已读取 ${r.points.length} 个真实关联点位，可在三维工作台查看。`
-                : '连接来源后读取真实点位。'}
-              <br />
-              不绘制虚构户型，不自动认定其他房间可裁切。
-            </p>
-          </div>
+          <SpatialPanel />
           <div className="info-note">
             <p>Room8 将优先展示已有处理成果；裁切与高度检测入口需后端能力支持。</p>
           </div>

@@ -20,6 +20,12 @@ export interface Point {
   review_kind: string | null
 }
 export interface Job {
+  scene_code?: string
+  room_id?: string
+  style_preset?: string
+  camera_mode?: string
+  fps?: number
+  resolution?: number[]
   job_id: string
   asset_version?: string
   runtime_state: string

@@ -11,6 +11,7 @@
 | 产品范围与验收 | [PRD](docs/PRD.md) |
 | 当前链路和目标系统 | [Architecture](docs/ARCHITECTURE.md) |
 | 进度/下一步/未验收项 | [项目状态](docs/PROJECT_STATUS.md) |
+| 11月19日现场冲刺 / 按钮及放行清单 | [演示操作清单](docs/DEMO_20261119.md) |
 | Room8 V1及工程验收、部署回退 | [发布基线](docs/RELEASES.md) |
 | ID/版本/文件/数据库/MinIO关系 | [数据规范](docs/DATA_ASSET_SPEC.md) |
 | 房间资产 / R3样式 / 动画运行 | [资产](docs/rendering/room_assets.md) · [R3](docs/rendering/style.md) · [动画](docs/rendering/animation.md) |
@@ -78,6 +79,8 @@ WinSCP负责上传明确版本安装包/核验输入、下载产物；不在远�
 
 ## 下一步
 
+2026-11-18优先级调整：11月19日前的导师现场真实浏览器闭环优先，登录/RBAC/公网/Grafana等延后。本地受控test提交/幂等保护/真实状态轮询及空间摘要显示代码已加入，默认关闭提交与新摘要；先不部署。隔离试跑/备份/部署批准及单次GPU批准仍是独立门槛，未完成真实新任务出片验收。具体状态与逐按钮操作见[演示清单](docs/DEMO_20261119.md)。以下只读里程碑保留其历史含义。
+
 工程基线、本场景数据导入及Room8产物登记已验收，任务API核心路径已通过。2026-11-16本地前端完成四页精简与Room8真实GLB、14个关联点、三张检查图、原V1视频及历史只读接入；运行、SSH隧道及验收见[前端说明](frontend/README.md)。下一步补足边界/起火点元数据与受控任务、真实按钮日志。第二房间、生命周期/Hybrid、权限与公网展示各自排期。
 
 登记与API在`feat/room8-web-registration-api`完成，前端从同步提交f2fc0ef派生`feature/frontend-mvp`开发。首批822528a、第二批57b53f1的验收边界不变。前端只读连接新版API；GLB/检查图经本机受限代理与用户SSH隧道读取，视频走原后端Range接口。不提交任务、不改生产配置或归档V1，未部署。接口见[Backend](backend/README.md)，服务器镜像/任务/备份及Compose边界仍以[发布记录](docs/RELEASES.md#2026-11-13-新版room8任务api部署与短片验收)为准。
@@ -88,10 +91,10 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 
 下面逐项列出本次整理后可提交的文件（含待提交文档），不包含Git内部目录、被忽略数据/缓存和本地工具环境。后续新增/删除文件应同步本表；归档原文只供追溯。目录README只维护专项边界，不重复本总表。
 
-清单共 **216** 个文件。
+清单共 **224** 个文件。
 
 <details>
-<summary>frontend：本地中文前端（49份，不含本机env、私有截图及日志）</summary>
+<summary>frontend：本地中文前端（56份，不含本机env、私有截图及日志）</summary>
 
 | 文件路径 | 用途 | 属性/运行环境 |
 | --- | --- | --- |
@@ -101,7 +104,14 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 | [frontend/.prettierrc.json](frontend/.prettierrc.json) | 源码格式规范 | 本地前端 |
 | [frontend/README.md](frontend/README.md) | 本地运行、验证及后续接入边界 | 本地前端 |
 | [frontend/components.json](frontend/components.json) | shadcn/ui别名与主题配置 | 本地前端 |
-| [frontend/local/readonly-proxy.ts](frontend/local/readonly-proxy.ts) | 受限只读API/资产代理、签名Host保留、SHA验证及脱敏日志 | 本机Vite，不是生产网关 |
+| [frontend/local/readonly-proxy.ts](frontend/local/readonly-proxy.ts) | 受限读取/资产代理及默认关闭的test提交、SHA验证及脱敏关联日志 | 本机Vite，不是生产网关 |
+| [frontend/e2e/controlled-job.spec.ts](frontend/e2e/controlled-job.spec.ts) | 隔离确认提交、任务号恢复、真实契约轮询及断线保护回归 | 离线浏览器夹具，非真实GPU证据 |
+| [frontend/src/features/jobs/submission.ts](frontend/src/features/jobs/submission.ts) | test白名单、提交前保存幂等键、超时不自动重发及真实任务号保存 | 本地前端，默认禁用真实提交 |
+| [frontend/src/features/jobs/submission.test.tsx](frontend/src/features/jobs/submission.test.tsx) | 提交白名单/日志/未知响应原键复用与重复点击回归 | 离线测试 |
+| [frontend/src/features/jobs/TestSubmissionPanel.tsx](frontend/src/features/jobs/TestSubmissionPanel.tsx) | 真实受控配置摘要、明确确认、机位及单次请求锁 | 本地前端 |
+| [frontend/src/features/jobs/useJob.ts](frontend/src/features/jobs/useJob.ts) | 指定任务GET轮询、错误停止、手动重取及切换隔离 | 本地前端 |
+| [frontend/src/features/resources/SpatialPanel.tsx](frontend/src/features/resources/SpatialPanel.tsx) | 核对版本/GLB/点位后显示归档边界和历史起火点，默认关闭 | 本地前端，线上接口待部署验收 |
+| [frontend/src/features/resources/SpatialPanel.test.tsx](frontend/src/features/resources/SpatialPanel.test.tsx) | 摘要门禁、GLB不匹配拒绝及换版本清图回归 | 离线测试 |
 | [frontend/playwright.live.config.ts](frontend/playwright.live.config.ts) | 显式真实资源浏览器验收配置 | 本机Edge/已连接隧道 |
 | [frontend/e2e-live/room8.spec.ts](frontend/e2e-live/room8.spec.ts) | 真实GLB、点位、三图、V1播放/Range/下载及响应式验收 | 显式只读联网测试 |
 | [frontend/src/features/resources/ResourceProvider.tsx](frontend/src/features/resources/ResourceProvider.tsx) | 真实来源、资产、点位、历史读取及刷新 | 本地前端 |
@@ -344,7 +354,7 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 </details>
 
 <details>
-<summary>docs：当前规范与指南（13份）</summary>
+<summary>docs：当前规范与指南（14份）</summary>
 
 | 文件路径 | 用途 | 属性/运行环境 |
 | --- | --- | --- |
@@ -352,6 +362,7 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 | [docs/DATA_ASSET_SPEC.md](docs/DATA_ASSET_SPEC.md) | 场景/房间/版本/任务ID、存储位置、指纹、上传登记及恢复规则 | 文档/约束 |
 | [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) | 公共HTTP/主要CLI/Room8关联日志、时间线、耗时、脱敏及远端最小验收/前端待验收边界 | 文档/约束 |
 | [docs/PRD.md](docs/PRD.md) | 产品目标、MVP、验收及日志/真实导入/网页的实施优先级 | 文档/约束 |
+| [docs/DEMO_20261119.md](docs/DEMO_20261119.md) | 19日演示冲刺、逐按钮/API/成功失败/联调状态和部署/GPU独立门槛 | 文档/验收清单 |
 | [docs/PROJECT_ORGANIZATION.md](docs/PROJECT_ORGANIZATION.md) | 职责/用途分类和依赖方向；逐文件表只在根README维护 | 文档/约束 |
 | [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) | 已完成/部分完成/待实施、限制及后续门禁，不追加每轮代码流水账 | 文档/约束 |
 | [docs/README.md](docs/README.md) | 当前需求、架构、状态、指南与归档的阅读索引 | 文档/约束 |

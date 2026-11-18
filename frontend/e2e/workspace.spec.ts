@@ -39,6 +39,7 @@ test('四个中文页面桌面/窄屏访问，无真实API请求或横向溢出'
 
 test('实际浏览器草稿交互、中文错误、预览切换与导航', async ({ page }) => {
   await page.goto('/simulation')
+  await page.getByText('仅本地演示草稿（不会提交）', { exact: true }).click()
   const value = page.getByRole('spinbutton', { name: '火焰持续时间数值' })
   await value.fill('75')
   await expect(value).toHaveValue('75')

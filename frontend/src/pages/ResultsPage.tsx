@@ -1,4 +1,7 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { useJob } from '@/features/jobs/useJob'
+import { restoreSubmission } from '@/features/jobs/submission'
 import { Activity, Download, Fingerprint } from 'lucide-react'
 import { PageHeading } from '@/components/PageHeading'
 import { StatusPanel } from '@/components/StatusPanel'
@@ -9,24 +12,59 @@ const states: Record<string, string> = {
   interrupted: '中断',
   unknown: '证据不可核验',
   created: '已创建',
+  preparing: '准备中',
   rendering: '渲染中',
   encoding: '编码中',
 }
 export function ResultsPage() {
   const r = useResources()
-  const [chosen, setChosen] = useState<string>()
+  const [query, setQuery] = useSearchParams()
+  const pending = restoreSubmission()
+  const scene = query.get('scene') ?? pending?.payload.scene_code ?? null
+  const jobId = query.get('job') ?? pending?.job_id ?? null
+  const tracker = useJob(scene, jobId)
   const v1 = r.jobs
     .filter((j) => j.preset === 'final' && j.technical_complete && j.video_available)
     .sort((a, b) => a.job_id.localeCompare(b.job_id))[0]
-  const job = r.jobs.find((j) => j.job_id === chosen) ?? v1 ?? r.jobs[0]
-  const [mediaError, setMediaError] = useState(false)
+  const job = jobId
+    ? (tracker.job ?? r.jobs.find((j) => j.job_id === jobId && j.scene_code === scene))
+    : (v1 ?? r.jobs[0])
+  const history =
+    tracker.job && !r.jobs.some((j) => j.job_id === tracker.job?.job_id)
+      ? [tracker.job, ...r.jobs]
+      : r.jobs
+  const [failedMediaJob, setFailedMediaJob] = useState<string>()
+  const mediaError = Boolean(job && failedMediaJob === job.job_id)
   return (
     <>
       <PageHeading
         number="04"
         title="任务与成果中心"
-        description="只读查看已有任务、文件运行状态与归档视频，不创建新任务。"
+        description="恢复指定任务、查看真实进度并交付对应视频；不自动重试渲染。"
       />
+      {jobId && (
+        <div className="connection-notice">
+          <p>
+            当前任务：{jobId} {tracker.loading ? '正在读取…' : ''}
+          </p>
+          {tracker.error && <p role="alert">{tracker.error}。进度已停止刷新，请手动重取。</p>}
+          <button className="ui-button button-outline" onClick={tracker.refresh}>
+            重新读取任务
+          </button>
+          {tracker.trace && (
+            <p>
+              trace_id：{tracker.trace.trace_id}{' '}
+              {tracker.trace.request_id ? `request_id：${tracker.trace.request_id}` : ''}
+            </p>
+          )}
+          {pending?.job_id === jobId && (
+            <p>
+              提交追踪：{pending.submission_trace_id ?? pending.trace_id ?? '未提供'}；
+              {pending.request_id ?? '无提交request_id'}
+            </p>
+          )}
+        </div>
+      )}
       <div className="results-layout">
         <section className="panel history-panel">
           <div className="panel-heading">
@@ -35,15 +73,15 @@ export function ResultsPage() {
               真实任务历史
             </h2>
           </div>
-          {r.jobs.length ? (
-            r.jobs.map((j) => (
+          {history.length ? (
+            history.map((j) => (
               <button
                 key={j.job_id}
                 className="history-button"
                 aria-pressed={job?.job_id === j.job_id}
                 onClick={() => {
-                  setChosen(j.job_id)
-                  setMediaError(false)
+                  setQuery({ scene: r.source?.scene_code ?? scene ?? '', job: j.job_id })
+                  setFailedMediaJob(undefined)
                 }}
               >
                 <code>{j.job_id}</code>
@@ -73,7 +111,7 @@ export function ResultsPage() {
                 src={job.video_url}
                 controls
                 preload="metadata"
-                onError={() => setMediaError(true)}
+                onError={() => setFailedMediaJob(job.job_id)}
               />
             ) : (
               <StatusPanel
@@ -94,7 +132,10 @@ export function ResultsPage() {
                 </a>
               ) : null}
               {mediaError && (
-                <button className="ui-button button-outline" onClick={() => setMediaError(false)}>
+                <button
+                  className="ui-button button-outline"
+                  onClick={() => setFailedMediaJob(undefined)}
+                >
                   重新获取视频
                 </button>
               )}
@@ -142,7 +183,31 @@ export function ResultsPage() {
                     <dd>{job.error_code ?? '无错误码'}</dd>
                   </div>
                   <div>
-                    <dt>GPU / 配置 / 完整运行报告</dt>
+                    <dt>技术校验</dt>
+                    <dd>
+                      {job.technical_complete === true
+                        ? '已通过'
+                        : job.technical_complete === false
+                          ? '未完成或未通过'
+                          : '未提供'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>房间 / 资产版本</dt>
+                    <dd>
+                      {job.room_id ?? r.source?.room_id ?? '未提供'} /{' '}
+                      {job.asset_version ?? '未提供'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>配置摘要</dt>
+                    <dd>
+                      {job.style_preset ?? '—'} / {job.preset ?? '—'} / {job.camera_mode ?? '—'} /{' '}
+                      {job.fps ?? '—'}帧每秒 / {job.resolution?.join('×') ?? '—'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>GPU / 完整运行报告</dt>
                     <dd>现有只读接口未提供</dd>
                   </div>
                 </dl>
@@ -179,7 +244,7 @@ export function ResultsPage() {
               </div>
               <div>
                 <dt>读取方式</dt>
-                <dd>本机同源只读代理</dd>
+                <dd>任务查询与视频为本机同源只读请求；受控提交由独立开关保护</dd>
               </div>
             </dl>
             <p className="panel-note">

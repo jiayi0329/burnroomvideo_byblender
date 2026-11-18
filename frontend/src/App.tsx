@@ -92,7 +92,10 @@ export function AppShell() {
               {
                 unconfigured: '真实服务未配置',
                 loading: '正在读取真实服务…',
-                connected: '真实服务已连接 · 只读',
+                connected:
+                  resources.submitEnabled && resources.renderEnabled
+                    ? '真实服务已连接 · 受控test入口已开启'
+                    : '真实服务已连接 · 只读',
                 error: '真实服务读取失败',
               }[resources.status]
             }

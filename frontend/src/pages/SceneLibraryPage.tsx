@@ -25,7 +25,7 @@ export function SceneLibraryPage() {
       <section className="info-note prototype-note" aria-label="项目说明">
         <p>
           当前为实验室科研原型。Room8 是已验证的演示样例，其验证依据来自既有服务器成果；
-          其余功能按实际接入状态显示；当前只读查看，不创建渲染任务。
+          其余功能按实际接入状态显示；测试渲染须经单独批准并明确确认。
         </p>
       </section>
       <div className="section-title">
@@ -91,7 +91,7 @@ export function SceneLibraryPage() {
         <div className="entry-number">下一步</div>
         <div>
           <h3>探索房间处理流程</h3>
-          <p>查看户型、房间裁切与资产核验的界面结构。Room8 为下一阶段首个接入对象。</p>
+          <p>查看所选房间的真实资产、点位及已归档核验信息；本轮不重新裁切。</p>
         </div>
         <Button asChild variant="outline">
           <Link to="/processing">

@@ -27,6 +27,7 @@ describe('中文前端业务骨架', () => {
   })
   it('参数可修改、越界提示、重置；正式预设限制近景并禁用提交', () => {
     open('/simulation')
+    fireEvent.click(screen.getByText('仅本地演示草稿（不会提交）', {selector:'summary'}))
     const value = screen.getByRole('spinbutton', { name: '火焰持续时间数值' }) as HTMLInputElement
     fireEvent.change(value, { target: { value: '75' } })
     expect(value.value).toBe('75')

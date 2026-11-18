@@ -1,4 +1,28 @@
 @import 'tailwindcss';
+.test-submission .confirmation {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 16px 0;
+}
+.test-submission .confirmation input {
+  flex: none;
+  margin-top: 4px;
+  accent-color: #ff843d;
+}
+.test-submission .parameter-body {
+  padding: 14px;
+}
+.test-submission .field {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+}
+.test-submission code {
+  overflow-wrap: anywhere;
+}
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

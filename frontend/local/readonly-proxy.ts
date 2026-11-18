@@ -7,24 +7,63 @@ import http from 'node:http'
 
 export function allowedApiPath(path: string) {
   return (
-    /^\/api\/room-jobs(?:\/(?:options|sources|[A-Za-z0-9_-]+(?:\/(?:video|spatial-context))?))?$/.test(path) ||
+    /^\/api\/room-jobs(?:\/(?:options|sources|[A-Za-z0-9_-]+(?:\/(?:video|spatial-context))?))?$/.test(
+      path,
+    ) ||
     /^\/api\/catalog\/(?:scenes\/[A-Za-z0-9_-]+\/rooms|rooms\/\d+\/(?:points|assets))$/.test(path)
   )
 }
-export function requestLog(trace: string, ok: boolean, duration: number) {
+export function requestLog(
+  trace: string,
+  ok: boolean,
+  duration: number,
+  method = 'GET',
+  requestId?: string,
+  jobId?: string,
+) {
   return {
     schema_version: 1,
     event_id: randomUUID(),
     ts: new Date().toISOString(),
     pid: process.pid,
     trace_id: trace,
-    request_id: randomUUID(),
-    operation: 'frontend.read_proxy',
+    ...(requestId ? { request_id: requestId } : {}),
+    ...(jobId ? { job_id: jobId } : {}),
+    operation: method === 'POST' ? 'frontend.test_submit' : 'frontend.read_proxy',
     stage: 'http',
     event: ok ? 'success' : 'failure',
     duration_ms: duration,
-    ...(!ok ? { error_code: 'read_proxy_failed' } : {}),
+    ...(!ok ? { error_code: method === 'POST' ? 'test_submit_failed' : 'read_proxy_failed' } : {}),
   }
+}
+export function validateTestBody(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('invalid')
+  const body = value as Record<string, unknown>,
+    keys = [
+      'scene_code',
+      'room_id',
+      'asset_version',
+      'layout_version_id',
+      'style_preset',
+      'preset',
+      'camera_mode',
+      'confirm_render',
+    ]
+  if (
+    Object.keys(body).sort().join(',') !== keys.sort().join(',') ||
+    body.room_id !== 'Room8' ||
+    body.style_preset !== 'r3' ||
+    body.preset !== 'test' ||
+    body.confirm_render !== true ||
+    !['overview', 'closeup'].includes(String(body.camera_mode)) ||
+    !Number.isInteger(body.layout_version_id) ||
+    Number(body.layout_version_id) < 1 ||
+    ![body.scene_code, body.asset_version].every(
+      (v) => typeof v === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$/.test(v),
+    )
+  )
+    throw Error('invalid')
+  return body
 }
 function tunnelRead(signed: URL, tunnel: string): Promise<Buffer> {
   const connection = new URL(tunnel)
@@ -85,6 +124,8 @@ export function readonlyProxy(env: Record<string, string>): Plugin {
       typeof raw === 'string' && /^[A-Za-z0-9_.:-]{1,96}$/.test(raw) ? raw : randomUUID()
     const start = performance.now()
     let ok = false
+    let upstreamRequestId: string | undefined
+    let acceptedJobId: string | undefined
     res.setHeader('X-Trace-ID', trace)
     res.setHeader('Cache-Control', 'no-store')
     res.on('finish', () => {
@@ -93,7 +134,16 @@ export function readonlyProxy(env: Record<string, string>): Plugin {
         .then(() =>
           appendFile(
             resolve(root, name),
-            JSON.stringify(requestLog(trace, ok, performance.now() - start)) + '\n',
+            JSON.stringify(
+              requestLog(
+                trace,
+                ok,
+                performance.now() - start,
+                req.method,
+                upstreamRequestId,
+                acceptedJobId,
+              ),
+            ) + '\n',
           ),
         )
         .catch(() => {})
@@ -103,17 +153,91 @@ export function readonlyProxy(env: Record<string, string>): Plugin {
       res.setHeader('Content-Type', 'application/json')
       res.end(JSON.stringify({ code: reason, trace_id: trace }))
     }
-    if (!['GET', 'HEAD'].includes(req.method ?? '')) return fail(405, 'read_only')
+    const submission = req.method === 'POST' && url.pathname === '/api/room-jobs' && !url.search
+    if (!['GET', 'HEAD'].includes(req.method ?? '') && !submission) return fail(405, 'read_only')
     if (!/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(req.headers.host ?? ''))
       return fail(403, 'local_only')
     if (req.headers.origin && !/^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(req.headers.origin))
       return fail(403, 'origin_rejected')
     if (url.pathname === '/local-service/status') {
       res.setHeader('Content-Type', 'application/json')
-      res.end(JSON.stringify({ configured: Boolean(target) && !disabled, read_only: true }))
+      res.end(
+        JSON.stringify({
+          configured: Boolean(target) && !disabled,
+          read_only: env.ROOM_TEST_SUBMIT_ENABLED !== '1',
+          test_submit_enabled: env.ROOM_TEST_SUBMIT_ENABLED === '1' && !disabled,
+          spatial_context_enabled: env.ROOM_SPATIAL_CONTEXT_ENABLED === '1' && !disabled,
+        }),
+      )
       return
     }
     if (!target || disabled) return fail(503, 'service_not_configured')
+    if (submission) {
+      if (env.ROOM_TEST_SUBMIT_ENABLED !== '1') return fail(403, 'submission_not_approved')
+      if (req.headers.origin !== `http://${req.headers.host}`) return fail(403, 'origin_rejected')
+      const key = req.headers['idempotency-key']
+      if (typeof key !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_-]{7,95}$/.test(key))
+        return fail(422, 'invalid_submission_key')
+      try {
+        const chunks: Buffer[] = []
+        let length = 0
+        for await (const chunk of req) {
+          length += chunk.length
+          if (length > 4096) return fail(413, 'submission_too_large')
+          chunks.push(Buffer.from(chunk))
+        }
+        let body: Record<string, unknown>
+        try {
+          body = validateTestBody(JSON.parse(Buffer.concat(chunks).toString('utf-8')))
+        } catch {
+          return fail(422, 'invalid_test_configuration')
+        }
+        const upstream = await fetch(new URL('/api/room-jobs', target), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Key': key,
+            'X-Trace-ID': trace,
+          },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(12000),
+          redirect: 'error',
+        })
+        const requestId = upstream.headers.get('X-Request-ID')
+        if (requestId && /^[A-Za-z0-9_.:-]{1,96}$/.test(requestId)) {
+          res.setHeader('X-Request-ID', requestId)
+          upstreamRequestId = requestId
+        }
+        const response: unknown = await upstream.json()
+        if (!response || typeof response !== 'object' || Array.isArray(response))
+          return fail(502, 'submission_outcome_unknown')
+        const bodyResponse = response as Record<string, unknown>
+        res.statusCode = upstream.status
+        res.setHeader('Content-Type', 'application/json')
+        ok = upstream.ok
+        if (!upstream.ok) {
+          const code = (response as { detail?: { code?: unknown } }).detail?.code
+          return res.end(
+            JSON.stringify({
+              detail: {
+                code:
+                  typeof code === 'string' && /^[a-z_]{1,96}$/.test(code)
+                    ? code
+                    : 'submission_failed',
+              },
+            }),
+          )
+        }
+        if (
+          typeof bodyResponse.job_id === 'string' &&
+          /^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$/.test(bodyResponse.job_id)
+        )
+          acceptedJobId = bodyResponse.job_id
+        return res.end(JSON.stringify(response))
+      } catch {
+        return fail(502, 'submission_outcome_unknown')
+      }
+    }
     try {
       if (url.pathname.startsWith('/api/')) {
         if (!allowedApiPath(url.pathname)) return fail(403, 'route_not_allowed')
@@ -146,6 +270,9 @@ export function readonlyProxy(env: Record<string, string>): Plugin {
           if (value) res.setHeader(key, value)
         }
         ok = true
+        const incomingRequestId = upstream.headers.get('X-Request-ID')
+        if (incomingRequestId && /^[A-Za-z0-9_.:-]{1,96}$/.test(incomingRequestId))
+          upstreamRequestId = incomingRequestId
         if (req.method === 'HEAD' || !upstream.body) res.end()
         else
           Readable.fromWeb(upstream.body as never)

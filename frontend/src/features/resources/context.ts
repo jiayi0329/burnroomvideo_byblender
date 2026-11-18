@@ -6,6 +6,10 @@ export interface Resources {
   traceId?: string
   lastUpdated?: string
   stale: boolean
+  submitEnabled: boolean
+  spatialEnabled: boolean
+  renderEnabled: boolean
+  allowedCameras: ('overview' | 'closeup')[]
   sources: Source[]
   source?: Source
   assets: Asset[]
@@ -17,6 +21,10 @@ export interface Resources {
 export const empty: Resources = {
   status: 'unconfigured',
   stale: false,
+  submitEnabled: false,
+  spatialEnabled: false,
+  renderEnabled: false,
+  allowedCameras: [],
   sources: [],
   assets: [],
   points: [],
