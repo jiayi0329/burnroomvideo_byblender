@@ -2,6 +2,32 @@
 
 更新：2026-11-07。只记录经过证明的交付与限制；不把 PRD 文档版本或 V6–V9 路线图当成产物标签。
 
+## 2026-11-18：只读空间摘要生产更新与网页接通
+
+用户明确批准仅app-server更新及受控应用回退，不含GPU任务。先完成真实预检、CPU隔离ASGI GET及限定备份，再于北京时间11:36完成应用更新。
+
+| 项目 | 实际结果 |
+| --- | --- |
+| 当前镜像 | `burnroom-app:spatial-readonly-aded5eb08095` |
+| 当前镜像ID | `sha256:c009543fba4c67b0cd8e8d8594056fcbf24733c765197bb9c490c244254ed5ae` |
+| 原镜像/保留标签 | 原ID `sha256:0b7262e615a2c1848384092c666465863b5886c18282476428a8bbadf8665d98`；保留为`burnroom-app:rollback-20261118T032041Z-3892466` |
+| 实际Compose | 原base、GPU及57b53f1验收override三文件全部保留，追加`/home/zhaojy/burnroom-prod/spatial-readonly-aded5eb08095/app-image.override.yml`，仅覆盖image |
+| 更新方式 | 基于保留旧镜像，只COPY已隔离核验的空间服务与room_jobs路由两模块；无apt/pip/下载，不改引擎/预设/迁移 |
+| 候选包SHA | `90e54b603fdafab1149c2b07f91e85e650274eabec96f249a8cab025d36de76d`；10123字节；不是先前完整后端包 |
+| 只读线上验收 | options、sources、原V1任务及新spatial-context均200；原V1单字节Range206；两模块SHA及原7份输入指纹一致；未触发回退 |
+| 部署trace_id | `spatial-deploy-e6851df3be6e4f9f9e2448b81ad527b7` |
+| 摘要request_id | `ecb56d7290a147f39ef43c0b83e5f7d7` |
+| 远端回执 | `/home/zhaojy/burnroom-prod/spatial-readonly-aded5eb08095/deployment-receipt-55ee8c8b.json` |
+| 限定备份 | `/data/zhaojy/burnroom-data/deploy-backups/20261118T032041Z-3892466`；部署代码/配置、实际三份Compose、数据库dump、指定Room8/V1共12文件、旧镜像回滚标签 |
+| 备份局限 | dump仅格式检查，未恢复试验；非全数据盘/全部帧/MinIO全量备份或完整镜像导出 |
+| 本机网页 | 空间摘要开关已启用，GPU提交明确关闭；真实11顶点边界、13内部点、门口32及历史22号只读显示、刷新/重取和1440/390布局已验收 |
+
+后续维护必须以当前**四份**Compose组合与新镜像为准，不能用旧三份组合当作当前配置。只有经审批的回退才使用原三份加备份rollback-image.override；不是恢复数据库或覆盖数据盘。
+
+摘要仅证明冻结文件、资产/点位/起火点的一致性，不是建筑语义或逐点人工审核。目录点位人工review_kind缺失时明确显示algorithm_status的算法归属，不捏造人工结论。V1仍是原24秒归档，本轮未生成新视频、使用GPU或修改数据库记录。最后一次GPU只读核验为4个其他用户计算进程，真实新片仍需安全空闲窗口及独立批准。完整运行报告接口和浏览器新任务闭环尚未验收；不将只读更新当作19日完整闭环已达成。
+
+本轮最终验证：类型检查、Lint、29项单元测试、生产构建、3项默认离线Edge测试、22项后端空间摘要专项通过。3项真实只读Edge用例均已验收：新空间图逐点坐标/刷新/重取/响应式；原V1指定任务恢复/播放暂停/12秒定位/整段播放/Range206/下载SHA；GLB与相机操作/14点/三张检查图SHA/V1及1440/390布局。GLB复验曾因本机19000隧道关闭返回502，用户恢复后补跑通过，不掩盖该中间失败。无浏览器运行/控制台错误或API写请求。构建仍有约1MiB三维分包提示，不影响构建通过。
+
 ## Room8 V1 演示基线
 
 | 字段 | 值/结论 |

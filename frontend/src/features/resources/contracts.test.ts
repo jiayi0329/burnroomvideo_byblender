@@ -1,7 +1,17 @@
 import { describe, it, expect } from 'vitest'
-import { assets, sources, points, jobs, glbPoint } from './contracts'
+import { assets, sources, points, jobs, glbPoint, pointCategory, pointLabel } from './contracts'
 import { allowedApiPath, requestLog } from '../../../local/readonly-proxy'
 describe('只读资源边界', () => {
+  it('人工归属优先，算法归属明确标记，缺失分类不猜测', () => {
+    const point = { device: 0, x: 1, y: 2, z: 3, review_kind: null, algorithm_status: 'interior' }
+    expect(pointCategory(point)).toBe('interior')
+    expect(pointLabel(point)).toBe('内部点（算法归属）')
+    expect(pointCategory({ ...point, review_kind: 'doorway' })).toBe('doorway')
+    expect(pointLabel({ ...point, review_kind: 'doorway' })).toBe('门口点')
+    expect(pointCategory({ ...point, review_kind: 'excluded' })).toBe('other')
+    expect(pointCategory({ ...point, algorithm_status: undefined })).toBe('other')
+    expect(() => points({ points: [{ ...point, algorithm_status: 13 }] })).toThrow()
+  })
   it('拒绝错误身份和任意媒体地址，不混淆业务号与数据库主键', () => {
     expect(() =>
       sources({ sources: [{ scene_code: 'scene', room_id: 'Room8', database_room_id: '6' }] }),

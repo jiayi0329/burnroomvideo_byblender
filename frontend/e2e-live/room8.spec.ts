@@ -1,6 +1,95 @@
 import { test, expect } from '@playwright/test'
 import { createHash } from 'node:crypto'
 
+test('真实空间摘要：11顶点、13内部点、门口32、历史22、刷新重取及响应式', async ({
+  page,
+  request,
+}) => {
+  const errors: string[] = [],
+    writes: string[] = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(m.text())
+  })
+  page.on('request', (r) => {
+    if (new URL(r.url()).pathname.startsWith('/api/') && !['GET', 'HEAD'].includes(r.method()))
+      writes.push(r.method())
+  })
+  const config = await (await request.get('/local-service/status')).json()
+  expect(config.spatial_context_enabled).toBe(true)
+  expect(config.test_submit_enabled).toBe(false)
+  expect(config.read_only).toBe(true)
+  const { sources } = await (await request.get('/api/room-jobs/sources')).json()
+  const source = sources.find((s: { room_id: string }) => s.room_id === 'Room8')
+  expect(source).toBeTruthy()
+  const { jobs } = await (
+    await request.get(`/api/room-jobs?scene_code=${source.scene_code}&limit=100`)
+  ).json()
+  const job = jobs
+    .filter(
+      (j: { preset: string; technical_complete: boolean; asset_version: string }) =>
+        j.preset === 'final' && j.technical_complete && j.asset_version === source.asset_version,
+    )
+    .sort((a: { job_id: string }, b: { job_id: string }) => a.job_id.localeCompare(b.job_id))[0]
+  const response = await request.get(
+    `/api/room-jobs/${job.job_id}/spatial-context?scene_code=${source.scene_code}`,
+  )
+  expect(response.status()).toBe(200)
+  expect(response.headers()['x-request-id']).toBeTruthy()
+  const data = await response.json()
+  expect(data.verified).toBe(true)
+  expect(data.verification_scope).toBe('file_consistency_only')
+  expect(data.boundary.polygon_raw_xy).toHaveLength(11)
+  expect(data.members.interior).toHaveLength(13)
+  expect(data.members.boundary).toEqual([32])
+  expect(data.ignition.device).toBe(22)
+  const { points } = await (
+    await request.get(`/api/catalog/rooms/${source.database_room_id}/points`)
+  ).json()
+  expect(
+    points.map((p: { device: number }) => p.device).sort((a: number, b: number) => a - b),
+  ).toEqual(
+    [...data.members.interior, ...data.members.boundary].sort((a: number, b: number) => a - b),
+  )
+  const ignition = points.find((p: { device: number }) => p.device === data.ignition.device)
+  expect([ignition.x, ignition.y, ignition.z]).toEqual(data.ignition.position_raw_xyz)
+  await page.goto('/processing')
+  const region = page.getByRole('region', { name: '已归档空间核验' })
+  const image = region.getByRole('img', { name: '已核验Room8边界与真实点位' })
+  await expect(image).toBeVisible({ timeout: 20000 })
+  await expect(image.locator('polygon')).toHaveAttribute(
+    'points',
+    data.boundary.polygon_raw_xy.map((p: number[]) => `${p[0]},${-p[1]}`).join(' '),
+  )
+  await expect(image.locator('circle')).toHaveCount(14)
+  await expect(region).toContainText('历史起火点22（只读存档配置）')
+  await expect(region).toContainText('边界/门口点：32')
+  await expect(region).toContainText(job.job_id)
+  for (const point of points) {
+    const group = image
+      .locator('g')
+      .filter({ has: page.locator('title', { hasText: new RegExp(`^点位${point.device} ·`) }) })
+    await expect(group.locator('circle')).toHaveAttribute('cx', String(point.x))
+    await expect(group.locator('circle')).toHaveAttribute('cy', String(-point.y))
+  }
+  const next = page.waitForResponse((r) => r.url().includes('/spatial-context?'))
+  await page.getByRole('button', { name: '重新读取空间摘要' }).click()
+  expect((await next).status()).toBe(200)
+  await expect(image).toBeVisible()
+  await page.reload()
+  await expect(image).toBeVisible({ timeout: 20000 })
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 1000 })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+    await page.screenshot({
+      path: `test-results/真实边界与历史起火点-${width}.png`,
+      fullPage: true,
+    })
+  }
+  expect(writes).toEqual([])
+  expect(errors).toEqual([])
+})
+
 test('真实已有V1任务恢复、播放拖动Range与下载（不依赖MinIO隧道）', async ({ page, request }) => {
   const errors: string[] = [],
     writes: string[] = []

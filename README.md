@@ -79,11 +79,11 @@ WinSCP负责上传明确版本安装包/核验输入、下载产物；不在远�
 
 ## 下一步
 
-2026-11-18优先级调整：11月19日前的导师现场真实浏览器闭环优先，登录/RBAC/公网/Grafana等延后。本地受控test提交/幂等保护/真实状态轮询及空间摘要显示代码已加入，默认关闭提交与新摘要；先不部署。隔离试跑/备份/部署批准及单次GPU批准仍是独立门槛，未完成真实新任务出片验收。具体状态与逐按钮操作见[演示清单](docs/DEMO_20261119.md)。以下只读里程碑保留其历史含义。
+2026-11-18最新：19日前现场真实浏览器闭环优先，登录/RBAC/公网/Grafana等延后。真实空间摘要已完成隔离、备份、批准的app-server更新及网页验收；本机摘要开启，GPU提交仍关闭。下一步协调安全GPU空闲窗口并单独批准一次test短片，验收新任务/进度/新MP4闭环；受控提交离线通过不等于已真实出片。具体状态与逐按钮操作见[演示清单](docs/DEMO_20261119.md)。
 
-工程基线、本场景数据导入及Room8产物登记已验收，任务API核心路径已通过。2026-11-16本地前端完成四页精简与Room8真实GLB、14个关联点、三张检查图、原V1视频及历史只读接入；运行、SSH隧道及验收见[前端说明](frontend/README.md)。下一步补足边界/起火点元数据与受控任务、真实按钮日志。第二房间、生命周期/Hybrid、权限与公网展示各自排期。
+工程基线、本场景数据导入及Room8产物登记已验收，任务API核心路径已通过。网页已接通Room8真实GLB、14个关联点、三张检查图、V1视频、11顶点边界及历史起火点；运行、SSH隧道及验收见[前端说明](frontend/README.md)。第二房间、生命周期/Hybrid、权限与公网展示各自排期。
 
-登记与API在`feat/room8-web-registration-api`完成，前端从同步提交f2fc0ef派生`feature/frontend-mvp`开发。首批822528a、第二批57b53f1的验收边界不变。前端只读连接新版API；GLB/检查图经本机受限代理与用户SSH隧道读取，视频走原后端Range接口。不提交任务、不改生产配置或归档V1，未部署。接口见[Backend](backend/README.md)，服务器镜像/任务/备份及Compose边界仍以[发布记录](docs/RELEASES.md#2026-11-13-新版room8任务api部署与短片验收)为准。
+登记与API在`feat/room8-web-registration-api`完成，前端从同步提交f2fc0ef派生`feature/frontend-mvp`开发。首批822528a、第二批57b53f1的历史验收边界不变。前端只读连接新版API；GLB/检查图经本机受限代理与用户SSH隧道读取，视频走后端Range接口。2026-11-18仅空间摘要应用更新获批并完成，当前镜像`spatial-readonly-aded5eb08095`、实际四份Compose及备份/回退见[发布记录](docs/RELEASES.md)。未创建新任务或改写归档V1，未部署公网。
 
 main合并、标签、部署和真实数据写入不自动执行。当前源码提交号不冒充V1原远端checkout；完整交付与缺失附件以RELEASES为准。
 
@@ -110,7 +110,7 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 | [frontend/src/features/jobs/submission.test.tsx](frontend/src/features/jobs/submission.test.tsx) | 提交白名单/日志/未知响应原键复用与重复点击回归 | 离线测试 |
 | [frontend/src/features/jobs/TestSubmissionPanel.tsx](frontend/src/features/jobs/TestSubmissionPanel.tsx) | 真实受控配置摘要、明确确认、机位及单次请求锁 | 本地前端 |
 | [frontend/src/features/jobs/useJob.ts](frontend/src/features/jobs/useJob.ts) | 指定任务GET轮询、错误停止、手动重取及切换隔离 | 本地前端 |
-| [frontend/src/features/resources/SpatialPanel.tsx](frontend/src/features/resources/SpatialPanel.tsx) | 核对版本/GLB/点位后显示归档边界和历史起火点，默认关闭 | 本地前端，线上接口待部署验收 |
+| [frontend/src/features/resources/SpatialPanel.tsx](frontend/src/features/resources/SpatialPanel.tsx) | 核对版本/GLB/点位后显示归档边界、真实成员及历史起火点 | 本地只读前端，真实接口已验收 |
 | [frontend/src/features/resources/SpatialPanel.test.tsx](frontend/src/features/resources/SpatialPanel.test.tsx) | 摘要门禁、GLB不匹配拒绝及换版本清图回归 | 离线测试 |
 | [frontend/playwright.live.config.ts](frontend/playwright.live.config.ts) | 显式真实资源浏览器验收配置 | 本机Edge/已连接隧道 |
 | [frontend/e2e-live/room8.spec.ts](frontend/e2e-live/room8.spec.ts) | 真实GLB、点位、三图、V1播放/Range/下载及响应式验收 | 显式只读联网测试 |
@@ -371,7 +371,7 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 | [docs/rendering/animation.md](docs/rendering/animation.md) | 完整代码包、overview动画、GPU证据、逐帧观察、视频验收及续跑 | 文档/约束 |
 | [docs/rendering/room_assets.md](docs/rendering/room_assets.md) | 核验→面级裁切→基础blend/GLB→展示检查及平层近似边界 | 文档/约束 |
 | [docs/rendering/style.md](docs/rendering/style.md) | 独立可读的当前R3参数/效果/六样帧指南；不需要先读R1/R2 | 文档/约束 |
-| [docs/frontend_spatial_metadata.md](docs/frontend_spatial_metadata.md) | 边界/起火点文件来源、指纹核验与拟议只读摘要接口（未实施） | 设计/约束 |
+| [docs/frontend_spatial_metadata.md](docs/frontend_spatial_metadata.md) | 边界/起火点文件来源、严格指纹契约及已实施的只读摘要验收范围 | 当前规范/约束 |
 
 </details>
 

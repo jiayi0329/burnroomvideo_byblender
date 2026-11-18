@@ -18,6 +18,7 @@ export interface Point {
   y: number
   z: number
   review_kind: string | null
+  algorithm_status?: string | null
 }
 export interface Job {
   scene_code?: string
@@ -88,7 +89,8 @@ export function points(v: unknown): Point[] {
     if (
       !Number.isInteger(p.device) ||
       ![p.x, p.y, p.z].every((x) => typeof x === 'number' && Number.isFinite(x)) ||
-      !(p.review_kind === null || typeof p.review_kind === 'string')
+      !(p.review_kind === null || typeof p.review_kind === 'string') ||
+      !(p.algorithm_status == null || typeof p.algorithm_status === 'string')
     )
       throw Error('invalid')
     return p as unknown as Point
@@ -110,4 +112,18 @@ export function jobs(v: unknown): Job[] {
 }
 export function glbPoint(p: Point): [number, number, number] {
   return [p.x, p.z, -p.y]
+}
+export function pointCategory(p: Point): 'interior' | 'doorway' | 'boundary' | 'other' {
+  if (p.review_kind === 'interior' || p.review_kind === 'doorway') return p.review_kind
+  if (p.review_kind !== null) return 'other'
+  if (p.algorithm_status === 'interior' || p.algorithm_status === 'boundary')
+    return p.algorithm_status
+  return 'other'
+}
+export function pointLabel(p: Point): string {
+  const category = pointCategory(p)
+  const label = { interior: '内部点', doorway: '门口点', boundary: '边界点', other: '其他关联点' }[
+    category
+  ]
+  return p.review_kind === null && category !== 'other' ? `${label}（算法归属）` : label
 }

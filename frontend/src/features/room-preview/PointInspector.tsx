@@ -1,5 +1,5 @@
 import type { Point } from '@/features/resources/contracts'
-import { glbPoint } from '@/features/resources/contracts'
+import { glbPoint, pointLabel } from '@/features/resources/contracts'
 import { Button } from '@/components/ui/button'
 
 export function PointInspector({
@@ -26,12 +26,7 @@ export function PointInspector({
           <option value="">请选择点位（只读查看）</option>
           {points.map((p) => (
             <option key={p.device} value={p.device}>
-              点位 {p.device} ·{' '}
-              {p.review_kind === 'interior'
-                ? '内部点'
-                : p.review_kind === 'doorway'
-                  ? '门口点'
-                  : '其他关联点'}
+              点位 {p.device} · {pointLabel(p)}
             </option>
           ))}
         </select>
@@ -49,12 +44,7 @@ export function PointInspector({
           <div>
             <dt>选中点位</dt>
             <dd>
-              {point.device} ·{' '}
-              {point.review_kind === 'interior'
-                ? '内部点'
-                : point.review_kind === 'doorway'
-                  ? '门口点'
-                  : '其他关联点'}
+              {point.device} · {pointLabel(point)}
             </dd>
           </div>
           <div>

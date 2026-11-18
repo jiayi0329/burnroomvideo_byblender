@@ -88,9 +88,12 @@ function SpatialContent() {
     ys = ring?.map((p) => p[1]) ?? [],
     x = Math.min(...xs),
     y = Math.max(...ys),
-    span = ring ? Math.max(Math.max(...xs) - x, y - Math.min(...ys), 1) : 1
+    width = ring ? Math.max(Math.max(...xs) - x, 0.1) : 1,
+    height = ring ? Math.max(y - Math.min(...ys), 0.1) : 1,
+    span = Math.max(width, height, 1),
+    padding = span * 0.06
   return (
-    <section className="panel">
+    <section className="panel" aria-label="已归档空间核验">
       <div className="panel-heading">
         <h2>已归档边界与历史起火点</h2>
         <button
@@ -121,7 +124,7 @@ function SpatialContent() {
           <svg
             role="img"
             aria-label="已核验Room8边界与真实点位"
-            viewBox={`${x - span * 0.15} ${-y - span * 0.15} ${span * 1.3} ${span * 1.3}`}
+            viewBox={`${x - padding} ${-y - padding} ${width + padding * 2} ${height + padding * 2}`}
             style={{ width: '100%', height: 300 }}
           >
             <polygon
@@ -132,6 +135,7 @@ function SpatialContent() {
             />
             {r.points.map((p) => (
               <g key={p.device}>
+                <title>{`点位${p.device} · ${d.members.interior.includes(p.device) ? '内部点' : '边界/门口点'}${p.device === d.ignition.device ? ' · 历史起火点（只读）' : ''}`}</title>
                 <circle
                   cx={p.x}
                   cy={-p.y}
@@ -154,6 +158,13 @@ function SpatialContent() {
             {ring!.length}顶点 · {d.members.interior.length}内部点 · {d.members.boundary.length}
             边界/门口点 · 历史起火点{d.ignition.device}（只读存档配置）。工程地板
             {d.boundary.floor_z}米，不代表真实建筑语义。
+          </p>
+          <p className="panel-note">
+            内部点：{d.members.interior.join('、')}。边界/门口点：{d.members.boundary.join('、')}。
+            归属来自冻结资产与历史任务的文件核验，不等同于逐点人工标注。
+          </p>
+          <p className="panel-note">
+            归档任务：<code>{d.file_job_id}</code>
           </p>
         </>
       )}

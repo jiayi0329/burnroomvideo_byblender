@@ -5,7 +5,7 @@ import { RoomPreview } from '@/features/room-preview/RoomPreview'
 import { ParameterPanel } from '@/features/simulation/ParameterPanel'
 import { Link } from 'react-router-dom'
 import { useResources } from '@/features/resources/context'
-import { glbPoint } from '@/features/resources/contracts'
+import { glbPoint, pointCategory } from '@/features/resources/contracts'
 import { recorder } from '@/lib/telemetry/operations'
 import { PointInspector } from '@/features/room-preview/PointInspector'
 import { TestSubmissionPanel } from '@/features/jobs/TestSubmissionPanel'
@@ -39,7 +39,7 @@ export function SimulationPage() {
       r.points.map((p) => ({
         id: String(p.device),
         position: glbPoint(p),
-        selectable: p.review_kind === 'interior',
+        selectable: pointCategory(p) === 'interior',
       })),
     [r.points],
   )

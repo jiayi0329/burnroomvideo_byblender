@@ -23,3 +23,13 @@ it('空点位及已移除的选择不伪造结果', () => {
   expect((screen.getByLabelText('查看扫描点位') as HTMLSelectElement).disabled).toBe(true)
   expect(screen.getByText(/未选择任何起火点/)).toBeTruthy()
 })
+it('显示真实算法归属而不冒充人工核验', () => {
+  render(
+    <PointInspector
+      points={[{ device: 0, x: 1, y: 2, z: 3, review_kind: null, algorithm_status: 'interior' }]}
+      selectedId="0"
+      onSelect={() => {}}
+    />,
+  )
+  expect(screen.getAllByText(/内部点（算法归属）/).length).toBeGreaterThan(0)
+})

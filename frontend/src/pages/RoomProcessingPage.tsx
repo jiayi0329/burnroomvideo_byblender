@@ -25,7 +25,7 @@ export function RoomProcessingPage() {
               <Map size={17} />
               户型与扫描点位
             </h2>
-            <span className="badge">待接入</span>
+            <span className="badge">{r.spatialEnabled ? '只读核验' : '待接入'}</span>
           </div>
           <div className="processing-toolbar">
             <label htmlFor="room-select">选择房间</label>
@@ -48,7 +48,7 @@ export function RoomProcessingPage() {
           </div>
           <SpatialPanel />
           <div className="info-note">
-            <p>Room8 将优先展示已有处理成果；裁切与高度检测入口需后端能力支持。</p>
+            <p>展示已登记的Room8成果；本轮不重新裁切或执行自动高度检测。</p>
           </div>
         </section>
         <div className="processing-aside">
