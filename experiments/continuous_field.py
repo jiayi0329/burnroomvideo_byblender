@@ -107,7 +107,8 @@ def field_from_config(config, polygon, seed_xy):
 
     This helper does not verify private asset bytes or authorize rendering.
     """
-    if config.get('schema_version')!=1 or config.get('scope')!='offline_arrival_field_only' or config.get('render_authorized') is not False:
+    scope=config.get('scope')
+    if config.get('schema_version')!=1 or scope not in ('offline_arrival_field_only','independent_visual_experiment') or type(config.get('render_authorized')) is not bool or (scope=='offline_arrival_field_only' and config['render_authorized']):
         raise ValueError('Offline experiment configuration required')
     controls=config['field']
     if controls['neighborhood']!=4:raise ValueError('Only four-neighbor propagation supported')
