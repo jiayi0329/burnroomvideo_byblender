@@ -6,6 +6,8 @@
 
 ## 先看这里
 
+2026-11-24当前方向：A连续火灾视觉验证优先，B2须导师认可A且用户明确授权后启动；B1仓库外独立并行。新增独立CPU连续场实验，尚无新火烟渲染结果；A1静态证据、空间假设与测试限制见[项目状态](docs/PROJECT_STATUS.md)。既有网页/R3/V1与安全机制保留，不因旧网页冲刺排期提前集成。
+
 | 想了解什么 | 文档 |
 | --- | --- |
 | 产品范围与验收 | [PRD](docs/PRD.md) |
@@ -91,7 +93,17 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 
 下面逐项列出本次整理后可提交的文件（含待提交文档），不包含Git内部目录、被忽略数据/缓存和本地工具环境。后续新增/删除文件应同步本表；归档原文只供追溯。目录README只维护专项边界，不重复本总表。
 
-清单共 **224** 个文件。
+清单共 **228** 个文件。
+
+<details>
+<summary>experiments：独立视觉算法原型（2份，不在生产R3保护清单/部署包）</summary>
+
+| 文件路径 | 用途 | 属性/运行环境 |
+| --- | --- | --- |
+| [experiments/__init__.py](experiments/__init__.py) | 独立实验包边界 | CPU离线 |
+| [experiments/continuous_field.py](experiments/continuous_field.py) | 单源四邻域到达时间、凹边界/障碍、未来火烟状态接口 | CPU离线，不能渲染 |
+
+</details>
 
 <details>
 <summary>frontend：本地中文前端（56份，不含本机env、私有截图及日志）</summary>
@@ -248,10 +260,11 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 </details>
 
 <details>
-<summary>configs：公共预设（4份）</summary>
+<summary>configs：公共预设与实验配置（5份）</summary>
 
 | 文件路径 | 用途 | 属性/运行环境 |
 | --- | --- | --- |
+| [configs/experiments/room8_continuous_a_v01.json](configs/experiments/room8_continuous_a_v01.json) | A2独立配置、候选种子/工程屋顶、私有边界引用、渲染关闭 | 未批准视觉效果/不兼容R3入口 |
 | [configs/render/README.md](configs/render/README.md) | 三份公共预设的用途、当前默认与批准指纹约束 | 文档/约束 |
 | [configs/render/room_fire_round1.json](configs/render/room_fire_round1.json) | 第一轮风格配置，历史对比/回归，非默认 | 配置/规则 |
 | [configs/render/room_fire_round2.json](configs/render/room_fire_round2.json) | 第二轮尺寸/厚度/烟柱配置，历史回归，非默认 | 配置/规则 |
@@ -281,10 +294,11 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 </details>
 
 <details>
-<summary>tests：测试（50份）</summary>
+<summary>tests：测试（51份）</summary>
 
 | 文件路径 | 用途 | 属性/运行环境 |
 | --- | --- | --- |
+| [tests/engine/test_continuous_field.py](tests/engine/test_continuous_field.py) | 单源/四邻域/凹边界/不可达/确定性/时序/日志/离线配置回归 | 不运行Blender/GPU |
 | [tests/README.md](tests/README.md) | 当前分组回归命令、测试约定、依赖和真实集成开关 | 文档/约束 |
 | [tests/__init__.py](tests/__init__.py) | Python包初始化/职责边界；不自动启动服务、连库或渲染 | 包/测试组登记 |
 | [tests/backend/__init__.py](tests/backend/__init__.py) | 登记该职责组的离线模块清单，供tests/suites.py汇总 | 包/测试组登记 |

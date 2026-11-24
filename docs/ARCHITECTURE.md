@@ -1,5 +1,7 @@
 # 系统架构：当前实现与目标边界
 
+2026-11-24实验边界：`experiments/continuous_field.py`为CPU独立到达时间场原型，只依赖引擎纯几何与公共操作日志；不在R3的29份保护清单或部署包内。配置位于configs/experiments，私有边界从已核验candidate另行传入，不复制完整资产进公共配置。没有渲染入口或生产API适配。后续效果须使用独立worker/配置契约和输出，不能改旧R3指纹或绕过GPU锁。先完成A视觉验证，导师认可后才进入正式集成；B2另需明确启动授权，B1不属于此架构。
+
 更新：2026-11-13。需求见[PRD](PRD.md)，状态见[PROJECT_STATUS](PROJECT_STATUS.md)，逐文件用途见[根README](../README.md)，编号/存储契约见[DATA_ASSET_SPEC](DATA_ASSET_SPEC.md)。当前架构只有新路径；兼容期过程见[归档](archive/20261111_process/engineering_history.md)。
 
 ## 1. 执行环境与依赖
