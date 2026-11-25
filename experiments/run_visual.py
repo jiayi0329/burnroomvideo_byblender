@@ -3,6 +3,7 @@ import argparse
 from copy import deepcopy
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import subprocess
@@ -18,6 +19,52 @@ ROOT=Path(__file__).resolve().parents[1]
 def sha(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 def read(path):return json.loads(Path(path).read_text(encoding='utf-8'))
 
+
+from render_engine.jobs.operation_logging import traced
+
+
+@traced('room.continuous.camera','verify_formal_v1_camera')
+def load_formal_v1_camera(directory,asset,expected_snapshot_sha256):
+    """Use final-frame effective records, never substitute the R3 sample camera."""
+    directory=Path(directory).resolve(strict=True);asset=Path(asset)
+    paths={name:directory/name for name in ('config_snapshot.json','render_manifest.json','effective_settings.json','video_receipt.json')}
+    if not expected_snapshot_sha256 or sha(paths['config_snapshot.json'])!=expected_snapshot_sha256:
+        raise ValueError('Formal V1 snapshot fingerprint differs')
+    spec=read(paths['config_snapshot.json']);unsigned=dict(spec);signature=unsigned.pop('signature')
+    if fingerprint(unsigned)!=signature:raise ValueError('Formal V1 snapshot signature differs')
+    animation=spec['animation']
+    if any(animation.get(k)!=v for k,v in {'stage':'final','preset':'final','camera_mode':'overview','fps':24,'frame_count':576,'duration_seconds':24,'resolution':[1280,720]}.items()):
+        raise ValueError('Not the reviewed formal V1 task')
+    # Bind the locally mapped asset by content, not by the server's absolute path.
+    blend_hash=sha(asset/'room.blend')
+    guards=spec['inputs']['guards']
+    if not any(Path(p).name=='room.blend' and h==blend_hash for p,h in guards.items()):
+        raise ValueError('Formal V1 uses another base asset')
+    manifest=read(paths['render_manifest.json'])
+    if manifest.get('signature')!=signature:raise ValueError('V1 manifest belongs to another snapshot')
+    frames=[r for r in manifest['frames'] if r['path'].startswith('frames/')]
+    if len(frames)!=576 or len({r['path'] for r in frames})!=576:raise ValueError('Incomplete formal V1 frame evidence')
+    keys=('type','position','target','lens','ortho_scale','clip_start','clip_end','sensor_width','sensor_fit','dof')
+    def camera(record):
+        value={k:record[k] for k in keys}
+        if value['type']!='ORTHO' or value['dof'] is not False:raise ValueError('Unexpected V1 projection or depth of field')
+        if value['sensor_fit'] not in ('AUTO','HORIZONTAL','VERTICAL'):raise ValueError('Invalid V1 sensor fit')
+        for name in ('position','target'):
+            if len(value[name])!=3 or not all(math.isfinite(float(v)) for v in value[name]):raise ValueError('Invalid V1 camera vector')
+        if sum((a-b)**2 for a,b in zip(value['position'],value['target']))<1e-8:raise ValueError('Invalid V1 camera aim')
+        for name in ('lens','ortho_scale','clip_start','clip_end','sensor_width'):
+            if not math.isfinite(float(value[name])) or value[name]<=0:raise ValueError('Invalid V1 camera scalar')
+        if value['clip_end']<=value['clip_start']:raise ValueError('Invalid V1 clip range')
+        return value
+    effective=camera(frames[0]['effective']['camera'])
+    if any(camera(r['effective']['camera'])!=effective for r in frames):raise ValueError('Formal V1 camera changes between frames')
+    settings=read(paths['effective_settings.json'])
+    if camera(settings['camera_setup']['overview'])!=effective:raise ValueError('V1 setup and rendered camera differ')
+    # Receipt is kept as provenance; do not infer camera pose from video metadata.
+    read(paths['video_receipt.json'])
+    return {'kind':'formal_v1_effective_frames','camera':effective,'verified_frame_count':576,
+            'snapshot_signature':signature,'guards':{str(p):sha(p) for p in paths.values()}}
+
 def projection_hits(candidate,x,y,ceiling):
     hits=[]
     for face in candidate['geometry']['faces']:
@@ -31,7 +78,7 @@ def projection_hits(candidate,x,y,ceiling):
         if z<=ceiling:hits.append(z)
     return sorted(hits)
 
-def prepare(config_path,candidate_path,asset,points,output_root,reference=None):
+def prepare(config_path,candidate_path,asset,points,output_root,reference=None,v1_job=None):
     config_path=Path(config_path).resolve(strict=True);candidate_path=Path(candidate_path).resolve(strict=True)
     asset=Path(asset).resolve(strict=True);points=Path(points).resolve(strict=True);output_root=Path(output_root).resolve()
     config=read(config_path);validate(config);candidate=read(candidate_path);manifest=read(asset/'manifest.json')
@@ -64,9 +111,14 @@ def prepare(config_path,candidate_path,asset,points,output_root,reference=None):
     from render_engine.paths import source_paths
     guards.update({str(p):sha(p) for p in source_paths(ROOT).values()})
     camera_reference=None
+    formal=(load_formal_v1_camera(v1_job,asset,config.get('formal_v1_snapshot_sha256')) if v1_job else None)
+    if formal:guards.update(formal['guards'])
     if config['camera']=='v1':
         ref=load_camera_reference(asset,Path(reference) if reference else None,True)
         camera_reference=ref['camera'];guards.update(ref['guards'])
+    elif config['camera']=='v1_final':
+        if formal is None:raise ValueError('Formal V1 evidence required; R3 samples are not a substitute')
+        camera_reference=formal['camera']
     elif config['camera'] not in ('low','roof'):raise ValueError('Unknown camera')
     view_audit=(camera_view_audit(config,seed,candidate['polygon_raw_xy'],candidate['geometry']['faces'])
                 if config.get('require_clear_view') is True else None)
@@ -81,6 +133,12 @@ def prepare(config_path,candidate_path,asset,points,output_root,reference=None):
     snapshot['r3_style']['quality']['resolution']=config['resolution'];snapshot['r3_style']['quality']['fps']=config['fps']
     snapshot['signature']=fingerprint(snapshot)
     (run/'snapshot.json').write_text(json.dumps(snapshot,indent=2),encoding='utf-8')
+    if formal:
+        low=config['cameras']['low'];base=config['seed']['proposed_base_z_m']
+        plan={'first':{'kind':'ignition_perspective','position':[seed[0]+low['offset'][0],seed[1]+low['offset'][1],base+low['offset'][2]],
+                       'target':[seed[0],seed[1],base+low['target_height']],'lens':low['lens']},
+              'second':formal,'order':['first','second'],'transition_implemented':False,'rendered':False}
+        (run/'camera-plan.json').write_text(json.dumps(plan,indent=2),encoding='utf-8')
     # CPU-only evaluated geometry counts; no mesh/image files are fabricated.
     stats=[]
     for t in config['key_times_s']:
@@ -96,6 +154,7 @@ def main(argv=None):
     parser.add_argument('--config',type=Path,default=ROOT/'configs/experiments/room8_continuous_a_v02.json')
     for name in ('candidate','asset','points','output-root'):parser.add_argument('--'+name,type=Path,required=True)
     parser.add_argument('--reference-samples',type=Path)
+    parser.add_argument('--v1-job',type=Path,help='Read-only formal V1 evidence directory; never a R3 sample directory')
     parser.add_argument('--render-keyframes',action='store_true');parser.add_argument('--confirm-gpu-experiment',action='store_true')
     parser.add_argument('--blender',default='blender')
     args=parser.parse_args(argv)
@@ -104,7 +163,7 @@ def main(argv=None):
         parser.error('GPU rendering needs separately approved config and explicit confirmation; default is plan only')
     trace='a2-'+uuid.uuid4().hex
     with bind_context(trace_id=trace),stage('room.continuous.experiment','prepare_plan'):
-        run,snapshot=prepare(args.config,args.candidate,args.asset,args.points,args.output_root,args.reference_samples)
+        run,snapshot=prepare(args.config,args.candidate,args.asset,args.points,args.output_root,args.reference_samples,args.v1_job)
     if not args.render_keyframes:
         print(json.dumps({'output':str(run),'rendered':False,'reachable_cells':snapshot['reachable_cells']}),flush=True);return 0
     from render_engine.jobs.run_room_animation import gpu_lock,busy_processes

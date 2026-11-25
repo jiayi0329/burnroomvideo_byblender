@@ -13,7 +13,7 @@ import unittest
 from unittest.mock import patch
 from experiments.continuous_field import build_field,inside
 from experiments.visual_state import geometry,roof_mesh,camera_view_audit,sightline_hit
-from experiments.run_visual import main,prepare
+from experiments.run_visual import main,prepare,load_formal_v1_camera
 from render_engine.jobs.operation_logging import bind_context,JsonlSink
 
 ROOT=Path(__file__).resolve().parents[2]
@@ -108,6 +108,31 @@ class VisualTests(unittest.TestCase):
     def test_adapters_import_without_bpy_and_compile(self):
         importlib.import_module('experiments.blender_visual');importlib.import_module('experiments.blender_worker')
         for p in (ROOT/'experiments').glob('*.py'):compile(p.read_text(),str(p),'exec')
+
+    def test_formal_v1_camera_requires_matching_actual_final_frames(self):
+        # Synthetic provenance only; never represented as recovered Room8 evidence.
+        from render_engine.jobs.room_animation_job import fingerprint
+        root=Path(self.temp.name);asset=root/'asset';asset.mkdir();(asset/'room.blend').write_bytes(b'fixture')
+        def dump(name,value):
+            p=root/name;p.write_text(json.dumps(value));return p
+        digest=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+        spec={'inputs':{'guards':{'/server/room.blend':digest(asset/'room.blend')}},
+              'animation':{'stage':'final','preset':'final','camera_mode':'overview','fps':24,'frame_count':576,'duration_seconds':24,'resolution':[1280,720]}}
+        spec['signature']=fingerprint(spec);path=dump('config_snapshot.json',spec);expected=digest(path)
+        camera={'type':'ORTHO','position':[3,-4,5],'target':[0,0,0],'lens':18,'ortho_scale':16,
+                'clip_start':.03,'clip_end':1000,'sensor_width':36,'sensor_fit':'AUTO','dof':False}
+        manifest={'signature':spec['signature'],'frames':[{'path':f'frames/{i:06}.png','effective':{'camera':deepcopy(camera)}} for i in range(576)]}
+        dump('render_manifest.json',manifest);dump('effective_settings.json',{'camera_setup':{'overview':camera}});dump('video_receipt.json',{'synthetic':True})
+        recovered=load_formal_v1_camera(root,asset,expected)
+        self.assertEqual(recovered['camera'],camera);self.assertEqual(recovered['verified_frame_count'],576)
+        with self.assertRaisesRegex(ValueError,'fingerprint'):load_formal_v1_camera(root,asset,'0'*64)
+        manifest['frames'][15]['effective']['camera']['position'][0]=4;dump('render_manifest.json',manifest)
+        with self.assertRaisesRegex(ValueError,'changes between frames'):load_formal_v1_camera(root,asset,expected)
+        manifest['frames'].pop();dump('render_manifest.json',manifest)
+        with self.assertRaisesRegex(ValueError,'Incomplete'):load_formal_v1_camera(root,asset,expected)
+        events=[json.loads(line) for p in root.glob('*.jsonl') for line in p.read_text().splitlines()]
+        failures=[e for e in events if e.get('operation')=='room.continuous.camera' and e['event']=='failure']
+        self.assertEqual(len(failures),3)
 
     def test_clear_camera_has_seed_flame_and_roof_inside_frame(self):
         config=deepcopy(self.config);base=config['seed']['proposed_base_z_m']

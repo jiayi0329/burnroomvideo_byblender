@@ -103,7 +103,7 @@ def construct(snapshot):
     materials['layer'].node_tree.nodes['EffectDensity'].inputs[1].default_value=config['visual']['layer_density']
     objects={name:object_mesh('A2_'+name,{'vertices':[],'faces':[]},materials[name]) for name in materials}
     camera_name=config['camera']
-    if camera_name=='v1':
+    if camera_name in ('v1','v1_final'):
         ref=snapshot['camera_reference'];scene.camera=None
         camera=independent_camera(scene,'A2_V1Reference',ref['position'],ref['target'],ref['type']=='ORTHO',ref['ortho_scale'])
         for key in ('lens','ortho_scale','clip_start','clip_end','sensor_width','sensor_fit'):setattr(camera.data,key,ref[key])
