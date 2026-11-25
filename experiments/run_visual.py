@@ -44,12 +44,13 @@ def load_formal_v1_camera(directory,asset,expected_snapshot_sha256):
     if manifest.get('signature')!=signature:raise ValueError('V1 manifest belongs to another snapshot')
     frames=[r for r in manifest['frames'] if r['path'].startswith('frames/')]
     if len(frames)!=576 or len({r['path'] for r in frames})!=576:raise ValueError('Incomplete formal V1 frame evidence')
-    keys=('type','position','target','lens','ortho_scale','clip_start','clip_end','sensor_width','sensor_fit','dof')
+    keys=('type','position','target','lens','ortho_scale','clip_start','clip_end','sensor_width','sensor_fit','dof','track_axis','up_axis','rotation_world_euler')
     def camera(record):
         value={k:record[k] for k in keys}
         if value['type']!='ORTHO' or value['dof'] is not False:raise ValueError('Unexpected V1 projection or depth of field')
+        if value['track_axis']!='TRACK_NEGATIVE_Z' or value['up_axis']!='UP_Y':raise ValueError('Unsupported V1 camera axes')
         if value['sensor_fit'] not in ('AUTO','HORIZONTAL','VERTICAL'):raise ValueError('Invalid V1 sensor fit')
-        for name in ('position','target'):
+        for name in ('position','target','rotation_world_euler'):
             if len(value[name])!=3 or not all(math.isfinite(float(v)) for v in value[name]):raise ValueError('Invalid V1 camera vector')
         if sum((a-b)**2 for a,b in zip(value['position'],value['target']))<1e-8:raise ValueError('Invalid V1 camera aim')
         for name in ('lens','ortho_scale','clip_start','clip_end','sensor_width'):
@@ -59,7 +60,8 @@ def load_formal_v1_camera(directory,asset,expected_snapshot_sha256):
     effective=camera(frames[0]['effective']['camera'])
     if any(camera(r['effective']['camera'])!=effective for r in frames):raise ValueError('Formal V1 camera changes between frames')
     settings=read(paths['effective_settings.json'])
-    if camera(settings['camera_setup']['overview'])!=effective:raise ValueError('V1 setup and rendered camera differ')
+    if camera(settings['camera_setup']['overview'])!=effective or camera(manifest['camera_setup']['overview'])!=effective:
+        raise ValueError('V1 setup and rendered camera differ')
     # Receipt is kept as provenance; do not infer camera pose from video metadata.
     read(paths['video_receipt.json'])
     return {'kind':'formal_v1_effective_frames','camera':effective,'verified_frame_count':576,

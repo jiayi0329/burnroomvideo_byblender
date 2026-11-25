@@ -105,7 +105,8 @@ def construct(snapshot):
     camera_name=config['camera']
     if camera_name in ('v1','v1_final'):
         ref=snapshot['camera_reference'];scene.camera=None
-        camera=independent_camera(scene,'A2_V1Reference',ref['position'],ref['target'],ref['type']=='ORTHO',ref['ortho_scale'])
+        name='A2_FormalV1Overview' if camera_name=='v1_final' else 'A2_R3SampleReference'
+        camera=independent_camera(scene,name,ref['position'],ref['target'],ref['type']=='ORTHO',ref['ortho_scale'])
         for key in ('lens','ortho_scale','clip_start','clip_end','sensor_width','sensor_fit'):setattr(camera.data,key,ref[key])
     else:
         seed=snapshot['seed_xy'];base=config['seed']['proposed_base_z_m']

@@ -120,8 +120,9 @@ class VisualTests(unittest.TestCase):
               'animation':{'stage':'final','preset':'final','camera_mode':'overview','fps':24,'frame_count':576,'duration_seconds':24,'resolution':[1280,720]}}
         spec['signature']=fingerprint(spec);path=dump('config_snapshot.json',spec);expected=digest(path)
         camera={'type':'ORTHO','position':[3,-4,5],'target':[0,0,0],'lens':18,'ortho_scale':16,
-                'clip_start':.03,'clip_end':1000,'sensor_width':36,'sensor_fit':'AUTO','dof':False}
-        manifest={'signature':spec['signature'],'frames':[{'path':f'frames/{i:06}.png','effective':{'camera':deepcopy(camera)}} for i in range(576)]}
+                'clip_start':.03,'clip_end':1000,'sensor_width':36,'sensor_fit':'AUTO','dof':False,
+                'track_axis':'TRACK_NEGATIVE_Z','up_axis':'UP_Y','rotation_world_euler':[.7,0,.6]}
+        manifest={'signature':spec['signature'],'camera_setup':{'overview':camera},'frames':[{'path':f'frames/{i:06}.png','effective':{'camera':deepcopy(camera)}} for i in range(576)]}
         dump('render_manifest.json',manifest);dump('effective_settings.json',{'camera_setup':{'overview':camera}});dump('video_receipt.json',{'synthetic':True})
         recovered=load_formal_v1_camera(root,asset,expected)
         self.assertEqual(recovered['camera'],camera);self.assertEqual(recovered['verified_frame_count'],576)
