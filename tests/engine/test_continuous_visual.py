@@ -7,10 +7,12 @@ from pathlib import Path
 import tempfile
 import hashlib
 import math
+import os
+from contextlib import nullcontext
 import unittest
 from unittest.mock import patch
 from experiments.continuous_field import build_field,inside
-from experiments.visual_state import geometry,roof_mesh
+from experiments.visual_state import geometry,roof_mesh,camera_view_audit,sightline_hit
 from experiments.run_visual import main,prepare
 from render_engine.jobs.operation_logging import bind_context,JsonlSink
 
@@ -57,9 +59,89 @@ class VisualTests(unittest.TestCase):
             with self.assertRaises(SystemExit):main(['--candidate','missing','--asset','missing','--points','missing','--output-root',self.temp.name,'--render-keyframes','--confirm-gpu-experiment'])
         run.assert_not_called();prepare_call.assert_not_called()
 
+    def test_launcher_inherits_runtime_environment_and_keeps_lock_and_trace(self):
+        # Fake process boundary only: never invoke Blender or acquire a real GPU.
+        run_dir=Path(self.temp.name)/'launch';run_dir.mkdir()
+        snapshot={'data_root':self.temp.name,'guards':{}}
+        environment={'PATH':'/usr/local/blender:/usr/bin','LD_LIBRARY_PATH':'/runtime/nvidia',
+                     'OPERATION_LOG_ROOT':str(Path(self.temp.name)/'parent-operations')}
+        with patch.dict(os.environ,environment,clear=True), \
+             patch('experiments.run_visual.read',return_value={'render_authorized':True}), \
+             patch('experiments.run_visual.prepare',return_value=(run_dir,snapshot)), \
+             patch('render_engine.jobs.run_room_animation.gpu_lock',return_value=nullcontext(87)) as lock, \
+             patch('render_engine.jobs.run_room_animation.busy_processes',return_value={'compute':{'available':True}}) as busy, \
+             patch('experiments.run_visual.check_guards') as guards, \
+             patch('experiments.run_visual.subprocess.run') as process:
+            result=main(['--candidate','unused','--asset','unused','--points','unused',
+                         '--output-root',self.temp.name,'--render-keyframes','--confirm-gpu-experiment'])
+            self.assertEqual(dict(os.environ),environment)
+        self.assertEqual(result,0);lock.assert_called_once_with(Path(self.temp.name));busy.assert_called_once()
+        self.assertEqual(guards.call_count,2);process.assert_called_once()
+        kwargs=process.call_args.kwargs;env=kwargs['env']
+        self.assertEqual(env['PATH'],environment['PATH'])
+        self.assertEqual(env['LD_LIBRARY_PATH'],environment['LD_LIBRARY_PATH'])
+        self.assertEqual(env['OPERATION_LOG_ROOT'],environment['OPERATION_LOG_ROOT'])
+        self.assertEqual(env['ROOM_ANIMATION_LOCK_FD'],'87');self.assertEqual(kwargs['pass_fds'],(87,))
+        self.assertTrue(kwargs['check'])
+        command=process.call_args.args[0]
+        self.assertEqual(command[0],'blender');self.assertIn('--disable-autoexec',command)
+        trace=json.loads(env['BURNROOM_OPERATION_CONTEXT'])['trace_id']
+        events=[json.loads(line) for p in (run_dir/'operations').glob('*.jsonl') for line in p.read_text().splitlines()]
+        self.assertTrue(any(e['event']=='success' and e['stage']=='keyframe_render' for e in events))
+        self.assertTrue(all(e['trace_id']==trace for e in events))
+        self.assertTrue(all('LD_LIBRARY_PATH' not in json.dumps(e) for e in events))
+
+    def test_launcher_occupancy_failure_stops_before_process_with_failure_log(self):
+        run_dir=Path(self.temp.name)/'blocked';run_dir.mkdir()
+        with patch('experiments.run_visual.read',return_value={'render_authorized':True}), \
+             patch('experiments.run_visual.prepare',return_value=(run_dir,{'data_root':self.temp.name,'guards':{}})), \
+             patch('render_engine.jobs.run_room_animation.gpu_lock',return_value=nullcontext(87)), \
+             patch('render_engine.jobs.run_room_animation.busy_processes',side_effect=RuntimeError('occupied')), \
+             patch('experiments.run_visual.subprocess.run') as process:
+            with self.assertRaisesRegex(RuntimeError,'occupied'):
+                main(['--candidate','unused','--asset','unused','--points','unused',
+                      '--output-root',self.temp.name,'--render-keyframes','--confirm-gpu-experiment'])
+        process.assert_not_called()
+        events=[json.loads(line) for p in (run_dir/'operations').glob('*.jsonl') for line in p.read_text().splitlines()]
+        self.assertTrue(any(e['event']=='failure' and e['stage']=='keyframe_render' and 'trace_id' in e for e in events))
+
     def test_adapters_import_without_bpy_and_compile(self):
         importlib.import_module('experiments.blender_visual');importlib.import_module('experiments.blender_worker')
         for p in (ROOT/'experiments').glob('*.py'):compile(p.read_text(),str(p),'exec')
+
+    def test_clear_camera_has_seed_flame_and_roof_inside_frame(self):
+        config=deepcopy(self.config);base=config['seed']['proposed_base_z_m']
+        config['cameras']['low']={'offset':[3,0,.25-base],'target_height':1.55,'lens':16}
+        ring=[[-4,-4],[4,-4],[4,4],[-4,4]]
+        a=camera_view_audit(config,[0,0],ring,[])
+        self.assertEqual(a,camera_view_audit(config,[0,0],ring,[]))
+        self.assertTrue(all(v['clear'] for v in a['targets'].values()))
+        self.assertIn('seed_base',a['targets']);self.assertIn('roof_near_seed',a['targets'])
+
+    def test_camera_rejects_outside_occluded_and_cropped_views_with_log(self):
+        config=deepcopy(self.config);base=config['seed']['proposed_base_z_m']
+        config['cameras']['low']={'offset':[3,0,.25-base],'target_height':1.55,'lens':16}
+        ring=[[-4,-4],[4,-4],[4,4],[-4,4]]
+        with self.assertRaisesRegex(ValueError,'outside Room8'):
+            camera_view_audit(config,[0,0],self.ring,[])
+        wall=[{'corners':[[1,-10,-10],[1,10,-10],[1,0,10]]}]
+        with self.assertRaisesRegex(ValueError,'Scan blocks'):
+            camera_view_audit(config,[0,0],ring,wall)
+        config['cameras']['low']['lens']=80
+        with self.assertRaisesRegex(ValueError,'image margin'):
+            camera_view_audit(config,[0,0],ring,[])
+        events=[json.loads(line) for p in Path(self.temp.name).glob('*.jsonl') for line in p.read_text().splitlines()]
+        failures=[e for e in events if e.get('operation')=='room.continuous.camera' and e['event']=='failure']
+        self.assertEqual(len(failures),3)
+        self.assertTrue(all(e['trace_id']=='visual-test' and 'duration_ms' in e for e in failures))
+
+    def test_sightline_preserves_near_obstacles_and_display_cut(self):
+        wall=[{'corners':[[.001,-1,-1],[.001,1,-1],[.001,0,1]]}]
+        hit=sightline_hit([0,0,0],[1,0,0],wall)
+        self.assertAlmostEqual(hit['distance_m'],.001)
+        self.assertIsNone(sightline_hit([0,0,0],[1,0,0],wall,cut_z=-.1))
+        endpoint=[{'corners':[[1,-1,-1],[1,1,-1],[1,0,1]]}]
+        self.assertIsNone(sightline_hit([0,0,0],[1,0,0],endpoint))
 
     def test_offline_plan_is_independent_and_pins_inputs(self):
         # Entire fixture, including fake BLEND bytes, is CPU-only synthetic data.
@@ -82,6 +164,10 @@ class VisualTests(unittest.TestCase):
         self.assertNotEqual(a,b);self.assertFalse(json.loads((a/'geometry-plan.json').read_text())['rendered'])
         self.assertTrue(all(digest(p)==value for p,value in before.items()))
         with self.assertRaises(ValueError):prepare(config,candidate,asset,points,scene/'forbidden-output')
+        cfg['require_clear_view']=True;dump(config,cfg)
+        with self.assertRaisesRegex(ValueError,'outside Room8'):
+            prepare(config,candidate,asset,points,root/'camera-rejected')
+        self.assertFalse((root/'camera-rejected').exists())
         from render_engine.jobs.room_animation_job import check_guards
         config.write_text('{}')
         with self.assertRaises(ValueError):check_guards({'guards':snapshot['guards']})

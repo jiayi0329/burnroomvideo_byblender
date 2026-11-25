@@ -10,7 +10,7 @@ import sys
 import uuid
 
 from experiments.continuous_field import field_from_config,inside
-from experiments.visual_state import geometry,validate
+from experiments.visual_state import geometry,validate,camera_view_audit
 from render_engine.jobs.operation_logging import JsonlSink,bind_context,stage,child_environment
 from render_engine.jobs.room_animation_job import fingerprint,check_guards,load_camera_reference
 
@@ -68,6 +68,8 @@ def prepare(config_path,candidate_path,asset,points,output_root,reference=None):
         ref=load_camera_reference(asset,Path(reference) if reference else None,True)
         camera_reference=ref['camera'];guards.update(ref['guards'])
     elif config['camera'] not in ('low','roof'):raise ValueError('Unknown camera')
+    view_audit=(camera_view_audit(config,seed,candidate['polygon_raw_xy'],candidate['geometry']['faces'])
+                if config.get('require_clear_view') is True else None)
     if any(output_root.is_relative_to(p) or p.is_relative_to(output_root) for p in (asset.parent,points.parent)):
         raise ValueError('Output root must be separate from all source scene data')
     output_root.mkdir(parents=True,exist_ok=True)
@@ -75,7 +77,7 @@ def prepare(config_path,candidate_path,asset,points,output_root,reference=None):
     snapshot={'schema_version':1,'experiment_id':run.name,'config':config,'config_path':str(config_path),'asset_blend':str(asset/'room.blend'),'data_root':str(points.parent.parent),
               'polygon':candidate['polygon_raw_xy'],'seed_xy':seed,'camera_reference':camera_reference,'r3_style':read(ROOT/'configs/render/room_fire_round3.json'),
               'guards':guards,'output':str(run),'reachable_cells':len(field.arrival_s),'unreachable_cells':len(field.unreachable),'scope':'independent_visual_experiment_not_r3_task',
-              'seed_audit':{'nearest_surface_z_m':hits[-1],'neighborhood':neighborhood,'visual_collision_clearance_confirmed':False}}
+              'seed_audit':{'nearest_surface_z_m':hits[-1],'neighborhood':neighborhood,'visual_collision_clearance_confirmed':False},'view_audit':view_audit}
     snapshot['r3_style']['quality']['resolution']=config['resolution'];snapshot['r3_style']['quality']['fps']=config['fps']
     snapshot['signature']=fingerprint(snapshot)
     (run/'snapshot.json').write_text(json.dumps(snapshot,indent=2),encoding='utf-8')
@@ -111,7 +113,8 @@ def main(argv=None):
             checks=busy_processes()
             if not all(v.get('available') for v in checks.values()):raise RuntimeError('GPU occupancy evidence unavailable')
             check_guards({'guards':snapshot['guards']})
-            env=child_environment();env['ROOM_ANIMATION_LOCK_FD']=str(fd)
+            env=dict(os.environ);env.update(child_environment())
+            env['ROOM_ANIMATION_LOCK_FD']=str(fd)
             with (run/'blender.log').open('xb') as log:
                 subprocess.run([args.blender,'--background','--factory-startup','--disable-autoexec','--python-exit-code','1','--python',str(ROOT/'experiments/blender_worker.py'),'--','--snapshot',str(run/'snapshot.json')],env=env,pass_fds=(fd,),stdout=log,stderr=subprocess.STDOUT,check=True)
             check_guards({'guards':snapshot['guards']})

@@ -9,6 +9,87 @@ from render_engine.geometry.room_clip_geometry import halfplane, triangulate
 from render_engine.jobs.operation_logging import traced
 
 
+def sightline_hit(origin,target,faces,cut_z=float('inf'),endpoint_clearance=.025):
+    """CPU ray/triangle visibility; opaque geometric gate, not a shader test.
+
+    Ignore contacts within 25mm of the target, not obstacles near the camera.
+    The display height cut removes the same portion as Blender's below().
+    """
+    def sub(a,b):return [a[k]-b[k] for k in range(3)]
+    def dot(a,b):return sum(a[k]*b[k] for k in range(3))
+    def cross(a,b):return [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]]
+    direction=sub(target,origin);length=math.sqrt(dot(direction,direction))
+    if length<.1:raise ValueError('Camera too close to inspection target')
+    nearest=None
+    for index,face in enumerate(faces):
+        a,b,c=[v[:3] for v in face['corners']]
+        # Conservative segment bounding box rejection.
+        if any(max(a[k],b[k],c[k])<min(origin[k],target[k])-1e-9 or min(a[k],b[k],c[k])>max(origin[k],target[k])+1e-9 for k in range(3)):continue
+        e1,e2=sub(b,a),sub(c,a);p=cross(direction,e2);det=dot(e1,p)
+        if abs(det)<1e-12:continue
+        s=sub(origin,a);u=dot(s,p)/det
+        if not 0<=u<=1:continue
+        q=cross(s,e1);v=dot(direction,q)/det
+        if v<0 or u+v>1:continue
+        t=dot(e2,q)/det;distance=t*length
+        if not 0<distance<length-endpoint_clearance:continue
+        point=[origin[k]+t*direction[k] for k in range(3)]
+        if point[2]>cut_z+1e-9:continue
+        if nearest is None or distance<nearest['distance_m']:
+            nearest={'face_index':index,'distance_m':distance,'point_raw_xyz':point}
+    return nearest
+
+
+def inspection_targets(config,seed,ring=None):
+    base=config['seed']['proposed_base_z_m'];roof=config['visual']['roof_z_m']
+    targets={'seed_base':[seed[0],seed[1],base+.08],
+            'initial_flame':[seed[0],seed[1],base+.65],
+            'flame_east':[seed[0]+.3,seed[1],base+.3],
+            'flame_south':[seed[0],seed[1]-.3,base+.3],
+            'early_smoke':[seed[0],seed[1],base+1.2],
+            'upper_smoke':[seed[0],seed[1],roof-.15],
+            'roof_near_seed':[seed[0],seed[1],roof]}
+    if ring and config.get('inspect_roof_outline'):
+        nearest=[]
+        for a,b in zip(ring,ring[1:]+ring[:1]):
+            dx,dy=b[0]-a[0],b[1]-a[1];squared=dx*dx+dy*dy
+            if squared<1e-15:continue
+            t=max(0,min(1,((seed[0]-a[0])*dx+(seed[1]-a[1])*dy)/squared))
+            point=[a[0]+t*dx,a[1]+t*dy,roof]
+            nearest.append((sum((point[k]-seed[k])**2 for k in range(2)),point))
+        targets['roof_outline']=min(nearest,key=lambda p:p[0])[1]
+    return targets
+
+
+@traced('room.continuous.camera','view_gate')
+def camera_view_audit(config,seed,ring,faces):
+    """Reject occluded or clipped experimental views before GPU launch."""
+    from experiments.continuous_field import inside
+    spec=config['cameras'][config['camera']];base=config['seed']['proposed_base_z_m']
+    if not 1<=finite(spec['lens'])<=200:raise ValueError('Invalid inspection lens')
+    origin=[seed[0]+spec['offset'][0],seed[1]+spec['offset'][1],base+spec['offset'][2]]
+    target=[seed[0],seed[1],base+spec['target_height']]
+    if not inside(origin[:2],ring):raise ValueError('Inspection camera is outside Room8 boundary')
+    forward=[target[k]-origin[k] for k in range(3)];length=math.sqrt(sum(v*v for v in forward));forward=[v/length for v in forward]
+    horizontal=math.hypot(forward[0],forward[1])
+    if horizontal<1e-6:raise ValueError('Low camera must have a horizontal viewing direction')
+    right=[forward[1]/horizontal,-forward[0]/horizontal,0]
+    up=[right[1]*forward[2],-right[0]*forward[2],right[0]*forward[1]-right[1]*forward[0]]
+    aspect=config['resolution'][0]/config['resolution'][1]
+    # Adapter explicitly sets a 36mm horizontal-fit sensor.
+    tangent_x=36/(2*spec['lens']);tangent_y=tangent_x/aspect
+    records={}
+    for name,point in inspection_targets(config,seed,ring).items():
+        delta=[point[k]-origin[k] for k in range(3)];depth=sum(delta[k]*forward[k] for k in range(3))
+        if depth<=.03:raise ValueError('Inspection target behind camera: '+name)
+        ndc=[sum(delta[k]*axis[k] for k in range(3))/(depth*tangent) for axis,tangent in ((right,tangent_x),(up,tangent_y))]
+        if max(abs(v) for v in ndc)>.92:raise ValueError('Inspection target outside safe image margin: '+name)
+        hit=sightline_hit(origin,point,faces,config['display_cut_z_m'])
+        if hit:raise ValueError('Scan blocks inspection target: '+name+' at '+str(round(hit['distance_m'],3))+'m')
+        records[name]={'ndc':ndc,'clear':True}
+    return {'camera_raw_xyz':origin,'target_raw_xyz':target,'targets':records,'candidate_geometry_only':True}
+
+
 def temporal_clip(vertices, threshold):
     result=[]
     previous=vertices[-1]

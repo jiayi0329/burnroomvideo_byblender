@@ -25,6 +25,10 @@ def main():
     from render_engine.blender.F8_room_animation import renderer_info
     with inherited_context(JsonlSink(out/'operations')),stage('room.continuous.experiment','blender_keyframes'):
         scene,apply=construct(snapshot);records=[]
+        if snapshot['config'].get('require_clear_view'):
+            audit=json.loads(scene['a2_camera_audit_json'])
+            if audit.get('actual_blender_view_checked') is not True:raise ValueError('Actual Blender visibility gate missing')
+            (out/'camera-audit.json').write_text(json.dumps(audit,indent=2))
         for seconds in snapshot['config']['key_times_s']:
             check_guards({'guards':snapshot['guards']})
             path=out/('key-'+str(seconds)+'s.png')

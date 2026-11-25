@@ -1,5 +1,35 @@
 """Blender-only adapter. Import bpy lazily; offline tests never import Blender."""
-from experiments.visual_state import geometry, roof_mesh
+from experiments.visual_state import geometry, roof_mesh, inspection_targets
+from render_engine.jobs.operation_logging import traced
+
+
+@traced('room.continuous.camera','blender_view_gate')
+def verify_blender_view(scene,snapshot):
+    """Check evaluated renderable scan meshes, not merely candidate geometry."""
+    import bpy
+    from mathutils import Vector
+    from mathutils.bvhtree import BVHTree
+    from bpy_extras.object_utils import world_to_camera_view
+    bpy.context.view_layer.update();origin=scene.camera.matrix_world.translation.copy()
+    trees=[];depsgraph=bpy.context.evaluated_depsgraph_get()
+    for obj in scene.objects:
+        if obj.type!='MESH' or obj.hide_render:continue
+        evaluated=obj.evaluated_get(depsgraph);mesh=evaluated.to_mesh()
+        try:
+            if not mesh.vertices or not mesh.polygons:continue
+            mesh.calc_loop_triangles()
+            trees.append((obj.name,BVHTree.FromPolygons([evaluated.matrix_world@v.co for v in mesh.vertices],[tuple(t.vertices) for t in mesh.loop_triangles],all_triangles=True)))
+        finally:evaluated.to_mesh_clear()
+    targets={}
+    for name,point in inspection_targets(snapshot['config'],snapshot['seed_xy'],snapshot['polygon']).items():
+        point=Vector(point);ndc=world_to_camera_view(scene,scene.camera,point)
+        if ndc.z<=0 or not (.04<=ndc.x<=.96 and .04<=ndc.y<=.96):raise ValueError('Blender camera clips inspection target: '+name)
+        delta=point-origin;length=delta.length
+        for object_name,tree in trees:
+            location,normal,index,distance=tree.ray_cast(origin,delta.normalized(),max(0,length-.025))
+            if location is not None:raise ValueError('Blender scan blocks '+name+' via '+object_name+' at '+str(round(distance,3))+'m')
+        targets[name]={'image_xy':[ndc.x,ndc.y],'clear':True}
+    return {'actual_blender_view_checked':True,'camera':list(origin),'targets':targets,'scan_meshes_checked':[n for n,_ in trees]}
 
 
 def volume_material(bpy,name,config,fire=False):
@@ -61,6 +91,13 @@ def construct(snapshot):
         spline=curve.splines.new('POLY');spline.points.add(len(ring)-1);spline.use_cyclic_u=True
         for point,(x,y) in zip(spline.points,ring):point.co=(x,y,config['visual']['roof_z_m'],1)
         line=bpy.data.objects.new(curve.name,curve);collection.objects.link(line)
+        if config.get('require_clear_view'):
+            # An explicitly artificial engineering outline, not a scanned roof.
+            outline=bpy.data.materials.new('A2_EngineeringRoofOutline');outline.use_nodes=True
+            nodes=outline.node_tree.nodes;nodes.clear()
+            output=nodes.new('ShaderNodeOutputMaterial');emission=nodes.new('ShaderNodeEmission')
+            emission.inputs['Color'].default_value=(.18,.42,.65,1);emission.inputs['Strength'].default_value=.8
+            outline.node_tree.links.new(emission.outputs[0],output.inputs['Surface']);curve.materials.append(outline)
     materials={name:volume_material(bpy,'A2_'+name,config,name=='flame') for name in ('flame','smoke','layer')}
     # Ceiling density is independent and bounded, not a solid black cap.
     materials['layer'].node_tree.nodes['EffectDensity'].inputs[1].default_value=config['visual']['layer_density']
@@ -75,8 +112,13 @@ def construct(snapshot):
         spec=config['cameras'][camera_name]
         camera=independent_camera(scene,'A2_'+camera_name,[seed[0]+spec['offset'][0],seed[1]+spec['offset'][1],base+spec['offset'][2]],[seed[0],seed[1],base+spec['target_height']],False,10)
         camera.data.lens=spec['lens']
+        if config.get('require_clear_view'):
+            camera.data.sensor_width=36;camera.data.sensor_fit='HORIZONTAL'
     scene.camera=camera
     for marker in scene.timeline_markers:marker.camera=None
+    if config.get('require_clear_view'):
+        import json
+        scene['a2_camera_audit_json']=json.dumps(verify_blender_view(scene,snapshot))
     light_data=bpy.data.lights.new('A2_FireBounce','POINT');light_data.color=(1,.18,.02)
     light=bpy.data.objects.new(light_data.name,light_data);collection.objects.link(light)
     light.location=(*snapshot['seed_xy'],config['seed']['proposed_base_z_m']+.4)
