@@ -93,16 +93,17 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 
 下面逐项列出本次整理后可提交的文件（含待提交文档），不包含Git内部目录、被忽略数据/缓存和本地工具环境。后续新增/删除文件应同步本表；归档原文只供追溯。目录README只维护专项边界，不重复本总表。
 
-清单共 **234** 个文件。
+清单共 **237** 个文件。
 
 <details>
-<summary>experiments：独立视觉实验（6份，不在生产R3保护清单/部署包）</summary>
+<summary>experiments：独立视觉实验（7份，不在生产R3保护清单/部署包）</summary>
 
 | 文件路径 | 用途 | 属性/运行环境 |
 | --- | --- | --- |
 | [experiments/__init__.py](experiments/__init__.py) | 独立实验包边界 | CPU离线 |
 | [experiments/continuous_field.py](experiments/continuous_field.py) | 单源四邻域到达时间、凹边界/障碍、未来火烟状态接口 | CPU离线，不能渲染 |
 | [experiments/visual_state.py](experiments/visual_state.py) | 连续时间裁切/房间裁切、焊接闭合火烟及屋顶层几何 | CPU，无CFD |
+| [experiments/scenario_timeline.py](experiments/scenario_timeline.py) | 绝对时间分镜、火烟单元事件及几何覆盖面积报告 | CPU，非物理预测 |
 | [experiments/blender_visual.py](experiments/blender_visual.py) | 独立Blender集合、材质/屋顶/相机和绝对时间适配 | 尚未Blender视觉验收 |
 | [experiments/run_visual.py](experiments/run_visual.py) | 默认CPU计划；后续独立批准后复用GPU锁的关键帧入口 | 不接生产API |
 | [experiments/blender_worker.py](experiments/blender_worker.py) | 继承锁与指纹/NVIDIA检查的独立关键帧worker | 禁止直接绕过启动器 |
@@ -264,12 +265,14 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 </details>
 
 <details>
-<summary>configs：公共预设与实验配置（6份）</summary>
+<summary>configs：公共预设与实验配置（8份）</summary>
 
 | 文件路径 | 用途 | 属性/运行环境 |
 | --- | --- | --- |
 | [configs/experiments/room8_continuous_a_v01.json](configs/experiments/room8_continuous_a_v01.json) | A2独立配置、候选种子/工程屋顶、私有边界引用、渲染关闭 | 未批准视觉效果/不兼容R3入口 |
 | [configs/experiments/room8_continuous_a_v02.json](configs/experiments/room8_continuous_a_v02.json) | 火烟/烟层/屋顶、三种模式、实验机位和冻结输入绑定 | 渲染授权关闭 |
+| [configs/experiments/room8_continuous_a_v03.json](configs/experiments/room8_continuous_a_v03.json) | 冻结R3材质节点适配、先烟/低位蔓延/持续大火阶段、独立背景对照 | 仅离线验证，渲染授权关闭 |
+| [configs/experiments/room8_continuous_a_v04.json](configs/experiments/room8_continuous_a_v04.json) | 12秒假设情景脚本、4秒切正式V1总览、阶段及范围计算 | 仅离线验证，渲染授权关闭 |
 | [configs/render/README.md](configs/render/README.md) | 三份公共预设的用途、当前默认与批准指纹约束 | 文档/约束 |
 | [configs/render/room_fire_round1.json](configs/render/room_fire_round1.json) | 第一轮风格配置，历史对比/回归，非默认 | 配置/规则 |
 | [configs/render/room_fire_round2.json](configs/render/room_fire_round2.json) | 第二轮尺寸/厚度/烟柱配置，历史回归，非默认 | 配置/规则 |

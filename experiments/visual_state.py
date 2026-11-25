@@ -4,9 +4,30 @@ No fluid simulation: arrival times and shape motion are artistic controls.
 Room clipping applies to every triangle, not only its centre.
 """
 import math
+import hashlib
+import json
+from pathlib import Path
 from experiments.continuous_field import finite
 from render_engine.geometry.room_clip_geometry import halfplane, triangulate
 from render_engine.jobs.operation_logging import traced
+
+
+def adaptation_style(config):
+    """Read the frozen R3 style, without changing its approved file or values."""
+    path=Path(__file__).resolve().parents[1]/'configs/render/room_fire_round3.json'
+    if hashlib.sha256(path.read_bytes()).hexdigest()!=config['r3_adaptation']['style_sha256']:
+        raise ValueError('Frozen R3 adaptation source differs')
+    return json.loads(path.read_text(encoding='utf-8'))
+
+
+def adaptation_state(config,seconds,arrival=0):
+    """Absolute local age: smoke first, low advancing fire, then sustained tall fire."""
+    a=config['r3_adaptation'];age=seconds-config['visual']['smoke_lead_s']-arrival
+    smooth=lambda x:(lambda v:v*v*(3-2*v))(min(1,max(0,x)))
+    large=smooth((age-a['ground_duration_s'])/a['large_growth_s'])
+    return {'fire':age>0,'local_fire_age_s':age,'large_fraction':large,
+            'ground_fraction':smooth(age/.5),
+            'smoke_fraction':min(1,max(0,(seconds-arrival)/config['visual']['growth_s']))}
 
 
 def sightline_hit(origin,target,faces,cut_z=float('inf'),endpoint_clearance=.025):
@@ -105,20 +126,31 @@ def temporal_clip(vertices, threshold):
 
 def validate(config):
     e=config['visual']; base=finite(config['seed']['proposed_base_z_m']);roof=finite(e['roof_z_m'])
-    for key in ('smoke_lead_s','rise_m_s','layer_spread_m_s','layer_thickness_m','flame_height_m','growth_s','smoke_density','layer_density','noise_scale'):
+    controls=('smoke_lead_s','rise_m_s','layer_spread_m_s','layer_thickness_m','growth_s')
+    if 'r3_adaptation' not in config:controls+=('flame_height_m','smoke_density','layer_density','noise_scale')
+    for key in controls:
         if not 0<finite(e[key])<=100:raise ValueError('Invalid visual control')
     if roof-base<.3 or e['layer_thickness_m']>=roof-base:raise ValueError('Invalid roof clearance')
     if e['roof_mode'] not in ('full','cutaway','outline'):raise ValueError('Invalid roof mode')
     if e['mode'] not in ('none','smoke','combined'):raise ValueError('Invalid comparison mode')
-    if any(not 0<=finite(v)<=1 for v in e['smoke_color'] ) or len(e['smoke_color'])!=4:raise ValueError('Invalid smoke color')
-    for key in ('flame_density','emission','light_energy','morph_hz'):
-        if not 0<=finite(e[key])<=1000:raise ValueError('Invalid material or light control')
+    if 'r3_adaptation' not in config:
+        if any(not 0<=finite(v)<=1 for v in e['smoke_color']) or len(e['smoke_color'])!=4:raise ValueError('Invalid smoke color')
+        for key in ('flame_density','emission','light_energy','morph_hz'):
+            if not 0<=finite(e[key])<=1000:raise ValueError('Invalid material or light control')
     if type(e['seed']) is not int or not 0<=e['seed']<2**32:raise ValueError('Invalid noise seed')
     if not -2<=finite(config['exposure'])<=2 or not base<finite(config['display_cut_z_m'])<=roof:raise ValueError('Invalid display controls')
     times=config['key_times_s']
     if not 1<=len(times)<=6 or any(not 0<=finite(t)<=12 for t in times) or list(times)!=sorted(set(times)):raise ValueError('At most six unique ordered keyframes in 0..12s')
     if len(config['resolution'])!=2 or any(type(v) is not int or not 2<=v<=limit for v,limit in zip(config['resolution'],(960,540))):raise ValueError('Keyframe resolution budget exceeded')
     if type(config['fps']) is not int or not 2<=config['fps']<=24:raise ValueError('Invalid FPS')
+    if 'preview_background' in config:
+        b=config['preview_background']
+        if len(b['color'])!=4 or any(not 0<=finite(v)<=1 for v in b['color']) or not 0<=finite(b['strength'])<=2:raise ValueError('Invalid preview background')
+    if 'r3_adaptation' in config:
+        a=config['r3_adaptation'];style=adaptation_style(config)
+        for name in ('ground_height_m','ground_duration_s','large_growth_s','smoke_density_gain','layer_density_gain'):
+            if not 0<finite(a[name])<=10:raise ValueError('Invalid R3 adaptation control')
+        if a['ground_height_m']>=style['art']['flame']['primary_height']:raise ValueError('Low fire must precede tall fire')
     return base,roof
 
 
@@ -193,11 +225,27 @@ def geometry(field, ring, config, seconds):
     def flame_top(p):
         noise=.7+.3*math.sin(p[0]*1.7+p[1]*2.3+t*2.1+e['seed'])**2
         return min(roof-.01,base+.003+e['flame_height_m']*growth(t-delay-p[2])*noise)
+    smoke_top=lambda p:min(roof-.005,base+.005+e['rise_m_s']*max(0.,t-p[2]))
+    if 'r3_adaptation' in config:
+        from render_engine.effects.room_fire_config import tongue_specs
+        style=adaptation_style(config);a=config['r3_adaptation'];f=style['art']['flame'];s=style['art']['smoke']
+        tongues=tongue_specs(style,22,True)
+        # A continuous, room-clipped height field, not one new flame per grid cell.
+        seed_cell=min(field.arrival_s,key=field.arrival_s.get);seed=field.xy(seed_cell)
+        def flame_top(p):
+            state=adaptation_state(config,t,p[2]);x,y=p[0]-seed[0],p[1]-seed[1]
+            lobes=max(math.exp(-((x-v['offset'][0])**2+(y-v['offset'][1])**2)/(2*(v['radius']*1.4)**2))*min(1,v['height']/f['primary_height']) for v in tongues)
+            waves=sum((.5+.5*math.sin((x*math.cos(v['phase'])+y*math.sin(v['phase']))/(v['radius']*2)+v['phase']+t*f['morph_speed']))**5 for v in tongues)/len(tongues)
+            contour=max(lobes,waves)*(.9+.1*math.sin(t*f['flicker_hz']*2*math.pi+x+y))
+            height=(a['ground_height_m']*state['ground_fraction']+state['large_fraction']*(f['primary_height']-a['ground_height_m']))*(.12+.88*contour)
+            return min(roof-.02,base+.004+height)
+        def smoke_top(p):
+            age=max(0,t-p[2]);curl=.85+.15*math.sin(p[0]*3+p[1]*2+t*s['morph_speed'])
+            return min(roof-.005,base+.005+e['rise_m_s']*age*curl)
     if e['mode']=='combined':
         result['flame']=envelope(field,ring,t-delay,lambda p:base,flame_top)
-    result['smoke']=envelope(field,ring,t,lambda p:base+.002,
-                            lambda p:min(roof-.005,base+.005+e['rise_m_s']*max(0.,t-p[2])))
-    ceiling_delay=(roof-base)/e['rise_m_s']
+    result['smoke']=envelope(field,ring,t,lambda p:base+.002,smoke_top)
+    ceiling_delay=(roof-base)/(e['rise_m_s']*(.85 if 'r3_adaptation' in config else 1))
     scale=config['field']['visual_speed_m_s']/e['layer_spread_m_s']
     # Re-express the common geodesic arrival field at the ceiling spread speed.
     layer_field=type(field)(field.origin,field.spacing_m,field.allowed,

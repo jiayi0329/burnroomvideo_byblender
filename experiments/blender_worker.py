@@ -25,6 +25,11 @@ def main():
     from render_engine.blender.F8_room_animation import renderer_info
     with inherited_context(JsonlSink(out/'operations')),stage('room.continuous.experiment','blender_keyframes'):
         scene,apply=construct(snapshot);records=[]
+        if 'r3_adaptation' in snapshot['config']:
+            from render_engine.blender.F8_room_fire_style import material_settings
+            materials=[m for m in bpy.data.materials if m.name.startswith('A2_R3_')]
+            if len(materials)!=3:raise ValueError('Expected three adapted R3 materials')
+            (out/'adapted-material-settings.json').write_text(json.dumps([material_settings(m) for m in materials],indent=2))
         if snapshot['config'].get('require_clear_view'):
             audit=json.loads(scene['a2_camera_audit_json'])
             if audit.get('actual_blender_view_checked') is not True:raise ValueError('Actual Blender visibility gate missing')
@@ -38,7 +43,14 @@ def main():
             renderer=renderer_info();verify_nvidia_renderer(renderer)
             if not path.is_file():raise RuntimeError('Image missing')
             check_guards({'guards':snapshot['guards']})
-            records.append({'seconds':seconds,'file':path.name,'render_seconds':time.perf_counter()-start,'renderer':renderer})
+            record={'seconds':seconds,'file':path.name,'render_seconds':time.perf_counter()-start,'renderer':renderer}
+            if snapshot['config']['camera']=='scenario':
+                from render_engine.blender.F8_room_animation import camera_parameters
+                record['effective_camera']=camera_parameters(scene.camera)
+            if 'r3_adaptation' in snapshot['config']:
+                record['material_controls']=[{'name':m.name,'density':m.node_tree.nodes['DensityEnvelope'].outputs[0].default_value,
+                    'emission':m.node_tree.nodes['EmissionEnvelope'].outputs[0].default_value if m.node_tree.nodes.get('EmissionEnvelope') else 0} for m in materials]
+            records.append(record)
             (out/'render-receipt.json').write_text(json.dumps({'visual_approved':False,'frames':records},indent=2))
 
 if __name__=='__main__':main()

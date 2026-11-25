@@ -12,7 +12,7 @@ from contextlib import nullcontext
 import unittest
 from unittest.mock import patch
 from experiments.continuous_field import build_field,inside
-from experiments.visual_state import geometry,roof_mesh,camera_view_audit,sightline_hit
+from experiments.visual_state import geometry,roof_mesh,camera_view_audit,sightline_hit,adaptation_state,adaptation_style,mesh_components
 from experiments.run_visual import main,prepare,load_formal_v1_camera
 from render_engine.jobs.operation_logging import bind_context,JsonlSink
 
@@ -29,6 +29,69 @@ class VisualTests(unittest.TestCase):
         early=geometry(self.field,self.ring,self.config,1)
         self.assertTrue(early['smoke']['faces']);self.assertFalse(early['flame']['faces'])
         for t in (3,6,9,12):self.assertTrue(geometry(self.field,self.ring,self.config,t)['flame']['faces'])
+
+    def test_absolute_scenario_cut_and_measured_footprints(self):
+        from experiments.scenario_timeline import camera_at,scenario_report,script_text
+        c=json.loads((ROOT/'configs/experiments/room8_continuous_a_v04.json').read_text())
+        self.assertFalse(c['render_authorized'])
+        for t,expected in ((12,'v1_final'),(0,'low'),(4,'v1_final'),(3.999,'low'),(4,'v1_final')):
+            self.assertEqual(camera_at(c,t),expected)
+        report=scenario_report(c,self.field,self.ring,[0,0])
+        self.assertEqual(report['timeline']['seed_tall_growth_after_s'],4)
+        self.assertEqual(report['timeline']['seed_tall_growth_complete_s'],9)
+        for effect in ('flame','smoke','layer'):
+            areas=[s['regions'][effect]['area_m2'] for s in report['samples']]
+            self.assertEqual(areas,sorted(areas));self.assertTrue(all(0<=a<=4+1e-8 for a in areas))
+        for event in report['cell_events']:
+            self.assertAlmostEqual(event['flame_after_s']-event['smoke_after_s'],1.5)
+        self.assertFalse(report['rendered'])
+        self.assertIn('非实测层高',script_text(report))
+        self.assertIn('0秒无火烟',script_text(report))
+        c['scenario_timeline']['camera_cut_s']=15
+        with self.assertRaises(ValueError):camera_at(c,4)
+
+    def test_scenario_area_is_mesh_projection_not_cell_count(self):
+        from experiments.scenario_timeline import footprint
+        vertices=[(x,y,z) for z in (0,1) for x,y in ((0,0),(1,0),(1,1),(0,1))]
+        payload={'vertices':vertices,'faces':[(0,3,2,1),(4,5,6,7),(0,1,5,4),(1,2,6,5),(2,3,7,6),(3,0,4,7)]}
+        self.assertAlmostEqual(footprint(payload,[0,0],0)['area_m2'],1)
+
+    def test_r3_adapted_smoke_ground_spread_then_large_sustained_fire(self):
+        config=json.loads((ROOT/'configs/experiments/room8_continuous_a_v03.json').read_text())
+        self.assertFalse(config['render_authorized'])
+        self.assertTrue(geometry(self.field,self.ring,config,1)['smoke']['faces'])
+        self.assertFalse(geometry(self.field,self.ring,config,1)['flame']['faces'])
+        early=geometry(self.field,self.ring,config,3)['flame'];late=geometry(self.field,self.ring,config,9)['flame']
+        base=config['seed']['proposed_base_z_m']
+        self.assertLessEqual(max(p[2] for p in early['vertices'])-base,.225)
+        self.assertGreater(max(p[2] for p in late['vertices'])-base,1)
+        for t in (3,6,9,12):
+            state=geometry(self.field,self.ring,config,t)
+            self.assertEqual(state,geometry(self.field,self.ring,config,t))
+            for payload in state.values():
+                self.assertLessEqual(mesh_components(payload),1)
+                self.assertTrue(all(inside(p[:2],self.ring) and p[2]<=1.85 for p in payload['vertices']))
+        self.assertEqual(adaptation_state(config,12)['large_fraction'],1)
+        self.assertEqual(adaptation_state(config,12,arrival=9)['large_fraction'],0)
+
+    def test_r3_adaptation_is_pinned_and_does_not_change_art_parameters(self):
+        config=json.loads((ROOT/'configs/experiments/room8_continuous_a_v03.json').read_text())
+        expected=json.loads((ROOT/'configs/render/room_fire_round3.json').read_text())
+        self.assertEqual(adaptation_style(config),expected)
+        config['r3_adaptation']['style_sha256']='0'*64
+        with self.assertRaisesRegex(ValueError,'source differs'):geometry(self.field,self.ring,config,3)
+
+    def test_adapter_calls_original_r3_material_factory_and_keeps_controls(self):
+        import sys
+        from unittest.mock import MagicMock
+        from experiments.blender_visual import adapted_material
+        config=json.loads((ROOT/'configs/experiments/room8_continuous_a_v03.json').read_text())
+        material=MagicMock();controls={'density':object(),'emission':object()}
+        factory=MagicMock(return_value=(material,controls));module=MagicMock(volume_material=factory)
+        with patch.dict(sys.modules,{'render_engine.blender.F8_room_fire_style':module}):
+            result=adapted_material(MagicMock(),'test',config,'flame')
+        factory.assert_called_once();self.assertEqual(factory.call_args.args[2],adaptation_style(config))
+        self.assertIs(result[1],controls);material.node_tree.animation_data_clear.assert_called_once()
 
     def test_welded_closed_mesh_boundary_and_repeatability(self):
         a=geometry(self.field,self.ring,self.config,6);b=geometry(self.field,self.ring,self.config,6)
@@ -107,7 +170,7 @@ class VisualTests(unittest.TestCase):
 
     def test_adapters_import_without_bpy_and_compile(self):
         importlib.import_module('experiments.blender_visual');importlib.import_module('experiments.blender_worker')
-        for p in (ROOT/'experiments').glob('*.py'):compile(p.read_text(),str(p),'exec')
+        for p in (ROOT/'experiments').glob('*.py'):compile(p.read_text(encoding='utf-8'),str(p),'exec')
 
     def test_formal_v1_camera_requires_matching_actual_final_frames(self):
         # Synthetic provenance only; never represented as recovered Room8 evidence.

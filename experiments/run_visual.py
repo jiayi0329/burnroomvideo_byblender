@@ -121,8 +121,15 @@ def prepare(config_path,candidate_path,asset,points,output_root,reference=None,v
     elif config['camera']=='v1_final':
         if formal is None:raise ValueError('Formal V1 evidence required; R3 samples are not a substitute')
         camera_reference=formal['camera']
+    elif config['camera']=='scenario':
+        from experiments.scenario_timeline import validate_timeline
+        validate_timeline(config)
+        if formal is None:raise ValueError('Scenario requires formal V1 effective-camera evidence')
+        camera_reference=formal['camera']
     elif config['camera'] not in ('low','roof'):raise ValueError('Unknown camera')
-    view_audit=(camera_view_audit(config,seed,candidate['polygon_raw_xy'],candidate['geometry']['faces'])
+    audit_config=deepcopy(config)
+    if audit_config['camera']=='scenario':audit_config['camera']='low'
+    view_audit=(camera_view_audit(audit_config,seed,candidate['polygon_raw_xy'],candidate['geometry']['faces'])
                 if config.get('require_clear_view') is True else None)
     if any(output_root.is_relative_to(p) or p.is_relative_to(output_root) for p in (asset.parent,points.parent)):
         raise ValueError('Output root must be separate from all source scene data')
@@ -139,8 +146,13 @@ def prepare(config_path,candidate_path,asset,points,output_root,reference=None,v
         low=config['cameras']['low'];base=config['seed']['proposed_base_z_m']
         plan={'first':{'kind':'ignition_perspective','position':[seed[0]+low['offset'][0],seed[1]+low['offset'][1],base+low['offset'][2]],
                        'target':[seed[0],seed[1],base+low['target_height']],'lens':low['lens']},
-              'second':formal,'order':['first','second'],'transition_implemented':False,'rendered':False}
+              'second':formal,'order':['first','second'],'transition_implemented':config['camera']=='scenario','rendered':False}
         (run/'camera-plan.json').write_text(json.dumps(plan,indent=2),encoding='utf-8')
+    if config['camera']=='scenario':
+        from experiments.scenario_timeline import scenario_report,script_text
+        report=scenario_report(config,field,snapshot['polygon'],seed)
+        (run/'scenario-script.json').write_text(json.dumps(report,indent=2),encoding='utf-8')
+        (run/'scenario-script.txt').write_text(script_text(report),encoding='utf-8')
     # CPU-only evaluated geometry counts; no mesh/image files are fabricated.
     stats=[]
     for t in config['key_times_s']:
