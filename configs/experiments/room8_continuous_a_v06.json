@@ -1,0 +1,195 @@
+{
+  "schema_version": 1,
+  "experiment_id": "room8-conflagration-v06",
+  "scope": "independent_visual_experiment",
+  "render_authorized": false,
+  "scene_code": "KK-EEz16cmU14",
+  "room_id": "Room8",
+  "asset_version": "20261102T025550Z-7f677509",
+  "candidate_sha256": "5093a409ef38a278b70b1f342c5dc0da5876a3a039a5e761cc766a4821bfc2d0",
+  "seed": {
+    "historical_device": 22,
+    "raw_camera_xyz_m": [
+      -1.921281539568,
+      0.2455643766889,
+      -0.094068
+    ],
+    "scan_surface_z_m": -1.348491565339,
+    "proposed_surface_offset_m": 0.015,
+    "proposed_base_z_m": -1.333491565339,
+    "visual_clearance_approved": false
+  },
+  "polygon_source": "verified_candidate.polygon_raw_xy (load private evidence separately)",
+  "field": {
+    "spacing_m": 0.2,
+    "visual_speed_m_s": 0.35,
+    "neighborhood": 4,
+    "blocked_cells": [],
+    "domain_status": "boundary_only_candidate_not_approved_fuel_map"
+  },
+  "integration": {
+    "r3_launcher_compatible": false,
+    "production_api_enabled": false,
+    "b2_enabled": false
+  },
+  "camera": "scenario",
+  "exposure": -0.35,
+  "display_cut_z_m": -0.25,
+  "resolution": [
+    960,
+    540
+  ],
+  "fps": 12,
+  "key_times_s": [
+    3,
+    6,
+    9
+  ],
+  "visual": {
+    "smoke_lead_s": 1.0,
+    "rise_m_s": 1.5,
+    "layer_spread_m_s": 1.25,
+    "layer_thickness_m": 0.8,
+    "growth_s": 2.5,
+    "roof_z_m": 1.85,
+    "roof_mode": "outline",
+    "mode": "combined",
+    "seed": 731
+  },
+  "cameras": {
+    "low": {
+      "offset": [
+        4.8,
+        -2.6,
+        3.2
+      ],
+      "target_height": 1.25,
+      "lens": 24
+    },
+    "roof": {
+      "offset": [
+        4,
+        -6,
+        4.5
+      ],
+      "target_height": 2.8,
+      "lens": 28
+    }
+  },
+  "implementation_status": "connected_fire_body_and_black_smoke_cpu_only_not_visual_accepted",
+  "asset_binding": {
+    "manifest.json": "7027ba8e527d93e62ba9570434dfe27d13681c937aaa56b2e9b05881f4adf110",
+    "room.blend": "3123e1373296c866602f683a22c80d80d4ac1507cf4a86243ee44a4852f3bce1",
+    "room.glb": "519c4ee5a12e5e1177c0e9babcbe3c1444b8d95909bf3c9aaaef0e72ff740fd1",
+    "validation.json": "689aa506ceae13e1a26462c21416e4be6b42a9eaca2aeb2e46141aa9e228cd50",
+    "points.json": "32e8702cf959ce07caf29e0c45eb07d731766999020c77e7cb0078197188dbfe"
+  },
+  "require_clear_view": true,
+  "inspect_roof_outline": true,
+  "r3_adaptation": {
+    "style_sha256": "af9854a21f47e840c837b9299584d4d7d9fd74dfa4fac19251e91873369d4202"
+  },
+  "preview_background": {
+    "color": [
+      0.12,
+      0.14,
+      0.17,
+      1
+    ],
+    "strength": 0.6
+  },
+  "engineering_note": "Hypothetical roof at raw Z=1.85m; not measured room height. Continuous support is not a verified fuel map.",
+  "formal_v1_snapshot_sha256": "81b1b3498d9a0b02cda35ff0ac0b0149ad128a1d07c45188157505112c93a404",
+  "scenario_timeline": {
+    "duration_s": 12,
+    "camera_cut_s": 4,
+    "transition": "cut",
+    "report_times_s": [
+      0,
+      1,
+      1.5,
+      3,
+      4,
+      6,
+      9,
+      12
+    ],
+    "late_camera_s": 9
+  },
+  "accelerated_visual": {
+    "domain_kind": "explicit_hypothetical_room8_visual_support",
+    "domain_source": "verified_candidate.polygon_raw_xy; no claim of real combustible furniture",
+    "smoke_start_s": 0.5,
+    "front_distance_m": [
+      [
+        1.5,
+        0
+      ],
+      [
+        3,
+        0.65
+      ],
+      [
+        4,
+        1.8
+      ],
+      [
+        6,
+        4.8
+      ],
+      [
+        9,
+        10
+      ],
+      [
+        12,
+        13
+      ]
+    ],
+    "patch_spacing_m": 0.65,
+    "max_patches": 100
+  },
+  "experimental_quality": {
+    "render_samples": 64,
+    "volume_steps": 96,
+    "volume_tile_size": "2"
+  },
+  "comparison_mode": "D",
+  "camera_review": {
+    "late_camera_raw_z_m": 3.2,
+    "display_derivative": "copy of RoomSource clipped below raw Z=-0.25m, original unchanged"
+  },
+  "review_lighting": {
+    "smoke_rim_energy": 120
+  },
+  "conflagration": {
+    "start_s": 4,
+    "transition_s": 3,
+    "initial_height_m": 0.5,
+    "initial_scale_m": 0.32,
+    "surface_height_m": 0.22,
+    "body_height_m": 2.45,
+    "body_thickness_gain": 0.65,
+    "body_density": 2.4,
+    "body_emission": 7,
+    "minimum_visible_emission": 10,
+    "density_floor": 0.55,
+    "noise_scale": 2.1,
+    "noise_speed": 0.55,
+    "height_irregularity": 0.5,
+    "detail_count": 12,
+    "detail_size_variation": 0.45,
+    "smoke_scatter_density": 0.35,
+    "smoke_absorption_density": 3.2,
+    "smoke_color": [
+      0.012,
+      0.014,
+      0.018,
+      1
+    ],
+    "smoke_radius_gain": 1.25,
+    "layer_absorption_density": 2.6,
+    "light_volume_gain": 0.25,
+    "fire_light_energy": 65
+  }
+}

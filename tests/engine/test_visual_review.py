@@ -82,3 +82,14 @@ class VisualReviewTests(unittest.TestCase):
         old=[a-b for a,b in zip(camera['target'],camera['position'])];new=[a-b for a,b in zip(fitted['target'],fitted['position'])]
         self.assertTrue(all(abs(a-b)<1e-9 for a,b in zip(old,new)))
         self.assertEqual(adaptation_style(self.c)['art']['flame']['primary_tongues'],4)
+
+    def test_single_r3_tongue_and_plume_keep_original_generated_coordinates(self):
+        import sys
+        from unittest.mock import MagicMock,patch
+        from experiments.blender_visual import adapted_material
+        for kind,smoke in (('tongue',False),('plume',True)):
+            mat=MagicMock();factory=MagicMock(return_value=(mat,{}));module=MagicMock(volume_material=factory)
+            with patch.dict(sys.modules,{'render_engine.blender.F8_room_fire_style':module}):
+                adapted_material(MagicMock(),'test',self.c,kind)
+            self.assertEqual(factory.call_args.args[1],smoke)
+            mat.node_tree.nodes.new.assert_not_called()

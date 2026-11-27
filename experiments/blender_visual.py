@@ -67,10 +67,13 @@ def adapted_material(bpy,name,config,kind):
     material,controls=r3_material(name,smoke,style,0,round(12*config['fps'])+1)
     material.node_tree.animation_data_clear() # absolute evaluation replaces factory keyframes
     nodes=material.node_tree.nodes;links=material.node_tree.links
-    position=nodes.new('ShaderNodeNewGeometry');stretch=nodes.new('ShaderNodeVectorMath');stretch.operation='MULTIPLY'
     params=style['art']['smoke' if smoke else 'flame']
-    stretch.inputs[1].default_value=(1,1,params['stretch_z']);links.new(position.outputs['Position'],stretch.inputs[0])
-    flow=nodes['EffectFlow'];links.new(stretch.outputs[0],flow.inputs[0])
+    if 'accelerated_visual' in config and kind in ('tongue','plume'):
+        material['coordinate_style']='original_R3_generated_local'
+    else:
+        position=nodes.new('ShaderNodeNewGeometry');stretch=nodes.new('ShaderNodeVectorMath');stretch.operation='MULTIPLY'
+        stretch.inputs[1].default_value=(1,1,params['stretch_z']);links.new(position.outputs['Position'],stretch.inputs[0])
+        flow=nodes['EffectFlow'];links.new(stretch.outputs[0],flow.inputs[0])
     material['style_source']='frozen_R3_node_factory';material['adaptation']='continuous_envelope_absolute_time'
     if 'accelerated_visual' in config and kind in ('smoke','layer'):
         # The R3 radial mask is for ONE plume, not an entire horizontal smoke sheet.
@@ -109,6 +112,9 @@ def construct(snapshot):
         data.size=4;data.volume_factor=1;obj=bpy.data.objects.new(data.name,data);collection.objects.link(obj)
         obj.location=(center[0]-3,center[1]+2,config['visual']['roof_z_m']+1.5)
         obj.rotation_euler=(Vector((center[0],center[1],config['visual']['roof_z_m']-.5))-obj.location).to_track_quat('-Z','Y').to_euler()
+    if 'conflagration' in config:
+        for light in scene.objects:
+            if light.type=='LIGHT':light.data.volume_factor*=config['conflagration']['light_volume_gain']
     def object_mesh(name,payload,material=None):
         mesh=bpy.data.meshes.new(name);mesh.from_pydata(payload['vertices'],payload.get('edges',[]),payload['faces']);mesh.update()
         obj=bpy.data.objects.new(name,mesh);collection.objects.link(obj)
@@ -129,13 +135,18 @@ def construct(snapshot):
             output=nodes.new('ShaderNodeOutputMaterial');emission=nodes.new('ShaderNodeEmission')
             emission.inputs['Color'].default_value=(.18,.42,.65,1);emission.inputs['Strength'].default_value=.8
             outline.node_tree.links.new(emission.outputs[0],output.inputs['Surface']);curve.materials.append(outline)
-    kinds=('flame','smoke','layer','tongue','plume') if 'accelerated_visual' in config else ('flame','smoke','layer')
+    kinds=(('tongue','plume') if 'conflagration' in config else ('flame','smoke','layer','tongue','plume')) if 'accelerated_visual' in config else ('flame','smoke','layer')
     adapted={name:adapted_material(bpy,'A2_R3_'+name,config,name) for name in kinds} if 'r3_adaptation' in config else None
     materials=({name:item[0] for name,item in adapted.items()} if adapted else
                {name:volume_material(bpy,'A2_'+name,config,name=='flame') for name in ('flame','smoke','layer')})
+    continuous_materials=None
+    if 'conflagration' in config:
+        from experiments.conflagration_material import build_material,update_material
+        continuous_materials={name:build_material(bpy,'A2_CF_'+name,config,name) for name in ('flame','body','smoke','layer')}
+        materials.update({name:item[0] for name,item in continuous_materials.items()})
     # Ceiling density is independent and bounded, not a solid black cap.
     if not adapted:materials['layer'].node_tree.nodes['EffectDensity'].inputs[1].default_value=config['visual']['layer_density']
-    objects={name:object_mesh('A2_'+name,{'vertices':[],'faces':[]},materials[name]) for name in ('flame','smoke','layer')}
+    objects={name:object_mesh('A2_'+name,{'vertices':[],'faces':[]},materials[name]) for name in (('flame','body','smoke','layer') if continuous_materials else ('flame','smoke','layer'))}
     layout=None;patch_objects={}
     if 'accelerated_visual' in config:
         from experiments.visual_composition import patch_layout,composition
@@ -183,9 +194,10 @@ def construct(snapshot):
     light=bpy.data.objects.new(light_data.name,light_data);collection.objects.link(light)
     light.location=(*snapshot['seed_xy'],config['seed']['proposed_base_z_m']+.4)
     if adapted:
-        fire_style=adapted['flame'][2]
+        fire_style=adapted['tongue' if continuous_materials else 'flame'][2]
         light_data.shadow_soft_size=fire_style['light_radius'];light_data.use_custom_distance=True
         light_data.cutoff_distance=fire_style['light_distance'];light_data.volume_factor=fire_style['light_volume_factor']
+        if continuous_materials:light_data.volume_factor*=config['conflagration']['light_volume_gain']
     def apply(seconds):
         if scenario_cameras:
             from experiments.scenario_timeline import camera_at
@@ -205,7 +217,10 @@ def construct(snapshot):
         for name,obj in objects.items():
             mesh=obj.data;mesh.clear_geometry();mesh.from_pydata(payloads[name]['vertices'],[],payloads[name]['faces']);mesh.update()
             obj.hide_render=not bool(payloads[name]['faces'])
-            if adapted:
+            if continuous_materials:
+                material,controls=continuous_materials[name]
+                update_material(material,controls,config,name,seconds)
+            elif adapted:
                 mat,controls,params=adapted[name];state=adaptation_state(config,seconds)
                 mat.node_tree.nodes['EffectFlow'].inputs[1].default_value=(0,0,-seconds*params['flow_speed'])
                 mat.node_tree.nodes['EffectNoise'].inputs['W'].default_value=config['visual']['seed']+seconds*params['morph_speed']
@@ -222,11 +237,24 @@ def construct(snapshot):
                 mat,controls,params=adapted[kind]
                 mat.node_tree.nodes['EffectFlow'].inputs[1].default_value=(0,0,-seconds*params['flow_speed'])
                 mat.node_tree.nodes['EffectNoise'].inputs['W'].default_value=config['visual']['seed']+seconds*params['morph_speed']
-                controls['density'].default_value=params['density']*(1 if kind=='tongue' else config['accelerated_visual']['plume_density_gain'])
+                controls['density'].default_value=params['density']*(1 if kind=='tongue' or continuous_materials else config['accelerated_visual']['plume_density_gain'])
                 if kind=='tongue':controls['emission'].default_value=params['emission']*.8*(1+params['flicker_amplitude']*math.sin(seconds*params['flicker_hz']*2*math.pi))
-            adapted['flame'][1]['emission'].default_value*=.15
+                if continuous_materials:
+                    cf=config['conflagration']
+                    if kind=='tongue':
+                        controls['density'].default_value=cf['body_density']
+                        controls['emission'].default_value=max(cf['minimum_visible_emission'],controls['emission'].default_value)
+                    else:
+                        params_nodes=mat.node_tree.nodes;params_nodes['PrincipledEffect'].inputs['Color'].default_value=cf['smoke_color']
+                        colors=params_nodes['EffectColors'].color_ramp
+                        colors.elements[0].color=tuple(min(1,v*1.8+.012) for v in cf['smoke_color'][:3])+(1,)
+                        colors.elements[-1].color=cf['smoke_color']
+                        controls['density'].default_value=cf['smoke_scatter_density']
+                        params_nodes['SmokeAbsorptionRatio'].inputs[1].default_value=cf['smoke_absorption_density']/cf['smoke_scatter_density']
+            if not continuous_materials:adapted['flame'][1]['emission'].default_value*=.15
         if adapted:
             light_data.energy=fire_style['light_energy']*adaptation_state(config,seconds)['ground_fraction'] if config['visual']['mode'] in ('combined','flame') else 0
+            if continuous_materials:light_data.energy=config['conflagration']['fire_light_energy']*adaptation_state(config,seconds)['ground_fraction'] if config['visual']['mode'] in ('combined','flame') else 0
         else:light_data.energy=(config['visual']['light_energy']*min(1,max(0,seconds-config['visual']['smoke_lead_s'])/2) if config['visual']['mode']=='combined' else 0)
     def frame_change(current,*args):apply((current.frame_current-1)/current.render.fps)
     bpy.app.handlers.frame_change_pre.append(frame_change)

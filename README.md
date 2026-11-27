@@ -93,10 +93,10 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 
 下面逐项列出本次整理后可提交的文件（含待提交文档），不包含Git内部目录、被忽略数据/缓存和本地工具环境。后续新增/删除文件应同步本表；归档原文只供追溯。目录README只维护专项边界，不重复本总表。
 
-清单共 **237** 个文件。
+清单共 **247** 个文件。
 
 <details>
-<summary>experiments：独立视觉实验（7份，不在生产R3保护清单/部署包）</summary>
+<summary>experiments：独立视觉实验（11份，不在生产R3保护清单/部署包）</summary>
 
 | 文件路径 | 用途 | 属性/运行环境 |
 | --- | --- | --- |
@@ -104,6 +104,10 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 | [experiments/continuous_field.py](experiments/continuous_field.py) | 单源四邻域到达时间、凹边界/障碍、未来火烟状态接口 | CPU离线，不能渲染 |
 | [experiments/visual_state.py](experiments/visual_state.py) | 连续时间裁切/房间裁切、焊接闭合火烟及屋顶层几何 | CPU，无CFD |
 | [experiments/scenario_timeline.py](experiments/scenario_timeline.py) | 绝对时间分镜、火烟单元事件及几何覆盖面积报告 | CPU，非物理预测 |
+| [experiments/visual_composition.py](experiments/visual_composition.py) | 连续支持上的不规则R3火舌簇、卷曲烟柱及活动边界适配 | CPU，视觉待实测 |
+| [experiments/visual_review.py](experiments/visual_review.py) | A—E对照配置与正交构图拟合 | CPU，不授权渲染 |
+| [experiments/conflagration.py](experiments/conflagration.py) | 连续大火主体高度场、平滑阶段及稀疏表面细节 | CPU，视觉待实测 |
+| [experiments/conflagration_material.py](experiments/conflagration_material.py) | 共享空间火体、消光主导黑烟与逐时材质检查 | Blender专用，尚未GPU验收 |
 | [experiments/blender_visual.py](experiments/blender_visual.py) | 独立Blender集合、材质/屋顶/相机和绝对时间适配 | 尚未Blender视觉验收 |
 | [experiments/run_visual.py](experiments/run_visual.py) | 默认CPU计划；后续独立批准后复用GPU锁的关键帧入口 | 不接生产API |
 | [experiments/blender_worker.py](experiments/blender_worker.py) | 继承锁与指纹/NVIDIA检查的独立关键帧worker | 禁止直接绕过启动器 |
@@ -265,7 +269,7 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 </details>
 
 <details>
-<summary>configs：公共预设与实验配置（8份）</summary>
+<summary>configs：公共预设与实验配置（10份）</summary>
 
 | 文件路径 | 用途 | 属性/运行环境 |
 | --- | --- | --- |
@@ -273,6 +277,8 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 | [configs/experiments/room8_continuous_a_v02.json](configs/experiments/room8_continuous_a_v02.json) | 火烟/烟层/屋顶、三种模式、实验机位和冻结输入绑定 | 渲染授权关闭 |
 | [configs/experiments/room8_continuous_a_v03.json](configs/experiments/room8_continuous_a_v03.json) | 冻结R3材质节点适配、先烟/低位蔓延/持续大火阶段、独立背景对照 | 仅离线验证，渲染授权关闭 |
 | [configs/experiments/room8_continuous_a_v04.json](configs/experiments/room8_continuous_a_v04.json) | 12秒假设情景脚本、4秒切正式V1总览、阶段及范围计算 | 仅离线验证，渲染授权关闭 |
+| [configs/experiments/room8_continuous_a_v05.json](configs/experiments/room8_continuous_a_v05.json) | 加速假设传播、实际R3火舌/烟柱、三机位；已完成独立获批D模式四帧 | 整体视觉未通过，默认授权关闭 |
+| [configs/experiments/room8_continuous_a_v06.json](configs/experiments/room8_continuous_a_v06.json) | 独立连续大火体、初期可见强度、稀疏细节与黑烟消光控制 | 未渲染，授权关闭 |
 | [configs/render/README.md](configs/render/README.md) | 三份公共预设的用途、当前默认与批准指纹约束 | 文档/约束 |
 | [configs/render/room_fire_round1.json](configs/render/room_fire_round1.json) | 第一轮风格配置，历史对比/回归，非默认 | 配置/规则 |
 | [configs/render/room_fire_round2.json](configs/render/room_fire_round2.json) | 第二轮尺寸/厚度/烟柱配置，历史回归，非默认 | 配置/规则 |
@@ -302,12 +308,14 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 </details>
 
 <details>
-<summary>tests：测试（52份）</summary>
+<summary>tests：测试（54份）</summary>
 
 | 文件路径 | 用途 | 属性/运行环境 |
 | --- | --- | --- |
 | [tests/engine/test_continuous_field.py](tests/engine/test_continuous_field.py) | 单源/四邻域/凹边界/不可达/确定性/时序/日志/离线配置回归 | 不运行Blender/GPU |
 | [tests/engine/test_continuous_visual.py](tests/engine/test_continuous_visual.py) | 包络闭合/边界/时序/屋顶模式、独立计划/指纹/授权/日志回归 | 不启动Blender |
+| [tests/engine/test_visual_review.py](tests/engine/test_visual_review.py) | 加速单源、R3真实网格、活动边界、三镜头及A—E对照隔离 | CPU，不代表视觉验收 |
+| [tests/engine/test_conflagration.py](tests/engine/test_conflagration.py) | 连续主体独立性、平滑过渡、参数作用及黑烟模拟节点连接 | 离线，不代表视觉验收 |
 | [tests/README.md](tests/README.md) | 当前分组回归命令、测试约定、依赖和真实集成开关 | 文档/约束 |
 | [tests/__init__.py](tests/__init__.py) | Python包初始化/职责边界；不自动启动服务、连库或渲染 | 包/测试组登记 |
 | [tests/backend/__init__.py](tests/backend/__init__.py) | 登记该职责组的离线模块清单，供tests/suites.py汇总 | 包/测试组登记 |
@@ -377,7 +385,7 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 </details>
 
 <details>
-<summary>docs：当前规范与指南（14份）</summary>
+<summary>docs：当前规范与指南（16份）</summary>
 
 | 文件路径 | 用途 | 属性/运行环境 |
 | --- | --- | --- |
@@ -390,6 +398,8 @@ main合并、标签、部署和真实数据写入不自动执行。当前源码�
 | [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) | 已完成/部分完成/待实施、限制及后续门禁，不追加每轮代码流水账 | 文档/约束 |
 | [docs/README.md](docs/README.md) | 当前需求、架构、状态、指南与归档的阅读索引 | 文档/约束 |
 | [docs/RELEASES.md](docs/RELEASES.md) | Room8 V1固定资产/任务/配置/视频/性能/缺失项；原运行路径保持历史含义 | 文档/约束 |
+| [docs/rendering/continuous_visual_review.md](docs/rendering/continuous_visual_review.md) | A2三帧根因、V04/V05参数、允许视觉域、对照及四帧审核边界 | 视觉未验收，不授权GPU |
+| [docs/rendering/conflagration_review.md](docs/rendering/conflagration_review.md) | V06连续大火专项根因、参数连接、离线范围与后续五帧候选 | 尚无V06图片，不授权GPU |
 | [docs/database.md](docs/database.md) | PostgreSQL当前路径、真实导入前备份/预览/人工关系/幂等与恢复计划 | 文档/约束 |
 | [docs/rendering/animation.md](docs/rendering/animation.md) | 完整代码包、overview动画、GPU证据、逐帧观察、视频验收及续跑 | 文档/约束 |
 | [docs/rendering/room_assets.md](docs/rendering/room_assets.md) | 核验→面级裁切→基础blend/GLB→展示检查及平层近似边界 | 文档/约束 |

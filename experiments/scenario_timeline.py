@@ -38,7 +38,10 @@ def footprint(payload,seed,base):
 @traced('room.continuous.scenario','evaluate_script')
 def scenario_report(config,field,polygon,seed):
     script=validate_timeline(config);base=config['seed']['proposed_base_z_m'];roof=config['visual']['roof_z_m']
-    delay=config['visual']['smoke_lead_s'];ground=config['r3_adaptation']['ground_duration_s'];large=config['r3_adaptation']['large_growth_s']
+    delay=config['visual']['smoke_lead_s']
+    cf=config.get('conflagration')
+    ground=(cf['start_s']-min(field.arrival_s.values())-delay) if cf else config['r3_adaptation']['ground_duration_s']
+    large=cf['transition_s'] if cf else config['r3_adaptation']['large_growth_s']
     samples=[]
     from experiments.visual_state import envelope
     complete=envelope(field,polygon,max(field.arrival_s.values())+1,lambda p:base,lambda p:base+.1)
@@ -60,7 +63,8 @@ def scenario_report(config,field,polygon,seed):
                 'not_visible_pixel_coverage':True}
         samples.append(sample)
     events=[{'cell':list(cell),'raw_xy_m':field.xy(cell),'smoke_after_s':arrival,'flame_after_s':arrival+delay,
-             'tall_growth_after_s':arrival+delay+ground,'tall_growth_complete_s':arrival+delay+ground+large}
+             'tall_growth_after_s':max(arrival+delay,cf['start_s']) if cf else arrival+delay+ground,
+             'tall_growth_complete_s':max(arrival+delay+.6,cf['start_s']+large) if cf else arrival+delay+ground+large}
             for cell,arrival in sorted(field.arrival_s.items(),key=lambda v:(v[1],v[0]))]
     return {'rendered':False,'units':'raw scan XYZ metres, absolute seconds','not_physical_prediction':True,
             'domain':'Room8 boundary-constrained visual support, not verified fuel',

@@ -89,7 +89,7 @@
   "inspect_roof_outline": true,
   "r3_adaptation": {
     "style_sha256": "af9854a21f47e840c837b9299584d4d7d9fd74dfa4fac19251e91873369d4202",
-    "ground_height_m": 0.65,
+    "ground_height_m": 0.16,
     "ground_duration_s": 1.0,
     "large_growth_s": 3.0,
     "smoke_density_gain": 0.1,
@@ -170,7 +170,6 @@
   "comparison_mode": "D",
   "camera_review": {
     "late_camera_raw_z_m": 3.2,
-    "orthographic_fit_margin": 0.07,
     "display_derivative": "copy of RoomSource clipped below raw Z=-0.25m, original unchanged"
   },
   "review_lighting": {

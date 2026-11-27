@@ -25,7 +25,9 @@ def adaptation_state(config,seconds,arrival=None):
     if arrival is None:arrival=config.get('accelerated_visual',{}).get('smoke_start_s',0)
     a=config['r3_adaptation'];age=seconds-config['visual']['smoke_lead_s']-arrival
     smooth=lambda x:(lambda v:v*v*(3-2*v))(min(1,max(0,x)))
-    large=smooth((age-a['ground_duration_s'])/a['large_growth_s'])
+    if 'conflagration' in config:
+        p=config['conflagration'];large=smooth((seconds-p['start_s'])/p['transition_s'])*smooth(age/.6)
+    else:large=smooth((age-a['ground_duration_s'])/a['large_growth_s'])
     return {'fire':age>0,'local_fire_age_s':age,'large_fraction':large,
             'ground_fraction':smooth(age/.5),
             'smoke_fraction':min(1,max(0,(seconds-arrival)/config['visual']['growth_s']))}
@@ -149,9 +151,13 @@ def validate(config):
         if len(b['color'])!=4 or any(not 0<=finite(v)<=1 for v in b['color']) or not 0<=finite(b['strength'])<=2:raise ValueError('Invalid preview background')
     if 'r3_adaptation' in config:
         a=config['r3_adaptation'];style=adaptation_style(config)
-        for name in ('ground_height_m','ground_duration_s','large_growth_s','smoke_density_gain','layer_density_gain'):
-            if not 0<finite(a[name])<=10:raise ValueError('Invalid R3 adaptation control')
-        if a['ground_height_m']>=style['art']['flame']['primary_height']:raise ValueError('Low fire must precede tall fire')
+        if 'conflagration' not in config:
+            for name in ('ground_height_m','ground_duration_s','large_growth_s','smoke_density_gain','layer_density_gain'):
+                if not 0<finite(a[name])<=10:raise ValueError('Invalid R3 adaptation control')
+            if a['ground_height_m']>=style['art']['flame']['primary_height']:raise ValueError('Low fire must precede tall fire')
+    if 'conflagration' in config:
+        from experiments.conflagration import validate_controls
+        validate_controls(config)
     return base,roof
 
 
@@ -221,6 +227,7 @@ def geometry(field, ring, config, seconds):
     base,roof=validate(config);e=config['visual'];delay=e['smoke_lead_s']
     empty=lambda:{'vertices':[],'faces':[]}
     result={'flame':empty(),'smoke':empty(),'layer':empty()}
+    if 'conflagration' in config:result['body']=empty()
     if e['mode']=='none':return result
     def growth(age):return min(1.,max(0.,age)/e['growth_s'])
     def flame_top(p):
@@ -244,7 +251,9 @@ def geometry(field, ring, config, seconds):
             age=max(0,t-p[2]);curl=.85+.15*math.sin(p[0]*3+p[1]*2+t*s['morph_speed'])
             return min(roof-.005,base+.005+e['rise_m_s']*age*curl)
     if 'accelerated_visual' in config:
-        def flame_top(p):return base+.004+.16*adaptation_state(config,t,p[2])['ground_fraction']
+        def flame_top(p):return base+.004+config['r3_adaptation']['ground_height_m']*adaptation_state(config,t,p[2])['ground_fraction']
+    if 'conflagration' in config:
+        def flame_top(p):return base+.004+config['conflagration']['surface_height_m']*adaptation_state(config,t,p[2])['ground_fraction']
     if e['mode'] in ('combined','flame'):
         result['flame']=envelope(field,ring,t-delay,lambda p:base,flame_top)
     result['smoke']=envelope(field,ring,t,lambda p:base+.002,smoke_top)
@@ -257,6 +266,9 @@ def geometry(field, ring, config, seconds):
     layer_field=type(field)(field.origin,field.spacing_m,field.allowed,layer_times,field.parent)
     result['layer']=envelope(layer_field,ring,t,
                             lambda p:roof-.005-.003-e['layer_thickness_m']*growth(t-p[2]),lambda p:roof-.005)
+    if 'conflagration' in config:
+        from experiments.conflagration import body_mesh
+        result['body']=body_mesh(field,ring,config,t) if e['mode'] in ('combined','flame') else empty()
     for payload in result.values():
         if mesh_components(payload)>1:raise ValueError('Disconnected visual shell; refine domain/grid before rendering')
     if e['mode']=='flame':result['smoke']=empty();result['layer']=empty()
