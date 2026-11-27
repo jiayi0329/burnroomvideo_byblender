@@ -52,6 +52,7 @@ class ArrivalField:
     allowed: frozenset[Cell]
     arrival_s: dict[Cell, float]
     parent: dict[Cell, Cell]
+    distance_m: dict[Cell,float] | None = None
 
     def xy(self, cell):
         return (self.origin[0]+cell[0]*self.spacing_m, self.origin[1]+cell[1]*self.spacing_m)
@@ -102,6 +103,7 @@ def build_field(polygon, seed_xy, spacing_m=0.2, speed_m_s=0.35, blocked=()):
     return ArrivalField(seed,spacing,allowed,times,parent)
 
 
+@traced('room.continuous.experiment','configured_arrival_field')
 def field_from_config(config, polygon, seed_xy):
     """Caller supplies fingerprint-verified geometry, not a hardcoded room outline.
 
@@ -112,8 +114,22 @@ def field_from_config(config, polygon, seed_xy):
         raise ValueError('Offline experiment configuration required')
     controls=config['field']
     if controls['neighborhood']!=4:raise ValueError('Only four-neighbor propagation supported')
-    return build_field(polygon,seed_xy,controls['spacing_m'],controls['visual_speed_m_s'],
-                       blocked=[tuple(c) for c in controls['blocked_cells']])
+    field=build_field(polygon,seed_xy,controls['spacing_m'],controls['visual_speed_m_s'],
+                      blocked=[tuple(c) for c in controls['blocked_cells']])
+    if 'accelerated_visual' in config:
+        a=config['accelerated_visual'];curve=a['front_distance_m'];lead=finite(config['visual']['smoke_lead_s'])
+        if a['domain_kind']!='explicit_hypothetical_room8_visual_support':raise ValueError('Explicit visual domain required')
+        if len(curve)<2 or curve[0][1]!=0 or curve[0][0]<lead:raise ValueError('Invalid accelerated front origin')
+        if abs(curve[0][0]-lead-finite(a['smoke_start_s']))>1e-9:raise ValueError('Seed smoke time differs from front schedule')
+        if any(not 0<=finite(t)<=60 or finite(d)<0 for t,d in curve):raise ValueError('Invalid front curve')
+        if any(b[0]<=c[0] or b[1]<=c[1] for c,b in zip(curve,curve[1:])):raise ValueError('Front curve must increase')
+        def inverse(distance):
+            if distance>curve[-1][1]:return curve[-1][0]+(distance-curve[-1][1])/(curve[-1][1]-curve[-2][1])*(curve[-1][0]-curve[-2][0])
+            for left,right in zip(curve,curve[1:]):
+                if distance<=right[1]:return left[0]+(right[0]-left[0])*(distance-left[1])/(right[1]-left[1])
+        times={c:inverse(t*controls['visual_speed_m_s'])-lead for c,t in field.arrival_s.items()}
+        field=ArrivalField(field.origin,field.spacing_m,field.allowed,times,field.parent,{c:t*controls['visual_speed_m_s'] for c,t in field.arrival_s.items()})
+    return field
 
 
 def states(field, seconds, flame_delay_s=1.5):

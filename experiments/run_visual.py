@@ -140,6 +140,10 @@ def prepare(config_path,candidate_path,asset,points,output_root,reference=None,v
               'guards':guards,'output':str(run),'reachable_cells':len(field.arrival_s),'unreachable_cells':len(field.unreachable),'scope':'independent_visual_experiment_not_r3_task',
               'seed_audit':{'nearest_surface_z_m':hits[-1],'neighborhood':neighborhood,'visual_collision_clearance_confirmed':False},'view_audit':view_audit}
     snapshot['r3_style']['quality']['resolution']=config['resolution'];snapshot['r3_style']['quality']['fps']=config['fps']
+    if 'experimental_quality' in config:
+        q=config['experimental_quality']
+        if set(q)!={'render_samples','volume_steps','volume_tile_size'} or q['render_samples'] not in (32,64) or q['volume_steps'] not in (48,96) or q['volume_tile_size'] not in ('2','4'):raise ValueError('Invalid experimental quality budget')
+        snapshot['r3_style']['quality'].update(q)
     snapshot['signature']=fingerprint(snapshot)
     (run/'snapshot.json').write_text(json.dumps(snapshot,indent=2),encoding='utf-8')
     if formal:
@@ -147,6 +151,14 @@ def prepare(config_path,candidate_path,asset,points,output_root,reference=None,v
         plan={'first':{'kind':'ignition_perspective','position':[seed[0]+low['offset'][0],seed[1]+low['offset'][1],base+low['offset'][2]],
                        'target':[seed[0],seed[1],base+low['target_height']],'lens':low['lens']},
               'second':formal,'order':['first','second'],'transition_implemented':config['camera']=='scenario','rendered':False}
+        if 'camera_review' in config:
+            from experiments.visual_review import fit_overview
+            ref=formal['camera'];late=deepcopy(ref);late['position'][2]=config['camera_review']['late_camera_raw_z_m']
+            aspect=config['resolution'][0]/config['resolution'][1]
+            plan['original_formal_v1']=formal
+            plan['second']={'kind':'experimental_reframed_v1','camera':fit_overview(ref,snapshot['polygon'],base,config['visual']['roof_z_m'],aspect)}
+            plan['third']={'kind':'experimental_smoke_side','camera':fit_overview(late,snapshot['polygon'],base,config['visual']['roof_z_m'],aspect)}
+            plan['order']=['first','second','third'];plan['actual_blender_validation']=False
         (run/'camera-plan.json').write_text(json.dumps(plan,indent=2),encoding='utf-8')
     if config['camera']=='scenario':
         from experiments.scenario_timeline import scenario_report,script_text

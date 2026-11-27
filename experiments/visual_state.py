@@ -20,8 +20,9 @@ def adaptation_style(config):
     return json.loads(path.read_text(encoding='utf-8'))
 
 
-def adaptation_state(config,seconds,arrival=0):
+def adaptation_state(config,seconds,arrival=None):
     """Absolute local age: smoke first, low advancing fire, then sustained tall fire."""
+    if arrival is None:arrival=config.get('accelerated_visual',{}).get('smoke_start_s',0)
     a=config['r3_adaptation'];age=seconds-config['visual']['smoke_lead_s']-arrival
     smooth=lambda x:(lambda v:v*v*(3-2*v))(min(1,max(0,x)))
     large=smooth((age-a['ground_duration_s'])/a['large_growth_s'])
@@ -132,7 +133,7 @@ def validate(config):
         if not 0<finite(e[key])<=100:raise ValueError('Invalid visual control')
     if roof-base<.3 or e['layer_thickness_m']>=roof-base:raise ValueError('Invalid roof clearance')
     if e['roof_mode'] not in ('full','cutaway','outline'):raise ValueError('Invalid roof mode')
-    if e['mode'] not in ('none','smoke','combined'):raise ValueError('Invalid comparison mode')
+    if e['mode'] not in ('none','smoke','combined','flame'):raise ValueError('Invalid comparison mode')
     if 'r3_adaptation' not in config:
         if any(not 0<=finite(v)<=1 for v in e['smoke_color']) or len(e['smoke_color'])!=4:raise ValueError('Invalid smoke color')
         for key in ('flame_density','emission','light_energy','morph_hz'):
@@ -242,18 +243,23 @@ def geometry(field, ring, config, seconds):
         def smoke_top(p):
             age=max(0,t-p[2]);curl=.85+.15*math.sin(p[0]*3+p[1]*2+t*s['morph_speed'])
             return min(roof-.005,base+.005+e['rise_m_s']*age*curl)
-    if e['mode']=='combined':
+    if 'accelerated_visual' in config:
+        def flame_top(p):return base+.004+.16*adaptation_state(config,t,p[2])['ground_fraction']
+    if e['mode'] in ('combined','flame'):
         result['flame']=envelope(field,ring,t-delay,lambda p:base,flame_top)
     result['smoke']=envelope(field,ring,t,lambda p:base+.002,smoke_top)
-    ceiling_delay=(roof-base)/(e['rise_m_s']*(.85 if 'r3_adaptation' in config else 1))
+    ceiling_delay=(roof-base)/(e['rise_m_s']*(.85 if 'r3_adaptation' in config else 1))+config.get('accelerated_visual',{}).get('smoke_start_s',0)
     scale=config['field']['visual_speed_m_s']/e['layer_spread_m_s']
+    start=config.get('accelerated_visual',{}).get('smoke_start_s',0)
     # Re-express the common geodesic arrival field at the ceiling spread speed.
-    layer_field=type(field)(field.origin,field.spacing_m,field.allowed,
-                           {c:ceiling_delay+a*scale for c,a in field.arrival_s.items()},field.parent)
+    layer_times=({c:ceiling_delay+d/e['layer_spread_m_s'] for c,d in field.distance_m.items()} if field.distance_m is not None else
+                 {c:ceiling_delay+(a-start)*scale for c,a in field.arrival_s.items()})
+    layer_field=type(field)(field.origin,field.spacing_m,field.allowed,layer_times,field.parent)
     result['layer']=envelope(layer_field,ring,t,
                             lambda p:roof-.005-.003-e['layer_thickness_m']*growth(t-p[2]),lambda p:roof-.005)
     for payload in result.values():
         if mesh_components(payload)>1:raise ValueError('Disconnected visual shell; refine domain/grid before rendering')
+    if e['mode']=='flame':result['smoke']=empty();result['layer']=empty()
     return result
 
 

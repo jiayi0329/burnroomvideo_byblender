@@ -28,8 +28,9 @@ def main():
         if 'r3_adaptation' in snapshot['config']:
             from render_engine.blender.F8_room_fire_style import material_settings
             materials=[m for m in bpy.data.materials if m.name.startswith('A2_R3_')]
-            if len(materials)!=3:raise ValueError('Expected three adapted R3 materials')
-            (out/'adapted-material-settings.json').write_text(json.dumps([material_settings(m) for m in materials],indent=2))
+            if len(materials)!=(5 if 'accelerated_visual' in snapshot['config'] else 3):raise ValueError('Unexpected adapted R3 material count')
+            (out/'adapted-material-settings.json').write_text(json.dumps([dict(material_settings(m),
+                experiment_bulk_mask=m.get('bulk_mask'),volume_output_connected=any(n.inputs['Volume'].is_linked for n in m.node_tree.nodes if n.bl_idname=='ShaderNodeOutputMaterial')) for m in materials],indent=2))
         if snapshot['config'].get('require_clear_view'):
             audit=json.loads(scene['a2_camera_audit_json'])
             if audit.get('actual_blender_view_checked') is not True:raise ValueError('Actual Blender visibility gate missing')
@@ -47,6 +48,7 @@ def main():
             if snapshot['config']['camera']=='scenario':
                 from render_engine.blender.F8_room_animation import camera_parameters
                 record['effective_camera']=camera_parameters(scene.camera)
+            if 'accelerated_visual' in snapshot['config']:record['composition']=json.loads(scene['a2_composition_json'])
             if 'r3_adaptation' in snapshot['config']:
                 record['material_controls']=[{'name':m.name,'density':m.node_tree.nodes['DensityEnvelope'].outputs[0].default_value,
                     'emission':m.node_tree.nodes['EmissionEnvelope'].outputs[0].default_value if m.node_tree.nodes.get('EmissionEnvelope') else 0} for m in materials]

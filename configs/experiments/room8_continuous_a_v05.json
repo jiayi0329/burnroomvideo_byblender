@@ -1,0 +1,179 @@
+{
+  "schema_version": 1,
+  "experiment_id": "room8-visual-review-v05",
+  "scope": "independent_visual_experiment",
+  "render_authorized": false,
+  "scene_code": "KK-EEz16cmU14",
+  "room_id": "Room8",
+  "asset_version": "20261102T025550Z-7f677509",
+  "candidate_sha256": "5093a409ef38a278b70b1f342c5dc0da5876a3a039a5e761cc766a4821bfc2d0",
+  "seed": {
+    "historical_device": 22,
+    "raw_camera_xyz_m": [
+      -1.921281539568,
+      0.2455643766889,
+      -0.094068
+    ],
+    "scan_surface_z_m": -1.348491565339,
+    "proposed_surface_offset_m": 0.015,
+    "proposed_base_z_m": -1.333491565339,
+    "visual_clearance_approved": false
+  },
+  "polygon_source": "verified_candidate.polygon_raw_xy (load private evidence separately)",
+  "field": {
+    "spacing_m": 0.2,
+    "visual_speed_m_s": 0.35,
+    "neighborhood": 4,
+    "blocked_cells": [],
+    "domain_status": "boundary_only_candidate_not_approved_fuel_map"
+  },
+  "integration": {
+    "r3_launcher_compatible": false,
+    "production_api_enabled": false,
+    "b2_enabled": false
+  },
+  "camera": "scenario",
+  "exposure": -0.35,
+  "display_cut_z_m": -0.25,
+  "resolution": [
+    960,
+    540
+  ],
+  "fps": 12,
+  "key_times_s": [
+    3.9166666666666665,
+    4,
+    6,
+    9
+  ],
+  "visual": {
+    "smoke_lead_s": 1.0,
+    "rise_m_s": 1.5,
+    "layer_spread_m_s": 1.25,
+    "layer_thickness_m": 0.65,
+    "growth_s": 2.5,
+    "roof_z_m": 1.85,
+    "roof_mode": "outline",
+    "mode": "combined",
+    "seed": 731
+  },
+  "cameras": {
+    "low": {
+      "offset": [
+        4.8,
+        -2.6,
+        3.2
+      ],
+      "target_height": 1.25,
+      "lens": 24
+    },
+    "roof": {
+      "offset": [
+        4,
+        -6,
+        4.5
+      ],
+      "target_height": 2.8,
+      "lens": 28
+    }
+  },
+  "implementation_status": "v05_cpu_only_visual_not_accepted",
+  "asset_binding": {
+    "manifest.json": "7027ba8e527d93e62ba9570434dfe27d13681c937aaa56b2e9b05881f4adf110",
+    "room.blend": "3123e1373296c866602f683a22c80d80d4ac1507cf4a86243ee44a4852f3bce1",
+    "room.glb": "519c4ee5a12e5e1177c0e9babcbe3c1444b8d95909bf3c9aaaef0e72ff740fd1",
+    "validation.json": "689aa506ceae13e1a26462c21416e4be6b42a9eaca2aeb2e46141aa9e228cd50",
+    "points.json": "32e8702cf959ce07caf29e0c45eb07d731766999020c77e7cb0078197188dbfe"
+  },
+  "require_clear_view": true,
+  "inspect_roof_outline": true,
+  "r3_adaptation": {
+    "style_sha256": "af9854a21f47e840c837b9299584d4d7d9fd74dfa4fac19251e91873369d4202",
+    "ground_height_m": 0.65,
+    "ground_duration_s": 1.0,
+    "large_growth_s": 3.0,
+    "smoke_density_gain": 0.1,
+    "layer_density_gain": 0.22,
+    "parameter_source": "Frozen R3 art.flame and art.smoke; only density gains and staged heights overridden here"
+  },
+  "preview_background": {
+    "color": [
+      0.12,
+      0.14,
+      0.17,
+      1
+    ],
+    "strength": 0.6
+  },
+  "engineering_note": "Hypothetical roof at raw Z=1.85m; not measured room height. Continuous support is not a verified fuel map.",
+  "formal_v1_snapshot_sha256": "81b1b3498d9a0b02cda35ff0ac0b0149ad128a1d07c45188157505112c93a404",
+  "scenario_timeline": {
+    "duration_s": 12,
+    "camera_cut_s": 4,
+    "transition": "cut",
+    "report_times_s": [
+      0,
+      0.5,
+      1,
+      1.5,
+      2,
+      3,
+      4,
+      6,
+      9,
+      12
+    ],
+    "late_camera_s": 9
+  },
+  "accelerated_visual": {
+    "domain_kind": "explicit_hypothetical_room8_visual_support",
+    "domain_source": "verified_candidate.polygon_raw_xy; no claim of real combustible furniture",
+    "smoke_start_s": 0.5,
+    "front_distance_m": [
+      [
+        1.5,
+        0
+      ],
+      [
+        3,
+        0.65
+      ],
+      [
+        4,
+        1.8
+      ],
+      [
+        6,
+        4.8
+      ],
+      [
+        9,
+        10
+      ],
+      [
+        12,
+        13
+      ]
+    ],
+    "patch_spacing_m": 0.65,
+    "max_patches": 100,
+    "early_tongue_height_m": 0.8,
+    "tongue_width_gain": 1.25,
+    "plume_density_gain": 0.4,
+    "coverage_target_at_9_s": 0.8
+  },
+  "experimental_quality": {
+    "render_samples": 64,
+    "volume_steps": 96,
+    "volume_tile_size": "2"
+  },
+  "comparison_mode": "D",
+  "camera_review": {
+    "late_camera_raw_z_m": 3.2,
+    "orthographic_fit_margin": 0.07,
+    "display_derivative": "copy of RoomSource clipped below raw Z=-0.25m, original unchanged"
+  },
+  "review_lighting": {
+    "smoke_rim_energy": 450
+  }
+}
